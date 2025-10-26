@@ -112,10 +112,23 @@ std::unique_ptr<ASTNode> Parser::exponent() {
     return primary();
 }
 
-// primary → NUMBER | '(' expression ')'
+// primary → NUMBER | IDENTIFIER ('(' args ')')? | '(' expression ')'
 std::unique_ptr<ASTNode> Parser::primary() {
     if (match(TokenType::NUMBER)) {
         return std::make_unique<NumberNode>(previous().value);
+    }
+
+    // Handle identifiers (constants or function calls)
+    if (match(TokenType::IDENTIFIER)) {
+        std::string name = previous().lexeme;
+
+        // Check if it's a function call
+        if (check(TokenType::LPAREN)) {
+            return parseFunctionCall(name);
+        }
+
+        // Otherwise, it's a constant
+        return parseConstant(name);
     }
 
     if (match(TokenType::LPAREN)) {
@@ -125,6 +138,32 @@ std::unique_ptr<ASTNode> Parser::primary() {
     }
 
     throw std::runtime_error("Expected expression");
+}
+
+// Parse function call: name '(' args ')'
+std::unique_ptr<ASTNode> Parser::parseFunctionCall(const std::string& name) {
+    consume(TokenType::LPAREN, "Expected '(' after function name");
+
+    std::vector<std::unique_ptr<ASTNode>> args;
+
+    // Parse arguments (if any)
+    if (!check(TokenType::RPAREN)) {
+        do {
+            args.push_back(expression());
+        } while (match(TokenType::COMMA));
+    }
+
+    consume(TokenType::RPAREN, "Expected ')' after arguments");
+
+    return std::make_unique<FunctionCallNode>(name, std::move(args));
+}
+
+// Parse constant: just return the constant value as a NumberNode
+std::unique_ptr<ASTNode> Parser::parseConstant(const std::string& name) {
+    // Will be evaluated at runtime by checking ConstantsRegistry
+    // For now, wrap in a FunctionCallNode with zero arguments
+    // (easier to handle in evaluator)
+    return std::make_unique<FunctionCallNode>(name, std::vector<std::unique_ptr<ASTNode>>());
 }
 
 } // namespace parser

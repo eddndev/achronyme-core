@@ -22,8 +22,13 @@ std::vector<Token> Lexer::tokenize() {
         if (std::isdigit(c) || c == '.') {
             tokens.push_back(scanNumber());
         }
+        // Identifiers (functions, constants)
+        else if (std::isalpha(c) || c == '_') {
+            tokens.push_back(scanIdentifier());
+        }
         // Operators and delimiters
-        else if (c == '+' || c == '-' || c == '*' || c == '/' || c == '^' || c == '(' || c == ')') {
+        else if (c == '+' || c == '-' || c == '*' || c == '/' || c == '^' ||
+                 c == '(' || c == ')' || c == ',') {
             tokens.push_back(scanOperator());
         }
         else {
@@ -103,9 +108,22 @@ Token Lexer::scanOperator() {
         case '^': return Token(TokenType::CARET, "^", pos);
         case '(': return Token(TokenType::LPAREN, "(", pos);
         case ')': return Token(TokenType::RPAREN, ")", pos);
+        case ',': return Token(TokenType::COMMA, ",", pos);
         default:
             throw std::runtime_error(std::string("Unknown operator: ") + c);
     }
+}
+
+Token Lexer::scanIdentifier() {
+    size_t start = current_;
+    std::string identifier;
+
+    // First character: letter or underscore
+    while (!isAtEnd() && (std::isalnum(peek()) || peek() == '_')) {
+        identifier += advance();
+    }
+
+    return Token(TokenType::IDENTIFIER, identifier, start);
 }
 
 } // namespace parser

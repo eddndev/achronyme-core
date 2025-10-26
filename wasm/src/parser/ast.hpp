@@ -14,7 +14,8 @@ namespace parser {
 enum class ASTNodeType {
     NUMBER,         // Literal number
     BINARY_OP,      // Binary operation (+, -, *, /, ^)
-    UNARY_OP        // Unary operation (- for negation)
+    UNARY_OP,       // Unary operation (- for negation)
+    FUNCTION_CALL   // Function call (sin(x), max(a,b,c), etc.)
 };
 
 /**
@@ -92,6 +93,28 @@ public:
 private:
     UnaryOp op_;
     std::unique_ptr<ASTNode> operand_;
+};
+
+/**
+ * Function call node
+ *
+ * Examples:
+ *   sin(PI/2)
+ *   max(1, 2, 3, 4)
+ *   sqrt(16)
+ */
+class FunctionCallNode : public ASTNode {
+public:
+    FunctionCallNode(std::string name, std::vector<std::unique_ptr<ASTNode>> args)
+        : name_(std::move(name)), args_(std::move(args)) {}
+
+    ASTNodeType type() const override { return ASTNodeType::FUNCTION_CALL; }
+    const std::string& name() const { return name_; }
+    const std::vector<std::unique_ptr<ASTNode>>& args() const { return args_; }
+
+private:
+    std::string name_;
+    std::vector<std::unique_ptr<ASTNode>> args_;
 };
 
 } // namespace parser

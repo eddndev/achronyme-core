@@ -12,11 +12,12 @@ namespace parser {
  * Token types for the lexer
  *
  * Phase 1: Arithmetic operators and numbers
- * Phase 2: Will add IDENTIFIER for functions
+ * Phase 2: IDENTIFIER for functions and constants
  */
 enum class TokenType {
     // Literals
     NUMBER,         // 123, 3.14, .5, 2e-3
+    IDENTIFIER,     // sin, cos, PI, E, etc.
 
     // Operators
     PLUS,           // +
@@ -28,6 +29,7 @@ enum class TokenType {
     // Delimiters
     LPAREN,         // (
     RPAREN,         // )
+    COMMA,          // ,
 
     // End of input
     END
@@ -78,6 +80,7 @@ private:
     // Token scanners
     Token scanNumber();
     Token scanOperator();
+    Token scanIdentifier();
 };
 
 } // namespace parser

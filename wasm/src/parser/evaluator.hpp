@@ -39,6 +39,7 @@ private:
     core::Value evaluateNumber(const NumberNode* node);
     core::Value evaluateBinaryOp(const BinaryOpNode* node);
     core::Value evaluateUnaryOp(const UnaryOpNode* node);
+    core::Value evaluateFunctionCall(const FunctionCallNode* node);
 };
 
 } // namespace parser

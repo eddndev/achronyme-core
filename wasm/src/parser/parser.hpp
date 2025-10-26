@@ -17,7 +17,8 @@ namespace parser {
  *   term        → factor (('*' | '/') factor)*
  *   factor      → exponent ('^' exponent)*   [right-associative]
  *   exponent    → '-' exponent | primary
- *   primary     → NUMBER | '(' expression ')'
+ *   primary     → NUMBER | IDENTIFIER ('(' args ')')? | '(' expression ')'
+ *   args        → expression (',' expression)*
  *
  * Precedence (highest to lowest):
  *   1. Parentheses ()
@@ -52,6 +53,10 @@ private:
     std::unique_ptr<ASTNode> factor();
     std::unique_ptr<ASTNode> exponent();
     std::unique_ptr<ASTNode> primary();
+
+    // Helper methods for Phase 2
+    std::unique_ptr<ASTNode> parseFunctionCall(const std::string& name);
+    std::unique_ptr<ASTNode> parseConstant(const std::string& name);
 };
 
 } // namespace parser
