@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/apache/htdocs/achronyme/**)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

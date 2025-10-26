@@ -1,0 +1,63 @@
+{
+  "name": "@achronyme/core",
+  "version": "0.1.0",
+  "description": "High-performance mathematical computation engine powered by WebAssembly (SOC - Superior Order Calculator)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/"
+  ],
+  "scripts": {
+    "build:wasm": "bash scripts/build-wasm.sh",
+    "build:js": "tsc",
+    "build": "npm run build:wasm && npm run build:js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:cpp": "echo 'C++ tests require native build. See wasm/README.md'",
+    "benchmark": "node dist/benchmark.js",
+    "optimize": "bash scripts/optimize-wasm.sh",
+    "prepublishOnly": "npm run build && npm run optimize",
+    "clean": "rm -rf dist wasm/build"
+  },
+  "keywords": [
+    "wasm",
+    "webassembly",
+    "math",
+    "mathematics",
+    "scientific-computing",
+    "dsp",
+    "digital-signal-processing",
+    "linear-algebra",
+    "fourier",
+    "fft",
+    "dft",
+    "convolution",
+    "numerical-methods",
+    "optimization",
+    "symbolic-computation",
+    "mathematical-engine",
+    "soc",
+    "superior-order-calculator",
+    "calculator",
+    "parser",
+    "expression-evaluator"
+  ],
+  "author": "Eduardo Alonso <contacto@eddndev.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eddndev/achronyme-core"
+  },
+  "bugs": {
+    "url": "https://github.com/eddndev/achronyme-core/issues"
+  },
+  "homepage": "https://achronyme.com",
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0",
+    "@types/node": "^20.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
