@@ -8,6 +8,28 @@ Parser::Parser(const std::vector<Token>& tokens)
     : tokens_(tokens), current_(0) {}
 
 std::unique_ptr<ASTNode> Parser::parse() {
+    return statement();
+}
+
+// statement → let IDENTIFIER = expression | expression
+std::unique_ptr<ASTNode> Parser::statement() {
+    // Check for let declaration
+    if (match(TokenType::LET)) {
+        // let IDENTIFIER = expression
+        if (!check(TokenType::IDENTIFIER)) {
+            throw std::runtime_error("Expected variable name after 'let'");
+        }
+
+        std::string name = advance().lexeme;
+
+        consume(TokenType::ASSIGN, "Expected '=' after variable name");
+
+        auto initializer = expression();
+
+        return std::make_unique<VariableDeclarationNode>(name, std::move(initializer));
+    }
+
+    // Otherwise, it's just an expression
     return expression();
 }
 
@@ -52,8 +74,42 @@ void Parser::consume(TokenType type, const std::string& message) {
 
 // Grammar rules
 
-// expression → term (('+' | '-') term)*
+// expression → comparison
 std::unique_ptr<ASTNode> Parser::expression() {
+    return comparison();
+}
+
+// comparison → additive (('>' | '<' | '>=' | '<=' | '==' | '!=') additive)*
+std::unique_ptr<ASTNode> Parser::comparison() {
+    auto node = additive();
+
+    while (match(TokenType::GT) || match(TokenType::LT) ||
+           match(TokenType::GTE) || match(TokenType::LTE) ||
+           match(TokenType::EQ) || match(TokenType::NEQ)) {
+
+        TokenType op = previous().type;
+        auto right = additive();
+
+        BinaryOp binOp;
+        switch (op) {
+            case TokenType::GT:  binOp = BinaryOp::GT;  break;
+            case TokenType::LT:  binOp = BinaryOp::LT;  break;
+            case TokenType::GTE: binOp = BinaryOp::GTE; break;
+            case TokenType::LTE: binOp = BinaryOp::LTE; break;
+            case TokenType::EQ:  binOp = BinaryOp::EQ;  break;
+            case TokenType::NEQ: binOp = BinaryOp::NEQ; break;
+            default:
+                throw std::runtime_error("Unknown comparison operator");
+        }
+
+        node = std::make_unique<BinaryOpNode>(binOp, std::move(node), std::move(right));
+    }
+
+    return node;
+}
+
+// additive → term (('+' | '-') term)*
+std::unique_ptr<ASTNode> Parser::additive() {
     auto node = term();
 
     while (match(TokenType::PLUS) || match(TokenType::MINUS)) {
@@ -126,7 +182,7 @@ std::unique_ptr<ASTNode> Parser::primary() {
         return std::make_unique<NumberNode>(value);
     }
 
-    // Handle identifiers (constants, function calls, or 'i')
+    // Handle identifiers (constants, function calls, lambdas, or 'i')
     if (match(TokenType::IDENTIFIER)) {
         std::string name = previous().lexeme;
 
@@ -135,17 +191,61 @@ std::unique_ptr<ASTNode> Parser::primary() {
             return std::make_unique<ComplexLiteralNode>(1.0);  // 0 + 1i
         }
 
+        // Check for single-param lambda: param => expr
+        if (check(TokenType::ARROW)) {
+            advance(); // consume =>
+            auto body = expression();
+            return std::make_unique<LambdaNode>(std::vector<std::string>{name}, std::move(body));
+        }
+
         // Check if it's a function call
         if (check(TokenType::LPAREN)) {
             return parseFunctionCall(name);
         }
 
-        // Otherwise, it's a constant
+        // Otherwise, it's a constant or variable reference
         return parseConstant(name);
     }
 
-    // Parenthesized expression with optional 'i' suffix
+    // Parenthesized expression or multi-param lambda
     if (match(TokenType::LPAREN)) {
+        // Lookahead to determine if this is a lambda or expression
+        // Lambda: (x, y) => expr
+        // Expression: (2 + 3)
+
+        size_t savedPos = current_;
+
+        // Try to parse as lambda parameters
+        std::vector<std::string> params;
+        bool isLambda = false;
+
+        if (check(TokenType::IDENTIFIER)) {
+            // Could be lambda
+            params.push_back(advance().lexeme);
+
+            // Check for more parameters
+            while (match(TokenType::COMMA)) {
+                if (!check(TokenType::IDENTIFIER)) {
+                    // Not a lambda, restore position
+                    current_ = savedPos;
+                    goto parse_as_expression;
+                }
+                params.push_back(advance().lexeme);
+            }
+
+            // Must have RPAREN followed by ARROW
+            if (match(TokenType::RPAREN) && check(TokenType::ARROW)) {
+                isLambda = true;
+                advance(); // consume =>
+                auto body = expression();
+                return std::make_unique<LambdaNode>(params, std::move(body));
+            }
+        }
+
+        // Restore position and parse as expression
+        current_ = savedPos;
+
+parse_as_expression:
         auto node = expression();
         consume(TokenType::RPAREN, "Expected ')' after expression");
 
@@ -192,12 +292,12 @@ std::unique_ptr<ASTNode> Parser::parseFunctionCall(const std::string& name) {
     return std::make_unique<FunctionCallNode>(name, std::move(args));
 }
 
-// Parse constant: just return the constant value as a NumberNode
+// Parse constant or variable reference
 std::unique_ptr<ASTNode> Parser::parseConstant(const std::string& name) {
-    // Will be evaluated at runtime by checking ConstantsRegistry
-    // For now, wrap in a FunctionCallNode with zero arguments
-    // (easier to handle in evaluator)
-    return std::make_unique<FunctionCallNode>(name, std::vector<std::unique_ptr<ASTNode>>());
+    // Phase 4A: Could be a constant (PI, E) or a variable (x, y)
+    // Return a VariableReferenceNode and let the evaluator decide
+    // (it will check variables first, then constants)
+    return std::make_unique<VariableReferenceNode>(name);
 }
 
 // Parse vector or matrix starting with '['

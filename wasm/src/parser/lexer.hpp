@@ -20,12 +20,27 @@ enum class TokenType {
     NUMBER,         // 123, 3.14, .5, 2e-3
     IDENTIFIER,     // sin, cos, PI, E, etc.
 
+    // Keywords (Phase 4A)
+    LET,            // let (variable declaration)
+
     // Operators
     PLUS,           // +
     MINUS,          // -
     STAR,           // *
     SLASH,          // /
     CARET,          // ^ (power)
+    ASSIGN,         // = (assignment)
+
+    // Comparison operators (Phase 4A)
+    GT,             // >
+    LT,             // <
+    GTE,            // >=
+    LTE,            // <=
+    EQ,             // ==
+    NEQ,            // !=
+
+    // Special operators (Phase 4A)
+    ARROW,          // => (lambda)
 
     // Delimiters
     LPAREN,         // (
@@ -33,6 +48,7 @@ enum class TokenType {
     LBRACKET,       // [ (Phase 3)
     RBRACKET,       // ] (Phase 3)
     COMMA,          // ,
+    SEMICOLON,      // ; (statement separator)
 
     // End of input
     END

@@ -28,7 +28,8 @@ std::vector<Token> Lexer::tokenize() {
         }
         // Operators and delimiters
         else if (c == '+' || c == '-' || c == '*' || c == '/' || c == '^' ||
-                 c == '(' || c == ')' || c == '[' || c == ']' || c == ',') {
+                 c == '(' || c == ')' || c == '[' || c == ']' || c == ',' || c == ';' ||
+                 c == '>' || c == '<' || c == '=' || c == '!') {
             tokens.push_back(scanOperator());
         }
         else {
@@ -100,7 +101,42 @@ Token Lexer::scanOperator() {
     size_t pos = current_;
     char c = advance();
 
+    // Check for two-character operators
     switch (c) {
+        case '>':
+            if (peek() == '=') {
+                advance();
+                return Token(TokenType::GTE, ">=", pos);
+            }
+            return Token(TokenType::GT, ">", pos);
+
+        case '<':
+            if (peek() == '=') {
+                advance();
+                return Token(TokenType::LTE, "<=", pos);
+            }
+            return Token(TokenType::LT, "<", pos);
+
+        case '=':
+            if (peek() == '=') {
+                advance();
+                return Token(TokenType::EQ, "==", pos);
+            }
+            if (peek() == '>') {
+                advance();
+                return Token(TokenType::ARROW, "=>", pos);
+            }
+            // Single '=' is assignment (Phase 4A)
+            return Token(TokenType::ASSIGN, "=", pos);
+
+        case '!':
+            if (peek() == '=') {
+                advance();
+                return Token(TokenType::NEQ, "!=", pos);
+            }
+            throw std::runtime_error("Unexpected '!' - did you mean '!='?");
+
+        // Single-character operators
         case '+': return Token(TokenType::PLUS, "+", pos);
         case '-': return Token(TokenType::MINUS, "-", pos);
         case '*': return Token(TokenType::STAR, "*", pos);
@@ -111,6 +147,8 @@ Token Lexer::scanOperator() {
         case '[': return Token(TokenType::LBRACKET, "[", pos);
         case ']': return Token(TokenType::RBRACKET, "]", pos);
         case ',': return Token(TokenType::COMMA, ",", pos);
+        case ';': return Token(TokenType::SEMICOLON, ";", pos);
+
         default:
             throw std::runtime_error(std::string("Unknown operator: ") + c);
     }
@@ -123,6 +161,11 @@ Token Lexer::scanIdentifier() {
     // First character: letter or underscore
     while (!isAtEnd() && (std::isalnum(peek()) || peek() == '_')) {
         identifier += advance();
+    }
+
+    // Check for keywords
+    if (identifier == "let") {
+        return Token(TokenType::LET, identifier, start);
     }
 
     return Token(TokenType::IDENTIFIER, identifier, start);

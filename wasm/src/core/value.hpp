@@ -7,6 +7,7 @@
 #include "complex.hpp"
 #include "vector.hpp"
 #include "matrix.hpp"
+#include "function.hpp"
 
 namespace achronyme {
 namespace core {
@@ -25,11 +26,12 @@ public:
         NUMBER,
         COMPLEX,
         VECTOR,
-        MATRIX
+        MATRIX,
+        FUNCTION    // Phase 4A: Lambda functions
     };
 
     // Variant type holding all possible values
-    using ValueType = std::variant<double, Complex, Vector, Matrix>;
+    using ValueType = std::variant<double, Complex, Vector, Matrix, Function>;
 
     // Constructors
     Value() : data_(0.0) {}
@@ -37,6 +39,7 @@ public:
     Value(const Complex& value) : data_(value) {}
     Value(const Vector& value) : data_(value) {}
     Value(const Matrix& value) : data_(value) {}
+    Value(const Function& value) : data_(value) {}
 
     // Type checking
     Type type() const;
@@ -44,12 +47,14 @@ public:
     bool isComplex() const { return std::holds_alternative<Complex>(data_); }
     bool isVector() const { return std::holds_alternative<Vector>(data_); }
     bool isMatrix() const { return std::holds_alternative<Matrix>(data_); }
+    bool isFunction() const { return std::holds_alternative<Function>(data_); }
 
     // Type access (throws if wrong type)
     double asNumber() const;
     Complex asComplex() const;
     Vector asVector() const;
     Matrix asMatrix() const;
+    Function asFunction() const;
 
     // Type coercion (automatic promotion)
     Complex toComplex() const;  // Number → Complex

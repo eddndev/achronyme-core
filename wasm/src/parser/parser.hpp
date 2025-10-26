@@ -48,12 +48,15 @@ private:
     bool match(TokenType type);
     void consume(TokenType type, const std::string& message);
 
-    // Grammar rules (in order of precedence)
+    // Grammar rules (in order of precedence, lowest to highest)
+    std::unique_ptr<ASTNode> statement();   // Phase 4A: let declarations
     std::unique_ptr<ASTNode> expression();
-    std::unique_ptr<ASTNode> term();
-    std::unique_ptr<ASTNode> factor();
-    std::unique_ptr<ASTNode> exponent();
-    std::unique_ptr<ASTNode> primary();
+    std::unique_ptr<ASTNode> comparison();  // Phase 4A: <, >, <=, >=, ==, !=
+    std::unique_ptr<ASTNode> additive();    // Phase 4A: +, -
+    std::unique_ptr<ASTNode> term();        // *, /
+    std::unique_ptr<ASTNode> factor();      // ^
+    std::unique_ptr<ASTNode> exponent();    // unary -
+    std::unique_ptr<ASTNode> primary();     // literals, parens, etc.
 
     // Helper methods for Phase 2
     std::unique_ptr<ASTNode> parseFunctionCall(const std::string& name);
@@ -63,6 +66,9 @@ private:
     std::unique_ptr<ASTNode> parseVectorOrMatrix();
     std::unique_ptr<ASTNode> parseVector(std::vector<std::unique_ptr<ASTNode>> firstRow);
     std::unique_ptr<ASTNode> parseMatrix(std::vector<std::unique_ptr<ASTNode>> firstRow);
+
+    // Helper methods for Phase 4A: Lambdas
+    std::unique_ptr<ASTNode> parseLambda(std::vector<std::string> params);
 };
 
 } // namespace parser

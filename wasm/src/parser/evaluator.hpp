@@ -2,6 +2,7 @@
 #define ACHRONYME_PARSER_EVALUATOR_HPP
 
 #include "ast.hpp"
+#include "environment.hpp"
 #include "../core/value.hpp"
 
 namespace achronyme {
@@ -34,6 +35,13 @@ public:
     // Evaluate an AST and return the result
     core::Value evaluate(const ASTNode* node);
 
+    // Get the environment (for testing/debugging)
+    Environment& environment() { return env_; }
+    const Environment& environment() const { return env_; }
+
+    // Apply a lambda function with arguments (Phase 4A: Higher-order functions)
+    core::Value applyFunction(const core::Function& func, const std::vector<core::Value>& args);
+
 private:
     // Helper methods for each node type
     core::Value evaluateNumber(const NumberNode* node);
@@ -45,6 +53,16 @@ private:
     core::Value evaluateComplexLiteral(const ComplexLiteralNode* node);
     core::Value evaluateVectorLiteral(const VectorLiteralNode* node);
     core::Value evaluateMatrixLiteral(const MatrixLiteralNode* node);
+
+    // Phase 4A: Variables
+    core::Value evaluateVariableDeclaration(const VariableDeclarationNode* node);
+    core::Value evaluateVariableReference(const VariableReferenceNode* node);
+
+    // Phase 4A: Lambdas
+    core::Value evaluateLambda(const LambdaNode* node);
+
+    // Environment for variable storage
+    Environment env_;
 };
 
 } // namespace parser

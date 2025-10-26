@@ -11,6 +11,7 @@ Value::Type Value::type() const {
     if (isComplex()) return Type::COMPLEX;
     if (isVector()) return Type::VECTOR;
     if (isMatrix()) return Type::MATRIX;
+    if (isFunction()) return Type::FUNCTION;
     throw std::runtime_error("Unknown value type");
 }
 
@@ -44,6 +45,13 @@ Matrix Value::asMatrix() const {
         throw std::runtime_error("Value is not a matrix");
     }
     return std::get<Matrix>(data_);
+}
+
+Function Value::asFunction() const {
+    if (!isFunction()) {
+        throw std::runtime_error("Value is not a function");
+    }
+    return std::get<Function>(data_);
 }
 
 // Type coercion
@@ -277,6 +285,9 @@ std::string Value::toString() const {
     }
     if (isMatrix()) {
         return asMatrix().toString();
+    }
+    if (isFunction()) {
+        return asFunction().toString();
     }
     return "<unknown>";
 }

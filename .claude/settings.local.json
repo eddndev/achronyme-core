@@ -7,7 +7,10 @@
       "Bash(wasm/src/parser/lexer.cpp )",
       "Bash(wasm/src/parser/parser.cpp )",
       "Bash(wasm/src/parser/evaluator.cpp )",
-      "Bash(wasm/src/bindings/main.cpp )"
+      "Bash(wasm/src/bindings/main.cpp )",
+      "Bash(node demo-phase4a-comparisons.mjs:*)",
+      "Bash(node debug-module.mjs:*)",
+      "Bash(node:*)"
     ],
     "deny": [],
     "ask": []

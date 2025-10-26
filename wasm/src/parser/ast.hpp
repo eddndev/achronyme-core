@@ -12,24 +12,36 @@ namespace parser {
  * AST Node types
  */
 enum class ASTNodeType {
-    NUMBER,         // Literal number
-    BINARY_OP,      // Binary operation (+, -, *, /, ^)
-    UNARY_OP,       // Unary operation (- for negation)
-    FUNCTION_CALL,  // Function call (sin(x), max(a,b,c), etc.)
-    COMPLEX_LITERAL,// Complex number literal (3+4i)
-    VECTOR_LITERAL, // Vector literal ([1, 2, 3])
-    MATRIX_LITERAL  // Matrix literal ([[1, 2], [3, 4]])
+    NUMBER,              // Literal number
+    BINARY_OP,           // Binary operation (+, -, *, /, ^)
+    UNARY_OP,            // Unary operation (- for negation)
+    FUNCTION_CALL,       // Function call (sin(x), max(a,b,c), etc.)
+    COMPLEX_LITERAL,     // Complex number literal (3+4i)
+    VECTOR_LITERAL,      // Vector literal ([1, 2, 3])
+    MATRIX_LITERAL,      // Matrix literal ([[1, 2], [3, 4]])
+    VARIABLE_DECLARATION,// Variable declaration (let x = expr)
+    VARIABLE_REFERENCE,  // Variable reference (x)
+    LAMBDA               // Lambda expression (x => expr)
 };
 
 /**
  * Binary operators
  */
 enum class BinaryOp {
+    // Arithmetic
     ADD,
     SUBTRACT,
     MULTIPLY,
     DIVIDE,
-    POWER
+    POWER,
+
+    // Comparison (Phase 4A)
+    GT,         // >
+    LT,         // <
+    GTE,        // >=
+    LTE,        // <=
+    EQ,         // ==
+    NEQ         // !=
 };
 
 /**
@@ -181,6 +193,74 @@ public:
 
 private:
     std::vector<std::vector<std::unique_ptr<ASTNode>>> rows_;
+};
+
+/**
+ * Variable declaration node (Phase 4A)
+ *
+ * Examples:
+ *   let x = 5
+ *   let result = sin(PI/2)
+ *   let vec = [1, 2, 3]
+ */
+class VariableDeclarationNode : public ASTNode {
+public:
+    VariableDeclarationNode(std::string name, std::unique_ptr<ASTNode> initializer)
+        : name_(std::move(name)), initializer_(std::move(initializer)) {}
+
+    ASTNodeType type() const override { return ASTNodeType::VARIABLE_DECLARATION; }
+    const std::string& name() const { return name_; }
+    const ASTNode* initializer() const { return initializer_.get(); }
+
+private:
+    std::string name_;
+    std::unique_ptr<ASTNode> initializer_;
+};
+
+/**
+ * Variable reference node (Phase 4A)
+ *
+ * Examples:
+ *   x
+ *   result
+ *   vec
+ */
+class VariableReferenceNode : public ASTNode {
+public:
+    explicit VariableReferenceNode(std::string name)
+        : name_(std::move(name)) {}
+
+    ASTNodeType type() const override { return ASTNodeType::VARIABLE_REFERENCE; }
+    const std::string& name() const { return name_; }
+
+private:
+    std::string name_;
+};
+
+/**
+ * Lambda expression node (Phase 4A)
+ *
+ * Examples:
+ *   x => x * 2
+ *   (x, y) => x + y
+ *   x => x > 0
+ *   (a, b, c) => a + b + c
+ */
+class LambdaNode : public ASTNode {
+public:
+    LambdaNode(std::vector<std::string> params, std::unique_ptr<ASTNode> body)
+        : params_(std::move(params)), body_(std::move(body)) {}
+
+    ASTNodeType type() const override { return ASTNodeType::LAMBDA; }
+    const std::vector<std::string>& params() const { return params_; }
+    const ASTNode* body() const { return body_.get(); }
+
+    // Transfer ownership (needed for creating Function objects)
+    std::unique_ptr<ASTNode> takeBody() { return std::move(body_); }
+
+private:
+    std::vector<std::string> params_;     // Parameter names (e.g., ["x", "y"])
+    std::unique_ptr<ASTNode> body_;       // Lambda body expression
 };
 
 } // namespace parser
