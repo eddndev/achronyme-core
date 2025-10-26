@@ -17,11 +17,12 @@ namespace parser {
  *   term        → factor (('*' | '/') factor)*
  *   factor      → exponent ('^' exponent)*   [right-associative]
  *   exponent    → '-' exponent | primary
- *   primary     → NUMBER | IDENTIFIER ('(' args ')')? | '(' expression ')'
+ *   primary     → NUMBER 'i'? | IDENTIFIER ('(' args ')')? | '(' expression ')' 'i'? | '[' vector_or_matrix ']'
  *   args        → expression (',' expression)*
+ *   vector_or_matrix → expression (',' expression)* | '[' expression (',' expression)* ']' (',' '[' ...)*
  *
  * Precedence (highest to lowest):
- *   1. Parentheses ()
+ *   1. Parentheses (), Brackets []
  *   2. Unary minus -
  *   3. Exponentiation ^ (right-associative: 2^3^2 = 2^(3^2) = 512)
  *   4. Multiplication *, Division /
@@ -57,6 +58,11 @@ private:
     // Helper methods for Phase 2
     std::unique_ptr<ASTNode> parseFunctionCall(const std::string& name);
     std::unique_ptr<ASTNode> parseConstant(const std::string& name);
+
+    // Helper methods for Phase 3
+    std::unique_ptr<ASTNode> parseVectorOrMatrix();
+    std::unique_ptr<ASTNode> parseVector(std::vector<std::unique_ptr<ASTNode>> firstRow);
+    std::unique_ptr<ASTNode> parseMatrix(std::vector<std::unique_ptr<ASTNode>> firstRow);
 };
 
 } // namespace parser

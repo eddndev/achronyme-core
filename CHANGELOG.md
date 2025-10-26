@@ -7,12 +7,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Planned Features (Phase 3+)
-- Complex number support (a + bi)
-- Vector operations ([1, 2, 3])
-- Matrix operations
+### Planned Features (Phase 4+)
 - Higher-order functions (map, reduce, compose)
+- Lambda expressions
 - DSP functions (DFT, FFT, convolution)
+- Symbolic computation
+- Units and dimensions
+
+## [0.3.0] - 2025-10-26
+
+### Added
+- **Phase 3: Complex Types** 🎉🎉🎉
+  - **Complex Numbers** (a + bi)
+    - Full arithmetic support (+, -, *, /, ^)
+    - Imaginary unit: `i`, `3i`, `2+3i`
+    - Functions: `complex(real, imag)`, `real(z)`, `imag(z)`, `conj(z)`, `arg(z)`
+    - Complex magnitude: `abs(3+4i)` = 5
+    - Automatic type promotion: Number → Complex
+
+  - **Vectors** ([x, y, z, ...])
+    - Vector literals: `[1, 2, 3]`
+    - Arithmetic: `[1,2] + [3,4]`, `[1,2,3] * 2`
+    - Functions: `dot(v1, v2)`, `cross(v1, v2)`, `norm(v)`, `normalize(v)`
+    - Broadcasting: `[1,2,3] + 10` → `[11, 12, 13]`
+    - Expressions in vectors: `[sin(0), cos(0), PI]`
+
+  - **Matrices** ([[a, b], [c, d], ...])
+    - Matrix literals: `[[1, 2], [3, 4]]`
+    - Arithmetic: matrix addition, subtraction, multiplication
+    - Functions: `transpose(M)`, `det(M)`, `inverse(M)`, `trace(M)`
+    - Scalar operations: `2 * [[1,2],[3,4]]`
+    - Expressions in matrices: `[[PI, E], [sqrt(2), sqrt(3)]]`
+
+  - **Type System**
+    - std::variant-based Value type
+    - Type checking: `isNumber()`, `isComplex()`, `isVector()`, `isMatrix()`
+    - Automatic type coercion
+    - Type-safe operations with runtime dispatch
+
+  - **Lexer/Parser Extensions**
+    - New tokens: `[`, `]` (LBRACKET, RBRACKET)
+    - Complex literal parsing: `3i`, `i`
+    - Vector/matrix literal parsing
+    - Automatic matrix row validation
+
+  - **Extended Functions**
+    - `abs()` now works for complex numbers
+    - 13 new functions for complex types
+    - Full support for nested expressions
+
+### Changed
+- WASM bundle size increased to 234 KB (from 106 KB)
+- eval() now returns string representation for all types
+- Value class now uses std::variant instead of double
+- Breaking change: eval() return type changed from double to string
+
+### Performance
+- Complex arithmetic: <10μs per operation
+- Vector operations: <5μs for basic ops
+- Matrix multiplication (2x2): <20μs
+- Still 3-20x faster than JavaScript equivalents
 
 ## [0.2.0] - 2025-10-26
 

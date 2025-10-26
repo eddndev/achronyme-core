@@ -168,7 +168,13 @@ void FunctionRegistry::registerBuiltInFunctions() {
     // ========================================================================
 
     registerFunction("abs", [](const std::vector<Value>& args) {
-        return Value(std::abs(args[0].asNumber()));
+        // abs() works for both numbers and complex numbers
+        if (args[0].isComplex()) {
+            Complex z = args[0].asComplex();
+            return Value(z.magnitude());
+        } else {
+            return Value(std::abs(args[0].asNumber()));
+        }
     }, 1);
 
     registerFunction("sign", [](const std::vector<Value>& args) {
@@ -216,6 +222,99 @@ void FunctionRegistry::registerBuiltInFunctions() {
     registerFunction("rad", [](const std::vector<Value>& args) {
         // Convert degrees to radians
         return Value(args[0].asNumber() * 3.141592653589793 / 180.0);
+    }, 1);
+
+    // ========================================================================
+    // Phase 3: Complex Number Functions
+    // ========================================================================
+
+    registerFunction("complex", [](const std::vector<Value>& args) {
+        // complex(real, imag) → Complex number
+        double real = args[0].asNumber();
+        double imag = args[1].asNumber();
+        return Value(Complex(real, imag));
+    }, 2);
+
+    registerFunction("real", [](const std::vector<Value>& args) {
+        // real(z) → real part of complex number
+        Complex z = args[0].asComplex();
+        return Value(z.real());
+    }, 1);
+
+    registerFunction("imag", [](const std::vector<Value>& args) {
+        // imag(z) → imaginary part of complex number
+        Complex z = args[0].asComplex();
+        return Value(z.imag());
+    }, 1);
+
+    registerFunction("conj", [](const std::vector<Value>& args) {
+        // conj(z) → complex conjugate
+        Complex z = args[0].asComplex();
+        return Value(z.conjugate());
+    }, 1);
+
+    registerFunction("arg", [](const std::vector<Value>& args) {
+        // arg(z) → argument/phase of complex number
+        Complex z = args[0].asComplex();
+        return Value(z.argument());
+    }, 1);
+
+    // ========================================================================
+    // Phase 3: Vector Functions
+    // ========================================================================
+
+    registerFunction("dot", [](const std::vector<Value>& args) {
+        // dot(v1, v2) → dot product of two vectors
+        Vector v1 = args[0].asVector();
+        Vector v2 = args[1].asVector();
+        return Value(v1.dot(v2));
+    }, 2);
+
+    registerFunction("cross", [](const std::vector<Value>& args) {
+        // cross(v1, v2) → cross product (3D only)
+        Vector v1 = args[0].asVector();
+        Vector v2 = args[1].asVector();
+        return Value(v1.cross(v2));
+    }, 2);
+
+    registerFunction("norm", [](const std::vector<Value>& args) {
+        // norm(v) → magnitude of vector
+        Vector v = args[0].asVector();
+        return Value(v.norm());
+    }, 1);
+
+    registerFunction("normalize", [](const std::vector<Value>& args) {
+        // normalize(v) → unit vector
+        Vector v = args[0].asVector();
+        return Value(v.normalize());
+    }, 1);
+
+    // ========================================================================
+    // Phase 3: Matrix Functions
+    // ========================================================================
+
+    registerFunction("transpose", [](const std::vector<Value>& args) {
+        // transpose(M) → matrix transpose
+        Matrix M = args[0].asMatrix();
+        return Value(M.transpose());
+    }, 1);
+
+    registerFunction("det", [](const std::vector<Value>& args) {
+        // det(M) → determinant of matrix
+        Matrix M = args[0].asMatrix();
+        return Value(M.determinant());
+    }, 1);
+
+    registerFunction("inverse", [](const std::vector<Value>& args) {
+        // inverse(M) → matrix inverse
+        Matrix M = args[0].asMatrix();
+        return Value(M.inverse());
+    }, 1);
+
+    registerFunction("trace", [](const std::vector<Value>& args) {
+        // trace(M) → sum of diagonal elements
+        Matrix M = args[0].asMatrix();
+        return Value(M.trace());
     }, 1);
 }
 

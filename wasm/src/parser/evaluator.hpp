@@ -40,6 +40,11 @@ private:
     core::Value evaluateBinaryOp(const BinaryOpNode* node);
     core::Value evaluateUnaryOp(const UnaryOpNode* node);
     core::Value evaluateFunctionCall(const FunctionCallNode* node);
+
+    // Phase 3: Complex types
+    core::Value evaluateComplexLiteral(const ComplexLiteralNode* node);
+    core::Value evaluateVectorLiteral(const VectorLiteralNode* node);
+    core::Value evaluateMatrixLiteral(const MatrixLiteralNode* node);
 };
 
 } // namespace parser

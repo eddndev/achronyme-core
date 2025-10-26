@@ -1,6 +1,7 @@
 {
   "name": "@achronyme/core",
-  "version": "0.2.0",
+  "version": "0.3.0",
+  "type": "module",
   "description": "High-performance mathematical computation engine powered by WebAssembly (SOC - Superior Order Calculator)",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

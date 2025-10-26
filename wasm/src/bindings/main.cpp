@@ -10,11 +10,14 @@ using namespace achronyme;
 /**
  * Main evaluation function exposed to JavaScript
  *
+ * Phase 1-2: Returns double
+ * Phase 3: Returns string representation (for Complex, Vector, Matrix support)
+ *
  * Usage from JS:
  *   const result = Module.eval("2 + 3 * 4");
- *   console.log(result); // 14
+ *   console.log(result); // "14" or "3 + 4i" or "[1, 2, 3]" or "[[1, 2], [3, 4]]"
  */
-double eval(const std::string& expression) {
+std::string eval(const std::string& expression) {
     try {
         // 1. Lexer: string → tokens
         parser::Lexer lexer(expression);
@@ -28,14 +31,12 @@ double eval(const std::string& expression) {
         parser::Evaluator evaluator;
         auto result = evaluator.evaluate(ast.get());
 
-        return result.asNumber();
+        // Return string representation
+        return result.toString();
     }
     catch (const std::exception& e) {
-        // In Phase 2, we'll add proper error handling
-        // For now, return NaN on error
-        emscripten::val::global("console").call<void>("error",
-            std::string("Evaluation error: ") + e.what());
-        return std::numeric_limits<double>::quiet_NaN();
+        // Return error message
+        return std::string("Error: ") + e.what();
     }
 }
 

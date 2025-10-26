@@ -82,4 +82,4 @@ console.log('✅ All expressions evaluated successfully!');
 console.log('\n📊 Performance Stats:');
 console.log(`  WASM size: ${(wasmBinary.length / 1024).toFixed(2)} KB`);
 console.log(`  Tests run: ${tests.length}`);
-console.log('\n🎉 Achronyme Core Phase 1 Complete!');
+console.log('\n🎉 Achronyme Core Phase 2 Complete!');

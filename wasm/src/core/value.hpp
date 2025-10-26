@@ -4,6 +4,9 @@
 #include <variant>
 #include <string>
 #include <stdexcept>
+#include "complex.hpp"
+#include "vector.hpp"
+#include "matrix.hpp"
 
 namespace achronyme {
 namespace core {
@@ -11,51 +14,71 @@ namespace core {
 /**
  * Value type for the SOC (Superior Order Calculator)
  *
- * Phase 1: Only supports double (Number)
- * Phase 3: Will support Complex, Vector, Matrix, Function
+ * Phase 1-2: Supported double (Number)
+ * Phase 3: Now supports Complex, Vector, Matrix
+ * Phase 4+: Will support Function, Symbolic expressions
  */
 class Value {
 public:
-    // Phase 1: Simple double wrapper
-    using ValueType = double;
+    // Type enumeration
+    enum class Type {
+        NUMBER,
+        COMPLEX,
+        VECTOR,
+        MATRIX
+    };
+
+    // Variant type holding all possible values
+    using ValueType = std::variant<double, Complex, Vector, Matrix>;
 
     // Constructors
     Value() : data_(0.0) {}
     Value(double value) : data_(value) {}
+    Value(const Complex& value) : data_(value) {}
+    Value(const Vector& value) : data_(value) {}
+    Value(const Matrix& value) : data_(value) {}
 
-    // Get the value as double
-    double asNumber() const { return data_; }
+    // Type checking
+    Type type() const;
+    bool isNumber() const { return std::holds_alternative<double>(data_); }
+    bool isComplex() const { return std::holds_alternative<Complex>(data_); }
+    bool isVector() const { return std::holds_alternative<Vector>(data_); }
+    bool isMatrix() const { return std::holds_alternative<Matrix>(data_); }
 
-    // Operators for arithmetic
-    Value operator+(const Value& other) const {
-        return Value(data_ + other.data_);
-    }
+    // Type access (throws if wrong type)
+    double asNumber() const;
+    Complex asComplex() const;
+    Vector asVector() const;
+    Matrix asMatrix() const;
 
-    Value operator-(const Value& other) const {
-        return Value(data_ - other.data_);
-    }
+    // Type coercion (automatic promotion)
+    Complex toComplex() const;  // Number → Complex
+    Value promoteToCommon(const Value& other) const;  // Find common type
 
-    Value operator*(const Value& other) const {
-        return Value(data_ * other.data_);
-    }
+    // Operators for arithmetic (type-dependent dispatch)
+    Value operator+(const Value& other) const;
+    Value operator-(const Value& other) const;
+    Value operator*(const Value& other) const;
+    Value operator/(const Value& other) const;
+    Value operator-() const;  // Unary minus
 
-    Value operator/(const Value& other) const {
-        if (other.data_ == 0.0) {
-            throw std::runtime_error("Division by zero");
-        }
-        return Value(data_ / other.data_);
-    }
-
-    // Unary minus
-    Value operator-() const {
-        return Value(-data_);
-    }
-
-    // Power operator (will implement with std::pow)
+    // Power operator
     Value pow(const Value& exponent) const;
+
+    // String representation
+    std::string toString() const;
+
+    // Get raw variant (for pattern matching)
+    const ValueType& data() const { return data_; }
 
 private:
     ValueType data_;
+
+    // Helper methods for arithmetic operations
+    Value numberOp(const Value& other, char op) const;
+    Value complexOp(const Value& other, char op) const;
+    Value vectorOp(const Value& other, char op) const;
+    Value matrixOp(const Value& other, char op) const;
 };
 
 } // namespace core

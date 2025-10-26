@@ -112,15 +112,28 @@ std::unique_ptr<ASTNode> Parser::exponent() {
     return primary();
 }
 
-// primary → NUMBER | IDENTIFIER ('(' args ')')? | '(' expression ')'
+// primary → NUMBER 'i'? | IDENTIFIER ('(' args ')')? | '(' expression ')' 'i'? | '[' vector_or_matrix ']'
 std::unique_ptr<ASTNode> Parser::primary() {
+    // NUMBER with optional 'i' suffix
     if (match(TokenType::NUMBER)) {
-        return std::make_unique<NumberNode>(previous().value);
+        double value = previous().value;
+
+        // Check for imaginary unit: 3i
+        if (match(TokenType::IDENTIFIER) && previous().lexeme == "i") {
+            return std::make_unique<ComplexLiteralNode>(value);  // 0 + value*i
+        }
+
+        return std::make_unique<NumberNode>(value);
     }
 
-    // Handle identifiers (constants or function calls)
+    // Handle identifiers (constants, function calls, or 'i')
     if (match(TokenType::IDENTIFIER)) {
         std::string name = previous().lexeme;
+
+        // Special case: standalone 'i' (imaginary unit)
+        if (name == "i") {
+            return std::make_unique<ComplexLiteralNode>(1.0);  // 0 + 1i
+        }
 
         // Check if it's a function call
         if (check(TokenType::LPAREN)) {
@@ -131,10 +144,31 @@ std::unique_ptr<ASTNode> Parser::primary() {
         return parseConstant(name);
     }
 
+    // Parenthesized expression with optional 'i' suffix
     if (match(TokenType::LPAREN)) {
         auto node = expression();
         consume(TokenType::RPAREN, "Expected ')' after expression");
+
+        // Check for imaginary unit: (2+3)i
+        // In this case, the entire expression becomes the imaginary part
+        if (match(TokenType::IDENTIFIER) && previous().lexeme == "i") {
+            // We need to evaluate this at parse time if it's a simple number
+            // For now, we'll handle this in a simplified way:
+            // (expr)i is treated as a special case to be handled in evaluator
+            // For simplicity, we'll return the node as-is and handle complex
+            // construction via multiplication by 'i' in evaluator
+            // Actually, let's create a UnaryOp or handle this differently
+
+            // For now, let's just throw an error and implement the simple cases first
+            throw std::runtime_error("Complex syntax (expr)i not yet fully supported. Use expr * i instead.");
+        }
+
         return node;
+    }
+
+    // Vector or Matrix literal
+    if (match(TokenType::LBRACKET)) {
+        return parseVectorOrMatrix();
     }
 
     throw std::runtime_error("Expected expression");
@@ -164,6 +198,93 @@ std::unique_ptr<ASTNode> Parser::parseConstant(const std::string& name) {
     // For now, wrap in a FunctionCallNode with zero arguments
     // (easier to handle in evaluator)
     return std::make_unique<FunctionCallNode>(name, std::vector<std::unique_ptr<ASTNode>>());
+}
+
+// Parse vector or matrix starting with '['
+// After consuming '[', we need to determine if this is:
+//   - Vector: [expr, expr, expr]
+//   - Matrix: [[expr, expr], [expr, expr]]
+std::unique_ptr<ASTNode> Parser::parseVectorOrMatrix() {
+    // We've already consumed the first '['
+
+    // Check if this is a matrix (next token is '[')
+    if (check(TokenType::LBRACKET)) {
+        // This is a matrix: [[...], [...], ...]
+        std::vector<std::vector<std::unique_ptr<ASTNode>>> rows;
+
+        do {
+            consume(TokenType::LBRACKET, "Expected '[' for matrix row");
+
+            std::vector<std::unique_ptr<ASTNode>> row;
+            if (!check(TokenType::RBRACKET)) {
+                do {
+                    row.push_back(expression());
+                } while (match(TokenType::COMMA));
+            }
+
+            consume(TokenType::RBRACKET, "Expected ']' after matrix row");
+            rows.push_back(std::move(row));
+
+        } while (match(TokenType::COMMA));
+
+        consume(TokenType::RBRACKET, "Expected ']' after matrix");
+
+        // Validate that all rows have the same length
+        if (!rows.empty()) {
+            size_t expectedCols = rows[0].size();
+            for (size_t i = 1; i < rows.size(); ++i) {
+                if (rows[i].size() != expectedCols) {
+                    throw std::runtime_error(
+                        "Matrix rows must have the same number of elements. "
+                        "Row 0 has " + std::to_string(expectedCols) +
+                        " elements, but row " + std::to_string(i) +
+                        " has " + std::to_string(rows[i].size()) + " elements."
+                    );
+                }
+            }
+        }
+
+        return std::make_unique<MatrixLiteralNode>(std::move(rows));
+    }
+
+    // This is a vector: [expr, expr, expr]
+    std::vector<std::unique_ptr<ASTNode>> elements;
+
+    if (!check(TokenType::RBRACKET)) {
+        do {
+            elements.push_back(expression());
+        } while (match(TokenType::COMMA));
+    }
+
+    consume(TokenType::RBRACKET, "Expected ']' after vector");
+
+    return std::make_unique<VectorLiteralNode>(std::move(elements));
+}
+
+// Parse vector (called when we know it's a vector)
+std::unique_ptr<ASTNode> Parser::parseVector(std::vector<std::unique_ptr<ASTNode>> firstRow) {
+    return std::make_unique<VectorLiteralNode>(std::move(firstRow));
+}
+
+// Parse matrix (called when we know it's a matrix)
+std::unique_ptr<ASTNode> Parser::parseMatrix(std::vector<std::unique_ptr<ASTNode>> firstRow) {
+    std::vector<std::vector<std::unique_ptr<ASTNode>>> rows;
+    rows.push_back(std::move(firstRow));
+
+    // Continue parsing remaining rows
+    while (match(TokenType::COMMA)) {
+        consume(TokenType::LBRACKET, "Expected '[' for matrix row");
+
+        std::vector<std::unique_ptr<ASTNode>> row;
+        do {
+            row.push_back(expression());
+        } while (match(TokenType::COMMA));
+
+        consume(TokenType::RBRACKET, "Expected ']' after matrix row");
+        rows.push_back(std::move(row));
+    }
+
+    return std::make_unique<MatrixLiteralNode>(std::move(rows));
 }
 
 } // namespace parser

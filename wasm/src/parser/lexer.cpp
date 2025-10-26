@@ -28,7 +28,7 @@ std::vector<Token> Lexer::tokenize() {
         }
         // Operators and delimiters
         else if (c == '+' || c == '-' || c == '*' || c == '/' || c == '^' ||
-                 c == '(' || c == ')' || c == ',') {
+                 c == '(' || c == ')' || c == '[' || c == ']' || c == ',') {
             tokens.push_back(scanOperator());
         }
         else {
@@ -108,6 +108,8 @@ Token Lexer::scanOperator() {
         case '^': return Token(TokenType::CARET, "^", pos);
         case '(': return Token(TokenType::LPAREN, "(", pos);
         case ')': return Token(TokenType::RPAREN, ")", pos);
+        case '[': return Token(TokenType::LBRACKET, "[", pos);
+        case ']': return Token(TokenType::RBRACKET, "]", pos);
         case ',': return Token(TokenType::COMMA, ",", pos);
         default:
             throw std::runtime_error(std::string("Unknown operator: ") + c);

@@ -13,6 +13,7 @@ namespace parser {
  *
  * Phase 1: Arithmetic operators and numbers
  * Phase 2: IDENTIFIER for functions and constants
+ * Phase 3: LBRACKET/RBRACKET for vectors and matrices
  */
 enum class TokenType {
     // Literals
@@ -29,6 +30,8 @@ enum class TokenType {
     // Delimiters
     LPAREN,         // (
     RPAREN,         // )
+    LBRACKET,       // [ (Phase 3)
+    RBRACKET,       // ] (Phase 3)
     COMMA,          // ,
 
     // End of input

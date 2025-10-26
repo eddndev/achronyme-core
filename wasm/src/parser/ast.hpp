@@ -15,7 +15,10 @@ enum class ASTNodeType {
     NUMBER,         // Literal number
     BINARY_OP,      // Binary operation (+, -, *, /, ^)
     UNARY_OP,       // Unary operation (- for negation)
-    FUNCTION_CALL   // Function call (sin(x), max(a,b,c), etc.)
+    FUNCTION_CALL,  // Function call (sin(x), max(a,b,c), etc.)
+    COMPLEX_LITERAL,// Complex number literal (3+4i)
+    VECTOR_LITERAL, // Vector literal ([1, 2, 3])
+    MATRIX_LITERAL  // Matrix literal ([[1, 2], [3, 4]])
 };
 
 /**
@@ -115,6 +118,69 @@ public:
 private:
     std::string name_;
     std::vector<std::unique_ptr<ASTNode>> args_;
+};
+
+/**
+ * Complex literal node (Phase 3)
+ *
+ * Examples:
+ *   3i
+ *   3 + 4i (parsed as BinaryOp with ComplexLiteralNode)
+ *   (2+3)i (parsed as ComplexLiteralNode with expression)
+ */
+class ComplexLiteralNode : public ASTNode {
+public:
+    // For pure imaginary: 3i
+    explicit ComplexLiteralNode(double imag) : real_(0.0), imag_(imag) {}
+
+    // For complex with both parts: used internally
+    ComplexLiteralNode(double real, double imag) : real_(real), imag_(imag) {}
+
+    ASTNodeType type() const override { return ASTNodeType::COMPLEX_LITERAL; }
+    double real() const { return real_; }
+    double imag() const { return imag_; }
+
+private:
+    double real_;
+    double imag_;
+};
+
+/**
+ * Vector literal node (Phase 3)
+ *
+ * Examples:
+ *   [1, 2, 3]
+ *   [sin(0), cos(0), tan(0)]
+ */
+class VectorLiteralNode : public ASTNode {
+public:
+    explicit VectorLiteralNode(std::vector<std::unique_ptr<ASTNode>> elements)
+        : elements_(std::move(elements)) {}
+
+    ASTNodeType type() const override { return ASTNodeType::VECTOR_LITERAL; }
+    const std::vector<std::unique_ptr<ASTNode>>& elements() const { return elements_; }
+
+private:
+    std::vector<std::unique_ptr<ASTNode>> elements_;
+};
+
+/**
+ * Matrix literal node (Phase 3)
+ *
+ * Examples:
+ *   [[1, 2], [3, 4]]
+ *   [[sin(0), cos(0)], [1, 2]]
+ */
+class MatrixLiteralNode : public ASTNode {
+public:
+    explicit MatrixLiteralNode(std::vector<std::vector<std::unique_ptr<ASTNode>>> rows)
+        : rows_(std::move(rows)) {}
+
+    ASTNodeType type() const override { return ASTNodeType::MATRIX_LITERAL; }
+    const std::vector<std::vector<std::unique_ptr<ASTNode>>>& rows() const { return rows_; }
+
+private:
+    std::vector<std::vector<std::unique_ptr<ASTNode>>> rows_;
 };
 
 } // namespace parser
