@@ -54,3 +54,8 @@ Thumbs.db
 
 # Claude directory
 .claude/
+
+# Test/demo directories
+test-npm-install/
+NPM_PREPARATION_SUMMARY.md
+PUBLISH.md

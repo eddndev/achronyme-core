@@ -668,7 +668,8 @@ export class Achronyme {
    */
   reduce(fn: string | AchronymeValue, arr: AchronymeValue, initial: number): AchronymeValue {
     const fnExpr = typeof fn === 'string' ? fn : fn._varName;
-    return this._createFromExpression(`reduce(${fnExpr}, ${arr._varName}, ${initial})`);
+    // Core expects: reduce(f, init, collection)
+    return this._createFromExpression(`reduce(${fnExpr}, ${initial}, ${arr._varName})`);
   }
 
   /**

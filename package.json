@@ -1,6 +1,6 @@
 {
   "name": "@achronyme/core",
-  "version": "0.3.0",
+  "version": "0.3.0-beta-3",
   "type": "module",
   "description": "High-performance mathematical computation engine with DSP and functional programming - TypeScript SDK over WebAssembly core",
   "main": "dist/sdk/index.js",

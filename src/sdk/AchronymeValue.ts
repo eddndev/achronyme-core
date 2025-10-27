@@ -224,6 +224,15 @@ export class AchronymeValue {
   }
 
   /**
+   * Modulo operation
+   */
+  mod(other: AchronymeValue | number): AchronymeValue {
+    this.checkDisposed();
+    const otherExpr = typeof other === 'number' ? other.toString() : other._varName;
+    return (this.ach as any)._createFromExpression(`${this.varName} % ${otherExpr}`);
+  }
+
+  /**
    * Negate (unary minus)
    */
   neg(): AchronymeValue {
