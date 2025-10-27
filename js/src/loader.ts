@@ -23,6 +23,7 @@ export async function loadWASM(): Promise<AchronymeModule> {
   try {
     // Import the Emscripten-generated module
     // In production, this path should be configurable
+    // @ts-ignore - WASM module doesn't have TypeScript declarations
     const AchronymeCore = await import('../../dist/achronyme-core.js');
 
     // Initialize the module

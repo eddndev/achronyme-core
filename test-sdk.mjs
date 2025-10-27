@@ -210,6 +210,149 @@ await asyncTest('Hanning window', async () => {
 console.log();
 
 // ============================================================================
+// Optimization Functions Tests (NEW)
+// ============================================================================
+console.log('⚡ Optimization Functions (Reduce JS-WASM Overhead)');
+
+await asyncTest('linspace - Generate linearly spaced samples', async () => {
+  const t = ach.linspace(0, 10, 11);
+  const val = await t.toVector();
+  t.dispose();
+  if (val.length !== 11) {
+    throw new Error(`Expected 11 samples, got ${val.length}`);
+  }
+  if (Math.abs(val[0] - 0) > 0.0001) {
+    throw new Error(`Expected first sample 0, got ${val[0]}`);
+  }
+  if (Math.abs(val[10] - 10) > 0.0001) {
+    throw new Error(`Expected last sample 10, got ${val[10]}`);
+  }
+  if (Math.abs(val[5] - 5) > 0.0001) {
+    throw new Error(`Expected middle sample 5, got ${val[5]}`);
+  }
+});
+
+await asyncTest('fft_phase - FFT phase spectrum', async () => {
+  const sig = ach.vector([1, 2, 3, 4, 5, 6, 7, 8]);
+  const phase = ach.fft_phase(sig);
+  const val = await phase.toVector();
+  sig.dispose();
+  phase.dispose();
+  if (val.length !== 8) {
+    throw new Error(`Expected 8 samples, got ${val.length}`);
+  }
+  // Phase values should be in range [-π, π] with small tolerance for floating point
+  const epsilon = 1e-6;
+  const allInRange = val.every(p => p >= -Math.PI - epsilon && p <= Math.PI + epsilon);
+  if (!allInRange) {
+    const outOfRange = val.filter(p => p < -Math.PI - epsilon || p > Math.PI + epsilon);
+    throw new Error(`Phase values out of range [-π, π]: ${outOfRange}`);
+  }
+});
+
+await asyncTest('fftshift - Center FFT spectrum', async () => {
+  const vec = ach.vector([0, 1, 2, 3, 4, 5]);
+  const shifted = ach.fftshift(vec);
+  const val = await shifted.toVector();
+  vec.dispose();
+  shifted.dispose();
+  // fftshift([0,1,2,3,4,5]) should give [3,4,5,0,1,2]
+  if (val.length !== 6) {
+    throw new Error(`Expected 6 samples, got ${val.length}`);
+  }
+  if (val[0] !== 3 || val[3] !== 0) {
+    throw new Error(`Expected [3,4,5,0,1,2], got [${val.join(',')}]`);
+  }
+});
+
+await asyncTest('ifftshift - Inverse of fftshift', async () => {
+  const vec = ach.vector([3, 4, 5, 0, 1, 2]);
+  const shifted = ach.ifftshift(vec);
+  const val = await shifted.toVector();
+  vec.dispose();
+  shifted.dispose();
+  // ifftshift([3,4,5,0,1,2]) should give [0,1,2,3,4,5]
+  if (val.length !== 6) {
+    throw new Error(`Expected 6 samples, got ${val.length}`);
+  }
+  if (val[0] !== 0 || val[5] !== 5) {
+    throw new Error(`Expected [0,1,2,3,4,5], got [${val.join(',')}]`);
+  }
+});
+
+await asyncTest('fft_spectrum - All-in-one spectrum analysis', async () => {
+  // Create a simple test signal
+  const sig = ach.vector([1, 0, -1, 0, 1, 0, -1, 0]);
+  const fs = 8; // 8 Hz sampling rate
+
+  // Compute spectrum with all defaults: shift=true, angular=true, no range filter
+  const spectrum = ach.fft_spectrum(sig, fs, true, true, -1);
+  const result = await spectrum.toMatrix();
+  sig.dispose();
+  spectrum.dispose();
+
+  // Result should be a matrix with 3 columns: [omega, magnitude, phase]
+  if (!Array.isArray(result) || result.length === 0) {
+    throw new Error('Expected non-empty matrix result');
+  }
+  if (result[0].length !== 3) {
+    throw new Error(`Expected 3 columns [omega, mag, phase], got ${result[0].length}`);
+  }
+
+  // Check that we have omega, magnitude, and phase values
+  const omega = result.map(row => row[0]);
+  const magnitude = result.map(row => row[1]);
+  const phase = result.map(row => row[2]);
+
+  if (omega.length === 0 || magnitude.length === 0 || phase.length === 0) {
+    throw new Error('Empty spectrum components');
+  }
+
+  // With shift=true, omega should be centered around 0
+  const hasNegative = omega.some(w => w < 0);
+  const hasPositive = omega.some(w => w > 0);
+  if (!hasNegative || !hasPositive) {
+    throw new Error('Expected shifted frequencies around 0');
+  }
+
+  // All magnitudes should be non-negative
+  const allNonNegative = magnitude.every(m => m >= 0);
+  if (!allNonNegative) {
+    throw new Error('Expected all magnitudes to be non-negative');
+  }
+
+  // All phases should be in range [-π, π]
+  const allPhasesInRange = phase.every(p => p >= -Math.PI && p <= Math.PI);
+  if (!allPhasesInRange) {
+    throw new Error('Phase values out of range [-π, π]');
+  }
+});
+
+await asyncTest('fft_spectrum with range filter', async () => {
+  const sig = ach.vector([1, 2, 3, 4, 5, 6, 7, 8]);
+  const fs = 100; // 100 Hz sampling rate
+  const omegaRange = 50; // Filter to [-50, 50] rad/s
+
+  const spectrum = ach.fft_spectrum(sig, fs, true, true, omegaRange);
+  const result = await spectrum.toMatrix();
+  sig.dispose();
+  spectrum.dispose();
+
+  if (result.length === 0) {
+    throw new Error('Expected non-empty filtered spectrum');
+  }
+
+  // Check that all omega values are within the specified range
+  const omega = result.map(row => row[0]);
+  const allInRange = omega.every(w => w >= -omegaRange && w <= omegaRange);
+  if (!allInRange) {
+    throw new Error(`Expected all omega in range [-${omegaRange}, ${omegaRange}]`);
+  }
+});
+
+console.log();
+
+// ============================================================================
 // Functional Programming Tests
 // ============================================================================
 console.log('λ Functional Programming');

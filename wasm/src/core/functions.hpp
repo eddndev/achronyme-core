@@ -71,6 +71,7 @@ Value dftMagFunction(const std::vector<Value>& args);
 Value dftPhaseFunction(const std::vector<Value>& args);
 Value fftFunction(const std::vector<Value>& args);
 Value fftMagFunction(const std::vector<Value>& args);
+Value fftPhaseFunction(const std::vector<Value>& args);
 Value ifftFunction(const std::vector<Value>& args);
 
 // Convolution
@@ -81,6 +82,12 @@ Value convFFTFunction(const std::vector<Value>& args);
 Value hanningFunction(const std::vector<Value>& args);
 Value hammingFunction(const std::vector<Value>& args);
 Value blackmanFunction(const std::vector<Value>& args);
+
+// Optimization functions (Reduce JS-WASM overhead)
+Value linspaceFunction(const std::vector<Value>& args);
+Value fftshiftFunction(const std::vector<Value>& args);
+Value ifftshiftFunction(const std::vector<Value>& args);
+Value fftSpectrumFunction(const std::vector<Value>& args);
 
 } // namespace core
 } // namespace achronyme

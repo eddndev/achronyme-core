@@ -509,6 +509,7 @@ void FunctionRegistry::registerBuiltInFunctions() {
 
     registerFunction("fft", fftFunction, 1);  // fft(signal) -> Matrix [N x 2]
     registerFunction("fft_mag", fftMagFunction, 1);  // fft_mag(signal) -> Vector
+    registerFunction("fft_phase", fftPhaseFunction, 1);  // fft_phase(signal) -> Vector
     registerFunction("ifft", ifftFunction, 1);  // ifft(spectrum) -> Vector
 
     // Convolution
@@ -519,6 +520,15 @@ void FunctionRegistry::registerBuiltInFunctions() {
     registerFunction("hanning", hanningFunction, 1);  // hanning(N) -> Vector
     registerFunction("hamming", hammingFunction, 1);  // hamming(N) -> Vector
     registerFunction("blackman", blackmanFunction, 1);  // blackman(N) -> Vector
+
+    // ========================================================================
+    // Optimization Functions (Reduce JS-WASM overhead)
+    // ========================================================================
+
+    registerFunction("linspace", linspaceFunction, 3);  // linspace(start, end, N) -> Vector
+    registerFunction("fftshift", fftshiftFunction, 1);  // fftshift(vector) -> Vector
+    registerFunction("ifftshift", ifftshiftFunction, 1);  // ifftshift(vector) -> Vector
+    registerFunction("fft_spectrum", fftSpectrumFunction, -1);  // fft_spectrum(signal, fs, shift?, angular?, omegaRange?) -> Matrix [N x 3]
 }
 
 } // namespace core
