@@ -1,61 +1,36 @@
-# Source files (not needed in npm package)
+# Development files
 wasm/
 src/
 examples/
-scripts/
+test-npm-install/
+docs/
 
 # Build artifacts
-*.o
-*.obj
-*.wasm.map
-
-# Development files
-.git/
-.gitignore
-.vscode/
-.idea/
 *.log
+*.tmp
 node_modules/
 
-# Test files
-test-*.mjs
-demo-*.mjs
-*.test.ts
-*.test.js
-*.spec.ts
-*.spec.js
-
-# Configuration files
-tsconfig*.json
-vitest.config.ts
-.eslintrc*
-.prettierrc*
-
-# Documentation (keep only README.md)
-CONTRIBUTING.md
-PROJECT_SUMMARY.md
-BUILD_SUCCESS.md
-PHASE*.md
-CHANGELOG.md
-VARIABLE_PERSISTENCE.md
-ARCHITECTURE_COMPARISON.md
-FUNCTIONAL_PROGRAMMING_REQUIREMENTS.md
-SDK-IMPLEMENTATION.md
-SDK-SUMMARY.md
-KNOWN-ISSUES.md
-
-# Temporary files
-*.tmp
-*.bak
+# IDE
+.vscode/
+.idea/
 *.swp
-.DS_Store
-Thumbs.db
+*.swo
 
+# Git
+.git/
+.gitignore
 
-# Claude directory
-.claude/
+# Tests
+test-*
+*.test.*
+__tests__/
 
-# Test/demo directories
-test-npm-install/
-NPM_PREPARATION_SUMMARY.md
-PUBLISH.md
+# Scripts
+scripts/
+
+# TypeScript config
+tsconfig*.json
+
+# Demo files
+demo-*.mjs
+debug-*.mjs
