@@ -36,8 +36,7 @@ std::string eval(const std::string& expression) {
 
         // 3. Evaluator: AST → result
         // ✨ Uses GLOBAL evaluator - variables persist!
-        // ✨ Saves AST so lambda bodies remain valid!
-        auto result = globalEvaluator.evaluateAndSave(std::move(ast));
+        auto result = globalEvaluator.evaluate(ast.get());
 
         // Return string representation
         return result.toString();

@@ -58,6 +58,21 @@ private:
     void registerBuiltInFunctions();
 };
 
+// Higher-order functions (Phase 4A)
+Value mapFunction(const std::vector<Value>& args);
+Value filterFunction(const std::vector<Value>& args);
+Value reduceFunction(const std::vector<Value>& args);
+Value composeFunction(const std::vector<Value>& args);
+Value pipeFunction(const std::vector<Value>& args);
+
+// DSP functions (Phase 4B)
+Value dftFunction(const std::vector<Value>& args);
+Value dftMagFunction(const std::vector<Value>& args);
+Value dftPhaseFunction(const std::vector<Value>& args);
+Value fftFunction(const std::vector<Value>& args);
+Value fftMagFunction(const std::vector<Value>& args);
+Value ifftFunction(const std::vector<Value>& args);
+
 } // namespace core
 } // namespace achronyme
 

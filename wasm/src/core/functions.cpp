@@ -316,6 +316,29 @@ void FunctionRegistry::registerBuiltInFunctions() {
         Matrix M = args[0].asMatrix();
         return Value(M.trace());
     }, 1);
+
+    // ========================================================================
+    // Phase 4A: Higher-Order Functions
+    // ========================================================================
+
+    registerFunction("map", mapFunction, -1);  // variadic: map(f, coll1, coll2, ...)
+    registerFunction("filter", filterFunction, 2);  // filter(predicate, collection)
+    registerFunction("reduce", reduceFunction, 3);  // reduce(f, init, collection)
+    registerFunction("pipe", pipeFunction, -1);  // variadic: pipe(value, f1, f2, ...)
+    // compose requires returning a function (deferred for now)
+    // registerFunction("compose", composeFunction, -1);
+
+    // ========================================================================
+    // Phase 4B: DSP Functions
+    // ========================================================================
+
+    registerFunction("dft", dftFunction, 1);  // dft(signal) -> Matrix [N x 2]
+    registerFunction("dft_mag", dftMagFunction, 1);  // dft_mag(signal) -> Vector
+    registerFunction("dft_phase", dftPhaseFunction, 1);  // dft_phase(signal) -> Vector
+
+    registerFunction("fft", fftFunction, 1);  // fft(signal) -> Matrix [N x 2]
+    registerFunction("fft_mag", fftMagFunction, 1);  // fft_mag(signal) -> Vector
+    registerFunction("ifft", ifftFunction, 1);  // ifft(spectrum) -> Vector
 }
 
 } // namespace core

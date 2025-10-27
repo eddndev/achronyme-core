@@ -1,6 +1,8 @@
 #ifndef ACHRONYME_PARSER_EVALUATOR_HPP
 #define ACHRONYME_PARSER_EVALUATOR_HPP
 
+#include <memory>
+#include <vector>
 #include "ast.hpp"
 #include "environment.hpp"
 #include "../core/value.hpp"
@@ -35,6 +37,9 @@ public:
     // Evaluate an AST and return the result
     core::Value evaluate(const ASTNode* node);
 
+    // Evaluate and save AST (for lambdas that need the AST to stay alive)
+    core::Value evaluateAndSave(std::unique_ptr<ASTNode> ast);
+
     // Get the environment (for testing/debugging)
     Environment& environment() { return env_; }
     const Environment& environment() const { return env_; }
@@ -42,7 +47,12 @@ public:
     // Apply a lambda function with arguments (Phase 4A: Higher-order functions)
     core::Value applyFunction(const core::Function& func, const std::vector<core::Value>& args);
 
+    // Get current evaluator instance (for HOF functions)
+    static Evaluator* getCurrentEvaluator() { return currentEvaluator_; }
+
 private:
+    // Thread-local current evaluator (for HOF access)
+    static thread_local Evaluator* currentEvaluator_;
     // Helper methods for each node type
     core::Value evaluateNumber(const NumberNode* node);
     core::Value evaluateBinaryOp(const BinaryOpNode* node);
@@ -63,6 +73,10 @@ private:
 
     // Environment for variable storage
     Environment env_;
+
+    // Phase 4A: AST storage for lambda bodies
+    // Keeps ASTs alive so lambda body pointers remain valid
+    std::vector<std::shared_ptr<ASTNode>> savedASTs_;
 };
 
 } // namespace parser

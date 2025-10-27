@@ -6,41 +6,81 @@
 namespace achronyme {
 namespace parser {
 
+// Thread-local current evaluator for HOF access
+thread_local Evaluator* Evaluator::currentEvaluator_ = nullptr;
+
 core::Value Evaluator::evaluate(const ASTNode* node) {
-    switch (node->type()) {
-        case ASTNodeType::NUMBER:
-            return evaluateNumber(static_cast<const NumberNode*>(node));
+    // Set current evaluator for HOF functions
+    Evaluator* savedEvaluator = currentEvaluator_;
+    currentEvaluator_ = this;
 
-        case ASTNodeType::BINARY_OP:
-            return evaluateBinaryOp(static_cast<const BinaryOpNode*>(node));
+    core::Value result;
 
-        case ASTNodeType::UNARY_OP:
-            return evaluateUnaryOp(static_cast<const UnaryOpNode*>(node));
+    try {
+        switch (node->type()) {
+            case ASTNodeType::NUMBER:
+                result = evaluateNumber(static_cast<const NumberNode*>(node));
+                break;
 
-        case ASTNodeType::FUNCTION_CALL:
-            return evaluateFunctionCall(static_cast<const FunctionCallNode*>(node));
+            case ASTNodeType::BINARY_OP:
+                result = evaluateBinaryOp(static_cast<const BinaryOpNode*>(node));
+                break;
 
-        case ASTNodeType::COMPLEX_LITERAL:
-            return evaluateComplexLiteral(static_cast<const ComplexLiteralNode*>(node));
+            case ASTNodeType::UNARY_OP:
+                result = evaluateUnaryOp(static_cast<const UnaryOpNode*>(node));
+                break;
 
-        case ASTNodeType::VECTOR_LITERAL:
-            return evaluateVectorLiteral(static_cast<const VectorLiteralNode*>(node));
+            case ASTNodeType::FUNCTION_CALL:
+                result = evaluateFunctionCall(static_cast<const FunctionCallNode*>(node));
+                break;
 
-        case ASTNodeType::MATRIX_LITERAL:
-            return evaluateMatrixLiteral(static_cast<const MatrixLiteralNode*>(node));
+            case ASTNodeType::COMPLEX_LITERAL:
+                result = evaluateComplexLiteral(static_cast<const ComplexLiteralNode*>(node));
+                break;
 
-        case ASTNodeType::VARIABLE_DECLARATION:
-            return evaluateVariableDeclaration(static_cast<const VariableDeclarationNode*>(node));
+            case ASTNodeType::VECTOR_LITERAL:
+                result = evaluateVectorLiteral(static_cast<const VectorLiteralNode*>(node));
+                break;
 
-        case ASTNodeType::VARIABLE_REFERENCE:
-            return evaluateVariableReference(static_cast<const VariableReferenceNode*>(node));
+            case ASTNodeType::MATRIX_LITERAL:
+                result = evaluateMatrixLiteral(static_cast<const MatrixLiteralNode*>(node));
+                break;
 
-        case ASTNodeType::LAMBDA:
-            return evaluateLambda(static_cast<const LambdaNode*>(node));
+            case ASTNodeType::VARIABLE_DECLARATION:
+                result = evaluateVariableDeclaration(static_cast<const VariableDeclarationNode*>(node));
+                break;
 
-        default:
-            throw std::runtime_error("Unknown AST node type");
+            case ASTNodeType::VARIABLE_REFERENCE:
+                result = evaluateVariableReference(static_cast<const VariableReferenceNode*>(node));
+                break;
+
+            case ASTNodeType::LAMBDA:
+                result = evaluateLambda(static_cast<const LambdaNode*>(node));
+                break;
+
+            default:
+                throw std::runtime_error("Unknown AST node type");
+        }
+    } catch (...) {
+        // Restore evaluator even on exception
+        currentEvaluator_ = savedEvaluator;
+        throw;
     }
+
+    // Restore previous evaluator
+    currentEvaluator_ = savedEvaluator;
+
+    return result;
+}
+
+// Evaluate and save AST (keeps AST alive for lambda bodies)
+core::Value Evaluator::evaluateAndSave(std::unique_ptr<ASTNode> ast) {
+    // Convert unique_ptr to shared_ptr and save it
+    std::shared_ptr<ASTNode> sharedAST(std::move(ast));
+    savedASTs_.push_back(sharedAST);
+
+    // Evaluate using the saved AST
+    return evaluate(sharedAST.get());
 }
 
 core::Value Evaluator::evaluateNumber(const NumberNode* node) {
@@ -142,7 +182,26 @@ core::Value Evaluator::evaluateFunctionCall(const FunctionCallNode* node) {
         }
     }
 
-    // Otherwise, it's a function call
+    // Phase 4A: Check if it's a lambda stored in a variable
+    if (env_.has(name)) {
+        core::Value varValue = env_.get(name);
+
+        // If it's a function, call it
+        if (varValue.isFunction()) {
+            // Evaluate all arguments
+            std::vector<core::Value> args;
+            for (const auto& argNode : argNodes) {
+                args.push_back(evaluate(argNode.get()));
+            }
+
+            // Apply the lambda function
+            return applyFunction(varValue.asFunction(), args);
+        }
+
+        // If it's not a function, fall through to error
+    }
+
+    // Otherwise, it's a built-in function call
     auto& funcRegistry = core::FunctionRegistry::instance();
 
     if (!funcRegistry.hasFunction(name)) {
@@ -273,6 +332,44 @@ core::Value Evaluator::evaluateLambda(const LambdaNode* node) {
 
     // Return as Value
     return core::Value(func);
+}
+
+// Apply a lambda function with arguments
+// Used by map, filter, reduce, etc.
+core::Value Evaluator::applyFunction(const core::Function& func, const std::vector<core::Value>& args) {
+    // Check arity
+    if (args.size() != func.arity()) {
+        throw std::runtime_error("Function expects " + std::to_string(func.arity()) +
+                               " arguments, got " + std::to_string(args.size()));
+    }
+
+    // Create a new environment extending the closure
+    Environment callEnv;
+
+    // Copy closure variables
+    if (func.closure()) {
+        callEnv = *func.closure();
+    }
+
+    // Bind parameters to arguments
+    const auto& params = func.params();
+    for (size_t i = 0; i < params.size(); ++i) {
+        callEnv.define(params[i], args[i]);
+    }
+
+    // Save current environment
+    Environment savedEnv = env_;
+
+    // Switch to call environment
+    env_ = callEnv;
+
+    // Evaluate function body
+    core::Value result = evaluate(func.body());
+
+    // Restore environment
+    env_ = savedEnv;
+
+    return result;
 }
 
 } // namespace parser
