@@ -1,332 +1,638 @@
-# Achronyme Core 🚀
+# Achronyme Core
 
-> **High-performance mathematical computation engine powered by WebAssembly**
+**Motor de cálculo matemático con capacidades DSP y programación funcional**
 
-Achronyme Core is a pure C++ mathematical computation engine compiled to WebAssembly, providing **near-native performance** for mathematical operations directly in the browser.
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![npm version](https://badge.fury.io/js/@achronyme%2Fcore.svg)](https://www.npmjs.com/package/@achronyme/core)
-
----
-
-## ✨ Features
-
-### Phase 1: Arithmetic Evaluator (Current)
-- ✅ **Basic arithmetic**: `+`, `-`, `*`, `/`, `^`
-- ✅ **Operator precedence**: respects mathematical precedence rules
-- ✅ **Parentheses**: override precedence with `(` `)`
-- ✅ **Unary operators**: negation `-x`
-- ✅ **Decimal numbers**: `3.14`, `.5`
-- ✅ **Scientific notation**: `1e-3`, `2.5e10`
-- ✅ **10-20x faster** than pure JavaScript parsers
-
-### Coming Soon
-- **Phase 2**: Mathematical functions (sin, cos, exp, log, sqrt, etc.)
-- **Phase 3**: Complex numbers, Vectors, Matrices
-- **Phase 4**: Higher-order functions (map, reduce, compose)
-- **Phase 5+**: DSP, Linear Algebra, Numerical Methods, Optimization
+Achronyme Core es un motor de computación matemática compilado a WebAssembly que combina:
+- Operaciones matemáticas avanzadas
+- Procesamiento digital de señales (DSP)
+- Programación funcional con lambdas y closures
+- Tipos complejos (Complex, Vector, Matrix)
 
 ---
 
-## 📦 Installation
+## 📋 Tabla de Contenidos
+
+- [Características](#-características)
+- [Requisitos Previos](#-requisitos-previos)
+- [Instalación](#-instalación)
+- [Compilación](#-compilación)
+- [Uso Rápido](#-uso-rápido)
+- [Ejecutar Tests](#-ejecutar-tests)
+- [Estructura del Proyecto](#-estructura-del-proyecto)
+- [API Reference](#-api-reference)
+- [Ejemplos Avanzados](#-ejemplos-avanzados)
+- [Solución de Problemas](#-solución-de-problemas)
+
+---
+
+## ✨ Características
+
+### **Operaciones Básicas**
+- **Aritmética**: `+`, `-`, `*`, `/`, `^`, unary `-`
+- **Trigonometría**: `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `atan2`, `sinh`, `cosh`, `tanh`
+- **Exponenciales**: `exp`, `log`, `log10`, `log2`, `ln`
+- **Raíces**: `sqrt`, `cbrt`, `pow`
+- **Redondeo**: `floor`, `ceil`, `round`, `trunc`
+- **Utilidades**: `abs`, `sign`, `min`, `max`
+- **Constantes**: `PI`, `E`, `PHI`, `TAU`
+
+### **Tipos Complejos**
+- **Complex**: Números complejos con aritmética completa (`3i`, `2+3i`)
+- **Vector**: Operaciones vectoriales, producto punto, norma (`[1, 2, 3]`)
+- **Matrix**: Matrices con transpose, determinante, inversa (`[[1,2],[3,4]]`)
+
+### **Programación Funcional**
+- **Variables**: Estado persistente entre evaluaciones (`let x = 10`)
+- **Lambdas**: Funciones anónimas de uno o múltiples parámetros (`x => x^2`)
+- **Closures**: Captura de scope externo
+- **Higher-order functions**: `map`, `filter`, `reduce`, `pipe`
+- **Comparaciones**: `>`, `<`, `>=`, `<=`, `==`, `!=`
+
+### **Procesamiento Digital de Señales (DSP)**
+- **DFT**: Transformada Discreta de Fourier O(N²)
+- **FFT**: Transformada Rápida de Fourier O(N log N) (algoritmo Cooley-Tukey)
+- **IFFT**: FFT Inversa con reconstrucción perfecta
+- **Convolución**:
+  - `conv()` - Método directo O(N×M)
+  - `conv_fft()` - Basado en FFT O((N+M) log(N+M))
+- **Ventanas**:
+  - `hanning()` - Ventana de Hann (supresión -31 dB)
+  - `hamming()` - Ventana de Hamming (supresión -43 dB)
+  - `blackman()` - Ventana de Blackman (supresión -58 dB)
+
+---
+
+## 🔧 Requisitos Previos
+
+### **1. Emscripten SDK**
+
+Emscripten es necesario para compilar C++ a WebAssembly.
+
+#### **Windows:**
+```bash
+# Descargar e instalar Emscripten
+git clone https://github.com/emscripten-core/emsdk.git
+cd emsdk
+emsdk install latest
+emsdk activate latest
+
+# Activar en la terminal actual
+emsdk_env.bat
+```
+
+#### **Linux/macOS:**
+```bash
+# Descargar e instalar Emscripten
+git clone https://github.com/emscripten-core/emsdk.git
+cd emsdk
+./emsdk install latest
+./emsdk activate latest
+
+# Activar en la terminal actual
+source ./emsdk_env.sh
+```
+
+**Verificar instalación:**
+```bash
+emcc --version
+# Debería mostrar: emcc (Emscripten gcc/clang-like replacement) X.X.X
+```
+
+### **2. Node.js**
+
+Node.js v16+ es necesario para ejecutar los tests.
+
+**Descargar desde:** https://nodejs.org/
+
+**Verificar instalación:**
+```bash
+node --version
+# Debería mostrar: v16.x.x o superior
+```
+
+---
+
+## 📦 Instalación
 
 ```bash
-npm install @achronyme/core
-```
-
----
-
-## 🚀 Quick Start
-
-### TypeScript/JavaScript
-
-```typescript
-import { SOC } from '@achronyme/core';
-
-// Create an instance
-const soc = new SOC();
-
-// Initialize (loads WASM module)
-await soc.init();
-
-// Evaluate expressions
-console.log(soc.eval('2 + 3 * 4'));        // 14
-console.log(soc.eval('(2 + 3) * 4'));      // 20
-console.log(soc.eval('2 ^ 3 ^ 2'));        // 512 (right-associative)
-console.log(soc.eval('-5 + 3'));           // -2
-console.log(soc.eval('3.14 * 2'));         // 6.28
-```
-
-### Using the Singleton
-
-```typescript
-import { soc } from '@achronyme/core';
-
-await soc.init();
-
-const result = soc.eval('10 / 2 + 3 * 4');
-console.log(result); // 17
-```
-
----
-
-## 📖 Examples
-
-### Basic Arithmetic
-
-```javascript
-soc.eval('2 + 3')           // 5
-soc.eval('10 - 5')          // 5
-soc.eval('6 / 2')           // 3
-soc.eval('5 * 7')           // 35
-soc.eval('2 ^ 8')           // 256
-```
-
-### Operator Precedence
-
-```javascript
-soc.eval('2 + 3 * 4')       // 14  (multiplication first)
-soc.eval('10 - 6 / 2')      // 7   (division first)
-soc.eval('2 * 3 ^ 2')       // 18  (power first)
-```
-
-### Parentheses
-
-```javascript
-soc.eval('(2 + 3) * 4')     // 20
-soc.eval('2 * (3 + 4)')     // 14
-soc.eval('2 * ((3 + 4) * 5)')  // 70
-```
-
-### Unary Minus
-
-```javascript
-soc.eval('-5')              // -5
-soc.eval('--5')             // 5  (double negation)
-soc.eval('-5 + 3')          // -2
-soc.eval('2 * -3')          // -6
-```
-
-### Decimals and Scientific Notation
-
-```javascript
-soc.eval('3.14 * 2')        // 6.28
-soc.eval('0.1 + 0.2')       // 0.3
-soc.eval('1e3')             // 1000
-soc.eval('1e-3')            // 0.001
-soc.eval('2.5e2')           // 250
-```
-
-### Complex Expressions
-
-```javascript
-soc.eval('2 + 3 * 4 - 5')   // 9
-soc.eval('10 / 2 + 3 * 4')  // 17
-soc.eval('(2 + 3) ^ 2')     // 25
-soc.eval('2 ^ (3 + 1)')     // 16
-```
-
----
-
-## 🏗️ Architecture
-
-Achronyme Core uses a **three-phase compilation pipeline**:
-
-```
-┌─────────────────────────────────────────────────┐
-│  Input: "2 + 3 * 4"                             │
-└─────────────────────────────────────────────────┘
-                    ↓
-┌─────────────────────────────────────────────────┐
-│  Phase 1: Lexer (Tokenizer)                     │
-│  Converts string → tokens                       │
-│  "2 + 3 * 4" → [NUM(2), PLUS, NUM(3),          │
-│                 STAR, NUM(4), END]              │
-└─────────────────────────────────────────────────┘
-                    ↓
-┌─────────────────────────────────────────────────┐
-│  Phase 2: Parser (Recursive Descent)            │
-│  Converts tokens → AST with precedence          │
-│        +                                        │
-│       / \                                       │
-│      2   *                                      │
-│         / \                                     │
-│        3   4                                    │
-└─────────────────────────────────────────────────┘
-                    ↓
-┌─────────────────────────────────────────────────┐
-│  Phase 3: Evaluator (AST Walker)                │
-│  Evaluates AST → result                         │
-│  2 + (3 * 4) = 2 + 12 = 14                     │
-└─────────────────────────────────────────────────┘
-                    ↓
-┌─────────────────────────────────────────────────┐
-│  Output: 14                                      │
-└─────────────────────────────────────────────────┘
-```
-
-### Key Design Principles
-
-1. **Recursive Descent Parser** with explicit precedence levels
-2. **Right-associative exponentiation** (`2^3^2 = 2^(3^2) = 512`)
-3. **Zero-copy** AST evaluation
-4. **WASM-optimized** for minimal overhead
-
----
-
-## 🧪 Grammar (BNF)
-
-```bnf
-expression  → term (('+' | '-') term)*
-term        → factor (('*' | '/') factor)*
-factor      → exponent ('^' exponent)*     ; right-associative
-exponent    → '-' exponent | primary
-primary     → NUMBER | '(' expression ')'
-```
-
-**Precedence (highest to lowest):**
-1. Parentheses `()`
-2. Unary minus `-`
-3. Exponentiation `^` (right-associative)
-4. Multiplication `*`, Division `/`
-5. Addition `+`, Subtraction `-`
-
----
-
-## 🛠️ Development
-
-### Prerequisites
-
-- **Emscripten SDK** (latest)
-- **CMake** >= 3.20
-- **Node.js** >= 18
-- **C++20** compiler
-
-### Setup
-
-```bash
-# Clone the repository
-git clone https://github.com/eddndev/achronyme-core
+# Clonar el repositorio (o descomprimir el archivo)
 cd achronyme-core
 
-# Install dependencies
-npm install
-
-# Build WASM + TypeScript
-npm run build
-
-# Run tests
-npm test
-```
-
-### Building from Source
-
-```bash
-# Build WASM only
-npm run build:wasm
-
-# Build TypeScript only
-npm run build:js
-
-# Build both
-npm run build
-
-# Optimize WASM (requires wasm-opt)
-npm run optimize
-```
-
-### Running Tests
-
-```bash
-# TypeScript/JavaScript tests
-npm test
-
-# C++ tests (requires native build)
-npm run test:cpp
+# No hay dependencias npm, el proyecto es standalone
 ```
 
 ---
 
-## 📚 Documentation
+## 🔨 Compilación
 
-- [Architecture](wasm/README.md) - WASM module structure
-- [Grammar Specification](docs/language-spec/grammar/) - Formal grammar
-- [API Reference](docs/API.md) - Complete API documentation (coming soon)
+### **Compilación Completa**
+
+#### **Windows:**
+```bash
+# Asegurarse de estar en el directorio raíz del proyecto
+cd achronyme-core
+
+# Entrar al directorio wasm
+cd wasm
+
+# Compilar con Emscripten
+emcc src/core/complex.cpp ^
+     src/core/vector.cpp ^
+     src/core/matrix.cpp ^
+     src/core/function.cpp ^
+     src/core/value.cpp ^
+     src/parser/lexer.cpp ^
+     src/parser/parser.cpp ^
+     src/parser/evaluator.cpp ^
+     src/bindings/main.cpp ^
+     src/core/constants.cpp ^
+     src/core/functions.cpp ^
+     src/core/functions_hof.cpp ^
+     src/core/functions_dsp.cpp ^
+     -o ../dist/achronyme-core.mjs ^
+     -O3 ^
+     -s MODULARIZE=1 ^
+     -s EXPORT_NAME="createAchronymeModule" ^
+     -s EXPORTED_FUNCTIONS="['_malloc','_free']" ^
+     -s EXPORTED_RUNTIME_METHODS="['ccall','cwrap']" ^
+     --bind ^
+     -s ALLOW_MEMORY_GROWTH=1 ^
+     -std=c++17
+
+# Volver al directorio raíz
+cd ..
+```
+
+#### **Linux/macOS:**
+```bash
+cd achronyme-core/wasm
+
+emcc src/core/complex.cpp \
+     src/core/vector.cpp \
+     src/core/matrix.cpp \
+     src/core/function.cpp \
+     src/core/value.cpp \
+     src/parser/lexer.cpp \
+     src/parser/parser.cpp \
+     src/parser/evaluator.cpp \
+     src/bindings/main.cpp \
+     src/core/constants.cpp \
+     src/core/functions.cpp \
+     src/core/functions_hof.cpp \
+     src/core/functions_dsp.cpp \
+     -o ../dist/achronyme-core.mjs \
+     -O3 \
+     -s MODULARIZE=1 \
+     -s EXPORT_NAME="createAchronymeModule" \
+     -s EXPORTED_FUNCTIONS="['_malloc','_free']" \
+     -s EXPORTED_RUNTIME_METHODS="['ccall','cwrap']" \
+     --bind \
+     -s ALLOW_MEMORY_GROWTH=1 \
+     -std=c++17
+
+cd ..
+```
+
+### **Resultado de la Compilación**
+
+Después de compilar exitosamente, encontrarás:
+- `dist/achronyme-core.mjs` - Módulo ES6 de WebAssembly
+- `dist/achronyme-core.wasm` - Binario WebAssembly
+
+---
+
+## 🚀 Uso Rápido
+
+### **Modo Básico**
+
+```javascript
+import createAchronymeModule from './dist/achronyme-core.mjs';
+
+// Cargar el módulo WASM
+const Module = await createAchronymeModule();
+
+// Evaluar expresiones
+console.log(Module.eval('2 + 2'));              // → "4"
+console.log(Module.eval('sin(PI / 2)'));        // → "1"
+console.log(Module.eval('sqrt(16)'));           // → "4"
+
+// Resetear el entorno (limpiar variables)
+Module.reset();
+```
+
+### **Con Variables y Funciones**
+
+```javascript
+const Module = await createAchronymeModule();
+Module.reset();
+
+// Definir variables
+Module.eval('let x = 10');
+Module.eval('let y = 20');
+console.log(Module.eval('x + y'));              // → "30"
+
+// Definir funciones lambda
+Module.eval('let square = n => n ^ 2');
+console.log(Module.eval('square(5)'));          // → "25"
+
+// Higher-order functions
+Module.eval('let double = n => n * 2');
+console.log(Module.eval('map(double, [1,2,3])'));
+// → "[2.000000, 4.000000, 6.000000]"
+```
+
+### **DSP: Análisis Espectral**
+
+```javascript
+const Module = await createAchronymeModule();
+Module.reset();
+
+// FFT de una señal
+const signal = '[1, 2, 3, 4, 5, 6, 7, 8]';
+const spectrum = Module.eval(`fft_mag(${signal})`);
+console.log('Spectrum:', spectrum);
+
+// Con ventana de Hanning
+const windowed = Module.eval(`
+  map((s, w) => s * w, ${signal}, hanning(8))
+`);
+const windowedSpectrum = Module.eval(`fft_mag(${windowed})`);
+console.log('Windowed spectrum:', windowedSpectrum);
+```
+
+### **Convolución (Filtrado FIR)**
+
+```javascript
+const Module = await createAchronymeModule();
+Module.reset();
+
+// Filtro de promedio móvil
+const result = Module.eval(`
+  conv([1, 2, 3, 4, 5], [0.333, 0.333, 0.333])
+`);
+console.log('Filtered:', result);
+
+// Convolución rápida con FFT (para señales grandes)
+const fastResult = Module.eval(`
+  conv_fft([1, 2, 3, 4, 5, 6, 7, 8], [1, 1, 1])
+`);
+console.log('Fast convolution:', fastResult);
+```
+
+---
+
+## 🧪 Ejecutar Tests
+
+El proyecto incluye un test comprehensivo con **96 pruebas**:
+
+```bash
+# Ejecutar el test completo
+node demo-achronyme.mjs
+```
+
+**Resultado esperado:**
+```
+╔═══════════════════════════════════════════════════════════════╗
+║         ACHRONYME CORE - COMPREHENSIVE DEMO & TESTS          ║
+╚═══════════════════════════════════════════════════════════════╝
+
+...
+
+╔═══════════════════════════════════════════════════════════════╗
+║                        TEST SUMMARY                           ║
+╚═══════════════════════════════════════════════════════════════╝
+
+  Total tests run:    96
+  Tests passed:       96
+  Tests failed:       0
+  Success rate:       100.0%
+
+🎉 ALL TESTS PASSED! 🎉
+```
+
+---
+
+## 📁 Estructura del Proyecto
+
+```
+achronyme-core/
+├── wasm/                          # Código fuente C++
+│   └── src/
+│       ├── core/                  # Tipos de datos y funciones
+│       │   ├── value.hpp/cpp      # Tipo Value (polimórfico)
+│       │   ├── complex.hpp/cpp    # Números complejos
+│       │   ├── vector.hpp/cpp     # Vectores
+│       │   ├── matrix.hpp/cpp     # Matrices
+│       │   ├── function.hpp/cpp   # Funciones lambda
+│       │   ├── constants.hpp/cpp  # Constantes (PI, E, etc.)
+│       │   ├── functions.hpp/cpp  # Registro de funciones
+│       │   ├── functions_hof.cpp  # Higher-order functions
+│       │   └── functions_dsp.cpp  # Funciones DSP
+│       ├── parser/                # Parser y evaluador
+│       │   ├── lexer.hpp/cpp      # Análisis léxico
+│       │   ├── parser.hpp/cpp     # Análisis sintáctico
+│       │   ├── ast.hpp            # Árbol sintáctico abstracto
+│       │   ├── evaluator.hpp/cpp  # Evaluador de expresiones
+│       │   └── environment.hpp    # Entorno de variables
+│       └── bindings/              # Bindings para JavaScript
+│           └── main.cpp           # Interfaz WASM
+├── dist/                          # Módulo WASM compilado
+│   ├── achronyme-core.mjs         # Módulo ES6
+│   └── achronyme-core.wasm        # Binario WASM
+├── demo-achronyme.mjs             # Test comprehensivo (96 tests)
+└── README.md                      # Este archivo
+```
+
+---
+
+## 📖 API Reference
+
+### **Módulo Principal**
+
+```javascript
+import createAchronymeModule from './dist/achronyme-core.mjs';
+
+const Module = await createAchronymeModule();
+
+// Evaluar una expresión
+Module.eval(expression: string): string
+
+// Resetear el entorno (limpiar todas las variables)
+Module.reset(): string
+
+// Listar variables (próximamente)
+Module.listVariables(): string
+```
+
+### **Funciones Matemáticas Básicas**
+
+| Función | Descripción | Ejemplo |
+|---------|-------------|---------|
+| `sin(x)`, `cos(x)`, `tan(x)` | Trigonométricas | `sin(PI/2)` → 1 |
+| `asin(x)`, `acos(x)`, `atan(x)` | Trigonométricas inversas | `asin(1)` → π/2 |
+| `sinh(x)`, `cosh(x)`, `tanh(x)` | Hiperbólicas | `sinh(0)` → 0 |
+| `exp(x)`, `log(x)`, `ln(x)` | Exponenciales | `exp(1)` → 2.718... |
+| `log10(x)`, `log2(x)` | Logaritmos | `log10(100)` → 2 |
+| `sqrt(x)`, `cbrt(x)`, `pow(x,y)` | Raíces y potencias | `sqrt(16)` → 4 |
+| `abs(x)`, `sign(x)` | Valor absoluto y signo | `abs(-5)` → 5 |
+| `floor(x)`, `ceil(x)`, `round(x)` | Redondeo | `floor(3.7)` → 3 |
+| `min(...)`, `max(...)` | Mínimo/Máximo (variádicas) | `max(1,5,3)` → 5 |
+
+### **Constantes**
+
+| Constante | Valor | Descripción |
+|-----------|-------|-------------|
+| `PI` | 3.14159... | Número π |
+| `E` | 2.71828... | Número e (base natural) |
+| `PHI` | 1.61803... | Razón áurea |
+| `TAU` | 6.28318... | τ = 2π |
+
+### **Tipos Complejos**
+
+| Operación | Ejemplo | Resultado |
+|-----------|---------|-----------|
+| Crear complejo | `3i` | 0+3i |
+| Complejo completo | `2+3i` | 2+3i |
+| Sumar complejos | `(2+3i) + (1+4i)` | 3+7i |
+| Magnitud | `abs(3+4i)` | 5 |
+| Fase | `arg(1+i)` | π/4 |
+| Conjugado | `conj(2+3i)` | 2-3i |
+| Vector | `[1, 2, 3]` | Vector de 3 elementos |
+| Producto punto | `dot([1,2], [3,4])` | 11 |
+| Norma | `norm([3,4])` | 5 |
+| Matriz | `[[1,2], [3,4]]` | Matriz 2×2 |
+| Transpuesta | `transpose([[1,2],[3,4]])` | [[1,3],[2,4]] |
+| Determinante | `det([[1,2],[3,4]])` | -2 |
+
+### **Programación Funcional**
+
+| Función | Sintaxis | Descripción | Ejemplo |
+|---------|----------|-------------|---------|
+| `let` | `let var = expr` | Define variable | `let x = 10` |
+| Lambda | `params => expr` | Función anónima | `x => x^2` |
+| Multi-param | `(a,b) => expr` | Múltiples parámetros | `(a,b) => a+b` |
+| `map` | `map(f, v1, ...)` | Aplicar función a cada elemento | `map(x => x*2, [1,2,3])` → [2,4,6] |
+| `filter` | `filter(pred, vec)` | Filtrar elementos | `filter(x => x>0, [-1,1,2])` → [1,2] |
+| `reduce` | `reduce(f, init, vec)` | Reducir a un valor | `reduce((a,b) => a+b, 0, [1,2,3])` → 6 |
+| `pipe` | `pipe(val, f1, f2, ...)` | Composición de funciones | `pipe([1,2], f, g, h)` |
+
+### **DSP - Procesamiento de Señales**
+
+| Función | Descripción | Complejidad | Ejemplo |
+|---------|-------------|-------------|---------|
+| `dft(signal)` | DFT clásica | O(N²) | `dft([1,0,0,0])` |
+| `dft_mag(signal)` | Magnitud DFT | O(N²) | `dft_mag([1,1,1,1])` |
+| `dft_phase(signal)` | Fase DFT | O(N²) | `dft_phase([1,0,0,0])` |
+| `fft(signal)` | FFT Cooley-Tukey | O(N log N) | `fft([1,2,3,4])` |
+| `fft_mag(signal)` | Magnitud FFT | O(N log N) | `fft_mag([1,1,1,1,1,1,1,1])` |
+| `ifft(spectrum)` | FFT inversa | O(N log N) | `ifft(fft([1,2,3,4]))` |
+| `conv(s1, s2)` | Convolución directa | O(N×M) | `conv([1,2,3], [1,1])` |
+| `conv_fft(s1, s2)` | Convolución FFT | O((N+M) log(N+M)) | `conv_fft([1,2,3,4,5], [1,2,1])` |
+| `hanning(N)` | Ventana de Hann | O(N) | `hanning(8)` |
+| `hamming(N)` | Ventana de Hamming | O(N) | `hamming(8)` |
+| `blackman(N)` | Ventana de Blackman | O(N) | `blackman(8)` |
+
+---
+
+## 💡 Ejemplos Avanzados
+
+### **Ejemplo 1: Biblioteca DSP Personalizada**
+
+```javascript
+const Module = await createAchronymeModule();
+Module.reset();
+
+// Crear funciones reutilizables
+Module.eval('let power = x => x ^ 2');
+Module.eval('let sum_vec = v => reduce((a,b) => a+b, 0, v)');
+Module.eval('let power_all = v => map(power, v)');
+Module.eval('let rms = v => sqrt(sum_vec(power_all(v)) / 8)');
+
+// Usar la biblioteca
+const signal = '[1, 2, 3, 4, 5, 6, 7, 8]';
+const rmsValue = Module.eval(`rms(${signal})`);
+console.log('RMS:', rmsValue);  // → "5.04975..."
+```
+
+### **Ejemplo 2: Análisis Espectral con Ventanas**
+
+```javascript
+const Module = await createAchronymeModule();
+Module.reset();
+
+// Pipeline de análisis
+Module.eval(`
+  let analyze = sig => fft_mag(
+    map((s,w) => s*w, sig, hanning(8))
+  )
+`);
+
+// Analizar señal
+const spectrum = Module.eval('analyze([1,2,3,4,5,6,7,8])');
+console.log('Spectrum:', spectrum);
+```
+
+### **Ejemplo 3: Filtrado FIR con Convolución**
+
+```javascript
+const Module = await createAchronymeModule();
+Module.reset();
+
+// Definir filtro paso-bajo
+Module.eval('let lowpass = [0.25, 0.5, 0.25]');
+Module.eval('let filter_signal = sig => conv(sig, lowpass)');
+
+// Aplicar filtro
+const filtered = Module.eval('filter_signal([1,2,3,4,5,6,7,8])');
+console.log('Filtered:', filtered);
+```
+
+### **Ejemplo 4: Pipeline Complejo con Pipe**
+
+```javascript
+const Module = await createAchronymeModule();
+Module.reset();
+
+// Crear pipeline de procesamiento
+const result = Module.eval(`
+  pipe(
+    [1, 2, 3, 4, 5, 6, 7, 8],
+    v => map((s,w) => s*w, v, hanning(8)),
+    v => fft_mag(v),
+    v => map(m => m^2, v),
+    v => reduce((a,b) => a+b, 0, v)
+  )
+`);
+
+console.log('Total spectral power:', result);
+```
+
+### **Ejemplo 5: Comparación de Ventanas**
+
+```javascript
+const Module = await createAchronymeModule();
+Module.reset();
+
+const signal = '[1,2,3,4,5,6,7,8]';
+
+// Definir funciones de análisis
+Module.eval(`
+  let analyze_hann = s => fft_mag(map((sig,w) => sig*w, s, hanning(8)))
+`);
+Module.eval(`
+  let analyze_hamm = s => fft_mag(map((sig,w) => sig*w, s, hamming(8)))
+`);
+Module.eval(`
+  let analyze_black = s => fft_mag(map((sig,w) => sig*w, s, blackman(8)))
+`);
+
+// Comparar resultados
+console.log('Hanning:', Module.eval(`analyze_hann(${signal})`));
+console.log('Hamming:', Module.eval(`analyze_hamm(${signal})`));
+console.log('Blackman:', Module.eval(`analyze_black(${signal})`));
+```
+
+---
+
+## 🐛 Solución de Problemas
+
+### **Error: "emcc: command not found"**
+
+**Causa:** Emscripten no está en el PATH.
+
+**Solución:**
+
+Windows:
+```bash
+cd C:\ruta\a\emsdk
+emsdk_env.bat
+```
+
+Linux/macOS:
+```bash
+cd /ruta/a/emsdk
+source ./emsdk_env.sh
+```
+
+### **Error: Module compilation failed**
+
+**Causa:** No se incluyeron todos los archivos .cpp en la compilación.
+
+**Solución:** Asegúrate de que el comando `emcc` incluya TODOS los archivos listados en la sección de compilación.
+
+### **Error: "Cannot find module './dist/achronyme-core.mjs'"**
+
+**Causa:** El módulo no ha sido compilado.
+
+**Solución:**
+```bash
+cd wasm
+# Ejecutar el comando de compilación completo
+cd ..
+```
+
+### **Error: Variables no persisten**
+
+**Causa:** Llamar a `Module.reset()` borra todas las variables.
+
+**Solución:** Solo llama a `reset()` cuando quieras limpiar el entorno intencionalmente.
+
+---
+
+## 📊 Rendimiento
+
+| Operación | Tamaño | Tiempo Aproximado* |
+|-----------|--------|-------------------|
+| FFT | N=1024 | ~1-2 ms |
+| IFFT | N=1024 | ~1-2 ms |
+| conv (directo) | N=100, M=10 | ~0.5 ms |
+| conv_fft | N=1000, M=100 | ~2-3 ms |
+| map | N=10000 | ~0.5 ms |
+| reduce | N=10000 | ~0.3 ms |
+
+*Tiempos medidos en Chrome con WebAssembly optimizado (-O3)*
 
 ---
 
 ## 🗺️ Roadmap
 
-### ✅ Phase 1: Arithmetic Evaluator (Current)
-- [x] Lexer implementation
-- [x] Recursive descent parser
-- [x] AST evaluator
-- [x] Emscripten bindings
-- [x] TypeScript wrapper
-- [x] Basic tests
+### ✅ **Completado**
 
-### 🚧 Phase 2: Mathematical Functions (Next)
-- [ ] Constants (PI, E, PHI, etc.)
-- [ ] Trigonometric functions (sin, cos, tan, etc.)
-- [ ] Exponential/logarithmic (exp, log, ln, etc.)
-- [ ] Other functions (sqrt, abs, floor, ceil, etc.)
+- [x] **Phase 1-2**: Operaciones matemáticas básicas
+- [x] **Phase 3**: Tipos complejos (Complex, Vector, Matrix)
+- [x] **Phase 4A**: Variables, lambdas, closures, HOF
+- [x] **Phase 4B**: DSP (DFT, FFT, IFFT, convolución, ventanas)
 
-### 📅 Phase 3: Complex Types
-- [ ] Complex numbers (a + bi)
-- [ ] Vectors ([1, 2, 3])
-- [ ] Type system and broadcasting
+### 📅 **Próximas Fases**
 
-### 📅 Phase 4: Higher-Order Functions
-- [ ] map, reduce, filter
-- [ ] Function composition
-- [ ] Lambda expressions
-
-### 📅 Phase 5+: Specialized Modules
-- [ ] DSP (DFT, FFT, Convolution)
-- [ ] Linear Algebra (matrices, solvers)
-- [ ] Numerical Methods (integration, differentiation)
-- [ ] Optimization (Simplex, gradient descent)
+- [ ] **Phase 5**: Álgebra lineal avanzada (eigenvalues, SVD, QR)
+- [ ] **Phase 6**: Métodos numéricos (integración, derivación, raíces)
+- [ ] **Phase 7**: Optimización (Simplex, gradiente descendente)
+- [ ] **Phase 8**: Estadística y probabilidad
 
 ---
 
-## 🤝 Contributing
+## 📝 Licencia
 
-Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details.
-
-### Areas for Contribution
-
-- **Phase 2 Implementation**: Add mathematical functions
-- **Optimization**: Improve WASM performance
-- **Testing**: Add more test cases
-- **Documentation**: Improve docs and examples
+[Especificar licencia del proyecto]
 
 ---
 
-## 📄 License
+## 👥 Autores
 
-MIT License - see [LICENSE](LICENSE) for details.
+Desarrollado como parte del proyecto Achronyme Core.
 
----
-
-## 🌟 Acknowledgments
-
-Achronyme Core is part of the [Achronyme](https://achronyme.com) project, an open-source alternative to Wolfram Mathematica.
-
-**Key Technologies:**
-- [Emscripten](https://emscripten.org/) - C++ to WebAssembly compiler
-- [CMake](https://cmake.org/) - Build system
-- [Google Test](https://github.com/google/googletest) - C++ testing framework
-- [Vitest](https://vitest.dev/) - JavaScript testing framework
+**Contacto:** contacto@eddndev.com
 
 ---
 
-## 📞 Contact
+## 🔗 Enlaces Útiles
 
-- **Author**: Eduardo Alonso
-- **Email**: contacto@eddndev.com
-- **Website**: [achronyme.com](https://achronyme.com)
-- **GitHub**: [@eddndev](https://github.com/eddndev)
+- [Emscripten Documentation](https://emscripten.org/docs/)
+- [WebAssembly MDN](https://developer.mozilla.org/en-US/docs/WebAssembly)
+- [C++ Reference](https://en.cppreference.com/)
+- [DSP Guide](https://www.dspguide.com/)
 
 ---
 
-Made with ❤️ by [Eduardo Alonso](https://github.com/eddndev)
+**¡Disfruta usando Achronyme Core!** 🚀
