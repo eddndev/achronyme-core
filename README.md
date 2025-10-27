@@ -17,6 +17,7 @@ Achronyme Core es un motor de computación matemática compilado a WebAssembly q
 - [Instalación](#-instalación)
 - [Compilación](#-compilación)
 - [Uso Rápido](#-uso-rápido)
+- [SDK TypeScript (Recomendado)](#-sdk-typescript-recomendado)
 - [Ejecutar Tests](#-ejecutar-tests)
 - [Estructura del Proyecto](#-estructura-del-proyecto)
 - [API Reference](#-api-reference)
@@ -278,6 +279,279 @@ const fastResult = Module.eval(`
 `);
 console.log('Fast convolution:', fastResult);
 ```
+
+---
+
+## 🎯 SDK TypeScript (Recomendado)
+
+**Nuevo**: Achronyme ahora incluye un SDK de TypeScript que proporciona una API tipo-segura y mucho más ergonómica sobre el núcleo WASM.
+
+### **¿Por qué usar el SDK?**
+
+En lugar de construir strings de comandos manualmente:
+```javascript
+// ❌ Antiguo: eval() directo (engorroso)
+Module.eval("let sig = [1, 2, 3, 4, 5, 6, 7, 8]");
+Module.eval("let spec = fft_mag(sig)");
+const result = Module.eval("spec");
+```
+
+Usa una API idiomática de TypeScript:
+```typescript
+// ✅ Nuevo: SDK TypeScript (limpio y tipo-seguro)
+const ach = new Achronyme();
+await ach.init();
+
+const sig = ach.vector([1, 2, 3, 4, 5, 6, 7, 8]);
+const spec = sig.fft_mag();
+console.log(await spec.toVector());
+
+// Limpieza de memoria
+sig.dispose();
+spec.dispose();
+```
+
+### **Beneficios del SDK**
+
+✅ **Type Safety**: TypeScript detecta errores en desarrollo
+✅ **Autocompletado**: IntelliSense muestra todas las funciones
+✅ **API Fluent**: Encadenamiento intuitivo de operaciones
+✅ **Manejo de Errores**: Excepciones personalizadas (AchronymeSyntaxError, AchronymeTypeError, etc.)
+✅ **Gestión de Memoria**: Control explícito con `dispose()`
+✅ **Sin Overhead**: Internamente usa el mismo Environment de C++
+
+### **Instalación del SDK**
+
+```bash
+# El SDK está incluido en el proyecto
+# Solo necesitas compilar el TypeScript
+
+npm install typescript --save-dev
+npx tsc --project tsconfig.sdk.json
+```
+
+### **Ejemplo Básico**
+
+```typescript
+import { Achronyme } from './src/sdk';
+
+const ach = new Achronyme();
+await ach.init();
+
+// Operaciones matemáticas
+const x = ach.number(5);
+const y = x.mul(2).add(10).div(4);
+console.log(await y.toNumber()); // 5
+
+// Vectores
+const v = ach.vector([1, 2, 3, 4]);
+const squared = v.pow(2);
+console.log(await squared.toVector()); // [1, 4, 9, 16]
+
+// DSP
+const signal = ach.vector([1, 2, 3, 4, 5, 6, 7, 8]);
+const spectrum = signal.fft_mag();
+console.log(await spectrum.toVector());
+
+// Limpieza
+x.dispose();
+y.dispose();
+v.dispose();
+squared.dispose();
+signal.dispose();
+spectrum.dispose();
+```
+
+### **Gestión de Memoria**
+
+El SDK usa **gestión manual explícita** mediante `dispose()`:
+
+```typescript
+// ✅ Correcto: Llamar dispose() cuando termines
+const x = ach.number(10);
+const y = x.add(5);
+console.log(await y.toNumber());
+x.dispose();
+y.dispose();
+
+// ❌ Incorrecto: No disponer puede causar fugas de memoria
+const z = ach.vector([1, 2, 3]);
+// ... usar z ...
+// (olvidaste dispose) ← Fuga de memoria en C++
+```
+
+**¿Por qué gestión manual?**
+
+- El GC de JavaScript no conoce la memoria de WASM/C++
+- `FinalizationRegistry` es experimental y no garantiza limpieza inmediata
+- `dispose()` manual es explícito, confiable y te da control total
+- Evita fugas de memoria cuando hay muchas variables intermedias
+
+**Estadísticas de memoria:**
+```typescript
+const stats = ach.getMemoryStats();
+console.log('Variables activas:', stats.activeVariables);
+console.log('Variables eliminadas:', stats.disposedVariables);
+
+// Limpiar todo (CUIDADO: invalida todos los AchronymeValue)
+ach.disposeAll();
+```
+
+### **Ejemplos Completos**
+
+El proyecto incluye 4 ejemplos del SDK:
+
+```bash
+# Ejemplo 1: Operaciones básicas
+node examples/basic-usage.mjs
+
+# Ejemplo 2: DSP (FFT, ventanas, convolución)
+node examples/dsp-example.mjs
+
+# Ejemplo 3: Programación funcional (map, filter, reduce)
+node examples/functional-programming.mjs
+
+# Ejemplo 4: Pipeline DSP avanzado
+node examples/advanced-dsp-pipeline.mjs
+```
+
+### **Test del SDK**
+
+```bash
+# Ejecutar test del SDK (20+ tests)
+node test-sdk.mjs
+```
+
+### **API Completa del SDK**
+
+#### **Clase Achronyme**
+
+**Inicialización:**
+```typescript
+const ach = new Achronyme(options?);
+await ach.init();
+```
+
+**Constructores de tipos:**
+```typescript
+ach.number(42)
+ach.vector([1, 2, 3, 4])
+ach.matrix([[1, 2], [3, 4]])
+ach.complex(2, 3)  // 2+3i
+```
+
+**Funciones matemáticas:**
+```typescript
+ach.sin(x), ach.cos(x), ach.tan(x)
+ach.sqrt(x), ach.exp(x), ach.ln(x), ach.log(x)
+ach.abs(x), ach.floor(x), ach.ceil(x), ach.round(x)
+ach.min(...values), ach.max(...values)
+// ... +60 funciones más
+```
+
+**Funciones DSP:**
+```typescript
+ach.fft(signal), ach.fft_mag(signal), ach.ifft(spectrum)
+ach.dft(signal), ach.dft_mag(signal), ach.dft_phase(signal)
+ach.conv(sig1, sig2), ach.conv_fft(sig1, sig2)
+ach.hanning(n), ach.hamming(n), ach.blackman(n)
+```
+
+**Higher-order functions:**
+```typescript
+ach.map('x => x^2', vector)
+ach.filter('x => x > 5', vector)
+ach.reduce('a, b => a + b', vector, 0)
+```
+
+**Variables y lambdas:**
+```typescript
+ach.let('x', 10)
+ach.get('x')
+ach.lambda(['x', 'y'], 'x + y')
+```
+
+**Constantes:**
+```typescript
+ach.PI, ach.E, ach.PHI, ach.TAU
+```
+
+#### **Clase AchronymeValue**
+
+**Extracción de valores:**
+```typescript
+await value.toNumber()      // → number
+await value.toVector()      // → number[]
+await value.toMatrix()      // → number[][]
+await value.toComplex()     // → {re, im}
+await value.value<T>()      // → T (auto-detect)
+```
+
+**Operaciones aritméticas:**
+```typescript
+value.add(other), value.sub(other), value.mul(other)
+value.div(other), value.pow(other), value.neg()
+```
+
+**Comparaciones:**
+```typescript
+value.gt(other), value.lt(other), value.eq(other)
+value.gte(other), value.lte(other), value.neq(other)
+```
+
+**Funciones matemáticas:**
+```typescript
+value.sin(), value.cos(), value.tan()
+value.sqrt(), value.abs(), value.ln(), value.exp()
+value.floor(), value.ceil(), value.round()
+```
+
+**DSP:**
+```typescript
+value.fft(), value.fft_mag(), value.ifft()
+value.dft(), value.dft_mag(), value.dft_phase()
+```
+
+**Vector/Matrix:**
+```typescript
+value.dot(other), value.cross(other), value.norm()
+value.transpose(), value.det(), value.inverse()
+```
+
+**Gestión:**
+```typescript
+value.dispose()
+value.isDisposed()
+value.getMetadata()
+```
+
+### **Manejo de Errores**
+
+El SDK envuelve errores de C++ en clases específicas:
+
+```typescript
+try {
+  const x = ach.number(5);
+  const y = x.div(0);  // División por cero
+} catch (e) {
+  if (e instanceof AchronymeRuntimeError) {
+    console.error('Error de runtime:', e.message);
+  } else if (e instanceof AchronymeSyntaxError) {
+    console.error('Error de sintaxis:', e.message);
+  } else if (e instanceof AchronymeTypeError) {
+    console.error('Error de tipo:', e.message);
+  }
+}
+```
+
+**Tipos de error disponibles:**
+- `AchronymeError` - Base
+- `AchronymeSyntaxError` - Error de sintaxis
+- `AchronymeRuntimeError` - Error de ejecución
+- `AchronymeTypeError` - Error de tipo
+- `AchronymeDisposedError` - Operación en valor disposed
+- `AchronymeNotInitializedError` - Módulo no inicializado
+- `AchronymeArgumentError` - Argumentos inválidos
 
 ---
 

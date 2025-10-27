@@ -29,6 +29,7 @@ enum class TokenType {
     STAR,           // *
     SLASH,          // /
     CARET,          // ^ (power)
+    MODULO,         // % (modulo)
     ASSIGN,         // = (assignment)
 
     // Comparison operators (Phase 4A)

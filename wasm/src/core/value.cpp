@@ -193,6 +193,25 @@ Value Value::operator*(const Value& other) const {
         return Value(other.asVector() * asNumber());
     }
 
+    // Vector * Vector (element-wise / Hadamard product)
+    if (isVector() && other.isVector()) {
+        const Vector& v1 = asVector();
+        const Vector& v2 = other.asVector();
+
+        if (v1.size() != v2.size()) {
+            throw std::runtime_error(
+                "Vector dimension mismatch for element-wise multiplication: " +
+                std::to_string(v1.size()) + " vs " + std::to_string(v2.size())
+            );
+        }
+
+        std::vector<double> result(v1.size());
+        for (size_t i = 0; i < v1.size(); ++i) {
+            result[i] = v1[i] * v2[i];
+        }
+        return Value(Vector(result));
+    }
+
     // Matrix * Scalar (or Scalar * Matrix)
     if (isMatrix() && other.isNumber()) {
         return Value(asMatrix() * other.asNumber());

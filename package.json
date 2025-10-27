@@ -2,11 +2,22 @@
   "name": "@achronyme/core",
   "version": "0.3.0",
   "type": "module",
-  "description": "High-performance mathematical computation engine powered by WebAssembly (SOC - Superior Order Calculator)",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "description": "High-performance mathematical computation engine with DSP and functional programming - TypeScript SDK over WebAssembly core",
+  "main": "dist/sdk/index.js",
+  "types": "dist/sdk/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/sdk/index.js",
+      "types": "./dist/sdk/index.d.ts"
+    },
+    "./wasm": {
+      "import": "./dist/achronyme-core.mjs"
+    }
+  },
   "files": [
-    "dist/"
+    "dist/",
+    "LICENSE",
+    "README.md"
   ],
   "scripts": {
     "build:wasm": "bash scripts/build-wasm.sh",

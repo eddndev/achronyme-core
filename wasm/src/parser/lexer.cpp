@@ -27,7 +27,7 @@ std::vector<Token> Lexer::tokenize() {
             tokens.push_back(scanIdentifier());
         }
         // Operators and delimiters
-        else if (c == '+' || c == '-' || c == '*' || c == '/' || c == '^' ||
+        else if (c == '+' || c == '-' || c == '*' || c == '/' || c == '^' || c == '%' ||
                  c == '(' || c == ')' || c == '[' || c == ']' || c == ',' || c == ';' ||
                  c == '>' || c == '<' || c == '=' || c == '!') {
             tokens.push_back(scanOperator());
@@ -142,6 +142,7 @@ Token Lexer::scanOperator() {
         case '*': return Token(TokenType::STAR, "*", pos);
         case '/': return Token(TokenType::SLASH, "/", pos);
         case '^': return Token(TokenType::CARET, "^", pos);
+        case '%': return Token(TokenType::MODULO, "%", pos);
         case '(': return Token(TokenType::LPAREN, "(", pos);
         case ')': return Token(TokenType::RPAREN, ")", pos);
         case '[': return Token(TokenType::LBRACKET, "[", pos);

@@ -2,6 +2,7 @@
 #include "../core/constants.hpp"
 #include "../core/functions.hpp"
 #include <stdexcept>
+#include <cmath>
 
 namespace achronyme {
 namespace parser {
@@ -108,6 +109,19 @@ core::Value Evaluator::evaluateBinaryOp(const BinaryOpNode* node) {
 
         case BinaryOp::POWER:
             return left.pow(right);
+
+        case BinaryOp::MODULO: {
+            // Modulo operator (%)
+            if (!left.isNumber() || !right.isNumber()) {
+                throw std::runtime_error("Modulo operator (%) currently only supports numbers");
+            }
+            double leftVal = left.asNumber();
+            double rightVal = right.asNumber();
+            if (rightVal == 0.0) {
+                throw std::runtime_error("Modulo by zero");
+            }
+            return core::Value(std::fmod(leftVal, rightVal));
+        }
 
         // Comparison operators (Phase 4A)
         // Returns 1.0 for true, 0.0 for false

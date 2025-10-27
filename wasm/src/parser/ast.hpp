@@ -34,6 +34,7 @@ enum class BinaryOp {
     MULTIPLY,
     DIVIDE,
     POWER,
+    MODULO,     // % (modulo/remainder)
 
     // Comparison (Phase 4A)
     GT,         // >

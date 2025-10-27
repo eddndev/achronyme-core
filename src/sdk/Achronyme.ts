@@ -1,0 +1,802 @@
+/**
+ * Achronyme - Main SDK class
+ *
+ * Provides a type-safe, idiomatic TypeScript API over the Achronyme Core WASM module.
+ * Manages variables in the C++ Environment and provides fluent chainable operations.
+ *
+ * @example
+ * const ach = new Achronyme();
+ * await ach.init();
+ *
+ * const signal = ach.vector([1, 2, 3, 4, 5, 6, 7, 8]);
+ * const spectrum = signal.fft_mag();
+ * console.log(await spectrum.toVector());
+ *
+ * // Clean up
+ * signal.dispose();
+ * spectrum.dispose();
+ */
+
+import createAchronymeModule from '../../achronyme-core.mjs';
+import { AchronymeValue } from './AchronymeValue.js';
+import {
+  WasmModule,
+  AchronymeOptions,
+  MemoryStats,
+  ComplexNumber,
+} from './types.js';
+import {
+  AchronymeNotInitializedError,
+  AchronymeArgumentError,
+  wrapCppError,
+} from './errors.js';
+import { formatValue, formatVector, formatMatrix, formatComplex, isValidVariableName } from './utils.js';
+
+export class Achronyme {
+  private module: WasmModule | null = null;
+  private varCounter: number = 0;
+  private variables: Set<string> = new Set();
+  private options: AchronymeOptions;
+  private initialized: boolean = false;
+
+  constructor(options: AchronymeOptions = {}) {
+    this.options = {
+      debug: false,
+      maxVariables: 10000,
+      ...options,
+    };
+  }
+
+  // ============================================================================
+  // Initialization
+  // ============================================================================
+
+  /**
+   * Initialize the WASM module
+   * Must be called before any other operations
+   */
+  async init(): Promise<void> {
+    if (this.initialized) {
+      return;
+    }
+
+    try {
+      const moduleInstance = await createAchronymeModule();
+      this.module = moduleInstance as unknown as WasmModule;
+      this.initialized = true;
+
+      if (this.options.debug) {
+        console.log('[Achronyme] Module initialized successfully');
+      }
+    } catch (e: any) {
+      throw wrapCppError(`Failed to initialize WASM module: ${e.message || e}`);
+    }
+  }
+
+  /**
+   * Check if the module is initialized
+   */
+  isInitialized(): boolean {
+    return this.initialized;
+  }
+
+  // ============================================================================
+  // Internal Helpers
+  // ============================================================================
+
+  /**
+   * @internal
+   * Evaluate an expression and return the raw string result
+   */
+  _eval(expression: string): string {
+    if (!this.module) {
+      throw new AchronymeNotInitializedError();
+    }
+
+    try {
+      const result = this.module.eval(expression);
+      if (this.options.debug) {
+        console.log(`[Achronyme] eval: ${expression} => ${result}`);
+      }
+      return result;
+    } catch (e: any) {
+      throw wrapCppError(e.message || String(e), expression);
+    }
+  }
+
+  /**
+   * @internal
+   * Generate a unique variable name
+   */
+  private generateVarName(): string {
+    return `__v${this.varCounter++}`;
+  }
+
+  /**
+   * @internal
+   * Create a new AchronymeValue from an expression
+   */
+  _createFromExpression(expression: string): AchronymeValue {
+    const varName = this.generateVarName();
+    this._eval(`let ${varName} = ${expression}`);
+    this.variables.add(varName);
+    this.checkMaxVariables();
+    return new AchronymeValue(this, varName);
+  }
+
+  /**
+   * @internal
+   * Create a new AchronymeValue from a direct value
+   */
+  private createFromValue(value: any): AchronymeValue {
+    const expr = formatValue(value);
+    return this._createFromExpression(expr);
+  }
+
+  /**
+   * @internal
+   * Dispose a variable (called by AchronymeValue.dispose())
+   */
+  _disposeVariable(varName: string): void {
+    if (this.variables.has(varName)) {
+      this.variables.delete(varName);
+      if (this.options.debug) {
+        console.log(`[Achronyme] Disposed variable: ${varName}`);
+      }
+    }
+  }
+
+  /**
+   * Check if we're approaching the max variables limit
+   */
+  private checkMaxVariables(): void {
+    if (this.options.maxVariables && this.variables.size >= this.options.maxVariables) {
+      console.warn(
+        `[Achronyme] Warning: ${this.variables.size} variables in memory. ` +
+        `Consider calling dispose() on unused values to free memory.`
+      );
+    }
+  }
+
+  // ============================================================================
+  // Memory Management
+  // ============================================================================
+
+  /**
+   * Get statistics about memory usage
+   */
+  getMemoryStats(): MemoryStats {
+    return {
+      totalVariables: this.varCounter,
+      activeVariables: this.variables.size,
+      disposedVariables: this.varCounter - this.variables.size,
+      variableNames: Array.from(this.variables),
+    };
+  }
+
+  /**
+   * Dispose all tracked variables
+   * WARNING: This will invalidate all AchronymeValue instances
+   */
+  disposeAll(): void {
+    this.variables.clear();
+    if (this.options.debug) {
+      console.log('[Achronyme] All variables disposed');
+    }
+  }
+
+  /**
+   * Reset the entire environment (clear all variables and state)
+   * This also resets the WASM module's internal state
+   */
+  reset(): void {
+    if (!this.module) {
+      throw new AchronymeNotInitializedError();
+    }
+
+    // Reset WASM module
+    try {
+      (this.module as any).reset();
+    } catch (e) {
+      // reset() might not be available, ignore
+    }
+
+    // Reset SDK state
+    this.disposeAll();
+    this.varCounter = 0;
+    if (this.options.debug) {
+      console.log('[Achronyme] Environment reset');
+    }
+  }
+
+  // ============================================================================
+  // Type Constructors
+  // ============================================================================
+
+  /**
+   * Create a number value
+   * @example
+   * const x = ach.number(42);
+   * const y = ach.number(Math.PI);
+   */
+  number(value: number): AchronymeValue {
+    return this.createFromValue(value);
+  }
+
+  /**
+   * Create a vector value
+   * @example
+   * const v = ach.vector([1, 2, 3, 4]);
+   */
+  vector(data: number[]): AchronymeValue {
+    if (!Array.isArray(data)) {
+      throw new AchronymeArgumentError('vector() requires an array of numbers');
+    }
+    return this.createFromValue(formatVector(data));
+  }
+
+  /**
+   * Create a matrix value
+   * @example
+   * const m = ach.matrix([[1, 2], [3, 4]]);
+   */
+  matrix(data: number[][]): AchronymeValue {
+    if (!Array.isArray(data) || !Array.isArray(data[0])) {
+      throw new AchronymeArgumentError('matrix() requires a 2D array of numbers');
+    }
+    return this.createFromValue(formatMatrix(data));
+  }
+
+  /**
+   * Create a complex number value
+   * @example
+   * const c1 = ach.complex(2, 3);  // 2+3i
+   * const c2 = ach.complex(0, 5);  // 5i
+   */
+  complex(re: number, im: number): AchronymeValue {
+    return this.createFromValue(formatComplex({ re, im }));
+  }
+
+  // ============================================================================
+  // Variables and Lambdas
+  // ============================================================================
+
+  /**
+   * Create a named variable
+   * @example
+   * const x = ach.let('myVar', 42);
+   * const y = ach.let('signal', [1, 2, 3, 4]);
+   */
+  let(name: string, value: AchronymeValue | number | number[] | ComplexNumber): AchronymeValue {
+    if (!isValidVariableName(name)) {
+      throw new AchronymeArgumentError(`Invalid variable name: ${name}`);
+    }
+
+    let expr: string;
+    if (value instanceof AchronymeValue) {
+      expr = value._varName;
+    } else if (typeof value === 'number') {
+      expr = value.toString();
+    } else if (Array.isArray(value)) {
+      expr = formatVector(value);
+    } else {
+      expr = formatValue(value);
+    }
+
+    this._eval(`let ${name} = ${expr}`);
+    this.variables.add(name);
+    return new AchronymeValue(this, name);
+  }
+
+  /**
+   * Get a reference to an existing variable
+   * @example
+   * ach.let('x', 10);
+   * const xRef = ach.get('x');
+   * console.log(await xRef.toNumber()); // 10
+   */
+  get(name: string): AchronymeValue {
+    if (!this.variables.has(name)) {
+      // Variable might exist but not tracked - try to access it anyway
+      if (this.options.debug) {
+        console.warn(`[Achronyme] Accessing untracked variable: ${name}`);
+      }
+    }
+    return new AchronymeValue(this, name);
+  }
+
+  /**
+   * Create a lambda function
+   * @example
+   * const square = ach.lambda(['x'], 'x ^ 2');
+   * const add = ach.lambda(['a', 'b'], 'a + b');
+   */
+  lambda(params: string[], body: string): AchronymeValue {
+    if (!Array.isArray(params) || params.length === 0) {
+      throw new AchronymeArgumentError('lambda() requires at least one parameter');
+    }
+
+    const paramList = params.join(', ');
+    const lambdaExpr = `${paramList} => ${body}`;
+    return this._createFromExpression(lambdaExpr);
+  }
+
+  // ============================================================================
+  // Mathematical Functions (Basic)
+  // ============================================================================
+
+  /**
+   * Sine function
+   */
+  sin(x: AchronymeValue | number): AchronymeValue {
+    const arg = typeof x === 'number' ? x.toString() : x._varName;
+    return this._createFromExpression(`sin(${arg})`);
+  }
+
+  /**
+   * Cosine function
+   */
+  cos(x: AchronymeValue | number): AchronymeValue {
+    const arg = typeof x === 'number' ? x.toString() : x._varName;
+    return this._createFromExpression(`cos(${arg})`);
+  }
+
+  /**
+   * Tangent function
+   */
+  tan(x: AchronymeValue | number): AchronymeValue {
+    const arg = typeof x === 'number' ? x.toString() : x._varName;
+    return this._createFromExpression(`tan(${arg})`);
+  }
+
+  /**
+   * Arcsine function
+   */
+  asin(x: AchronymeValue | number): AchronymeValue {
+    const arg = typeof x === 'number' ? x.toString() : x._varName;
+    return this._createFromExpression(`asin(${arg})`);
+  }
+
+  /**
+   * Arccosine function
+   */
+  acos(x: AchronymeValue | number): AchronymeValue {
+    const arg = typeof x === 'number' ? x.toString() : x._varName;
+    return this._createFromExpression(`acos(${arg})`);
+  }
+
+  /**
+   * Arctangent function
+   */
+  atan(x: AchronymeValue | number): AchronymeValue {
+    const arg = typeof x === 'number' ? x.toString() : x._varName;
+    return this._createFromExpression(`atan(${arg})`);
+  }
+
+  /**
+   * Two-argument arctangent
+   */
+  atan2(y: AchronymeValue | number, x: AchronymeValue | number): AchronymeValue {
+    const yArg = typeof y === 'number' ? y.toString() : y._varName;
+    const xArg = typeof x === 'number' ? x.toString() : x._varName;
+    return this._createFromExpression(`atan2(${yArg}, ${xArg})`);
+  }
+
+  /**
+   * Hyperbolic sine
+   */
+  sinh(x: AchronymeValue | number): AchronymeValue {
+    const arg = typeof x === 'number' ? x.toString() : x._varName;
+    return this._createFromExpression(`sinh(${arg})`);
+  }
+
+  /**
+   * Hyperbolic cosine
+   */
+  cosh(x: AchronymeValue | number): AchronymeValue {
+    const arg = typeof x === 'number' ? x.toString() : x._varName;
+    return this._createFromExpression(`cosh(${arg})`);
+  }
+
+  /**
+   * Hyperbolic tangent
+   */
+  tanh(x: AchronymeValue | number): AchronymeValue {
+    const arg = typeof x === 'number' ? x.toString() : x._varName;
+    return this._createFromExpression(`tanh(${arg})`);
+  }
+
+  /**
+   * Square root
+   */
+  sqrt(x: AchronymeValue | number): AchronymeValue {
+    const arg = typeof x === 'number' ? x.toString() : x._varName;
+    return this._createFromExpression(`sqrt(${arg})`);
+  }
+
+  /**
+   * Cube root
+   */
+  cbrt(x: AchronymeValue | number): AchronymeValue {
+    const arg = typeof x === 'number' ? x.toString() : x._varName;
+    return this._createFromExpression(`cbrt(${arg})`);
+  }
+
+  /**
+   * Exponential (e^x)
+   */
+  exp(x: AchronymeValue | number): AchronymeValue {
+    const arg = typeof x === 'number' ? x.toString() : x._varName;
+    return this._createFromExpression(`exp(${arg})`);
+  }
+
+  /**
+   * Natural logarithm
+   */
+  ln(x: AchronymeValue | number): AchronymeValue {
+    const arg = typeof x === 'number' ? x.toString() : x._varName;
+    return this._createFromExpression(`ln(${arg})`);
+  }
+
+  /**
+   * Common logarithm (base 10)
+   */
+  log(x: AchronymeValue | number): AchronymeValue {
+    const arg = typeof x === 'number' ? x.toString() : x._varName;
+    return this._createFromExpression(`log(${arg})`);
+  }
+
+  /**
+   * Base-10 logarithm
+   */
+  log10(x: AchronymeValue | number): AchronymeValue {
+    return this.log(x);
+  }
+
+  /**
+   * Base-2 logarithm
+   */
+  log2(x: AchronymeValue | number): AchronymeValue {
+    const arg = typeof x === 'number' ? x.toString() : x._varName;
+    return this._createFromExpression(`log2(${arg})`);
+  }
+
+  /**
+   * Power function
+   */
+  pow(base: AchronymeValue | number, exponent: AchronymeValue | number): AchronymeValue {
+    const baseArg = typeof base === 'number' ? base.toString() : base._varName;
+    const expArg = typeof exponent === 'number' ? exponent.toString() : exponent._varName;
+    return this._createFromExpression(`pow(${baseArg}, ${expArg})`);
+  }
+
+  /**
+   * Absolute value
+   */
+  abs(x: AchronymeValue | number): AchronymeValue {
+    const arg = typeof x === 'number' ? x.toString() : x._varName;
+    return this._createFromExpression(`abs(${arg})`);
+  }
+
+  /**
+   * Sign function (-1, 0, or 1)
+   */
+  sign(x: AchronymeValue | number): AchronymeValue {
+    const arg = typeof x === 'number' ? x.toString() : x._varName;
+    return this._createFromExpression(`sign(${arg})`);
+  }
+
+  /**
+   * Floor function
+   */
+  floor(x: AchronymeValue | number): AchronymeValue {
+    const arg = typeof x === 'number' ? x.toString() : x._varName;
+    return this._createFromExpression(`floor(${arg})`);
+  }
+
+  /**
+   * Ceiling function
+   */
+  ceil(x: AchronymeValue | number): AchronymeValue {
+    const arg = typeof x === 'number' ? x.toString() : x._varName;
+    return this._createFromExpression(`ceil(${arg})`);
+  }
+
+  /**
+   * Round function
+   */
+  round(x: AchronymeValue | number): AchronymeValue {
+    const arg = typeof x === 'number' ? x.toString() : x._varName;
+    return this._createFromExpression(`round(${arg})`);
+  }
+
+  /**
+   * Truncate function
+   */
+  trunc(x: AchronymeValue | number): AchronymeValue {
+    const arg = typeof x === 'number' ? x.toString() : x._varName;
+    return this._createFromExpression(`trunc(${arg})`);
+  }
+
+  /**
+   * Minimum of values
+   */
+  min(...values: (AchronymeValue | number)[]): AchronymeValue {
+    if (values.length === 0) {
+      throw new AchronymeArgumentError('min() requires at least one argument');
+    }
+    const args = values.map(v => typeof v === 'number' ? v.toString() : v._varName).join(', ');
+    return this._createFromExpression(`min(${args})`);
+  }
+
+  /**
+   * Maximum of values
+   */
+  max(...values: (AchronymeValue | number)[]): AchronymeValue {
+    if (values.length === 0) {
+      throw new AchronymeArgumentError('max() requires at least one argument');
+    }
+    const args = values.map(v => typeof v === 'number' ? v.toString() : v._varName).join(', ');
+    return this._createFromExpression(`max(${args})`);
+  }
+
+  // ============================================================================
+  // DSP Functions
+  // ============================================================================
+
+  /**
+   * Fast Fourier Transform
+   * @example
+   * const signal = ach.vector([1, 2, 3, 4, 5, 6, 7, 8]);
+   * const spectrum = ach.fft(signal);
+   */
+  fft(signal: AchronymeValue): AchronymeValue {
+    return this._createFromExpression(`fft(${signal._varName})`);
+  }
+
+  /**
+   * FFT Magnitude (absolute value of complex FFT result)
+   */
+  fft_mag(signal: AchronymeValue): AchronymeValue {
+    return this._createFromExpression(`fft_mag(${signal._varName})`);
+  }
+
+  /**
+   * Inverse Fast Fourier Transform
+   */
+  ifft(spectrum: AchronymeValue): AchronymeValue {
+    return this._createFromExpression(`ifft(${spectrum._varName})`);
+  }
+
+  /**
+   * Discrete Fourier Transform
+   */
+  dft(signal: AchronymeValue): AchronymeValue {
+    return this._createFromExpression(`dft(${signal._varName})`);
+  }
+
+  /**
+   * DFT Magnitude
+   */
+  dft_mag(signal: AchronymeValue): AchronymeValue {
+    return this._createFromExpression(`dft_mag(${signal._varName})`);
+  }
+
+  /**
+   * DFT Phase
+   */
+  dft_phase(signal: AchronymeValue): AchronymeValue {
+    return this._createFromExpression(`dft_phase(${signal._varName})`);
+  }
+
+  /**
+   * Convolution (direct method)
+   * @example
+   * const sig1 = ach.vector([1, 2, 3]);
+   * const sig2 = ach.vector([1, 1]);
+   * const result = ach.conv(sig1, sig2);
+   */
+  conv(signal1: AchronymeValue, signal2: AchronymeValue): AchronymeValue {
+    return this._createFromExpression(`conv(${signal1._varName}, ${signal2._varName})`);
+  }
+
+  /**
+   * Convolution using FFT (faster for large signals)
+   */
+  conv_fft(signal1: AchronymeValue, signal2: AchronymeValue): AchronymeValue {
+    return this._createFromExpression(`conv_fft(${signal1._varName}, ${signal2._varName})`);
+  }
+
+  /**
+   * Hanning window function
+   * @param n - Window size
+   */
+  hanning(n: number): AchronymeValue {
+    return this._createFromExpression(`hanning(${n})`);
+  }
+
+  /**
+   * Hamming window function
+   * @param n - Window size
+   */
+  hamming(n: number): AchronymeValue {
+    return this._createFromExpression(`hamming(${n})`);
+  }
+
+  /**
+   * Blackman window function
+   * @param n - Window size
+   */
+  blackman(n: number): AchronymeValue {
+    return this._createFromExpression(`blackman(${n})`);
+  }
+
+  // ============================================================================
+  // Higher-Order Functions
+  // ============================================================================
+
+  /**
+   * Map function over a vector
+   * @example
+   * const v = ach.vector([1, 2, 3, 4]);
+   * const squared = ach.map('x => x ^ 2', v);
+   * // Or with a lambda:
+   * const fn = ach.lambda(['x'], 'x ^ 2');
+   * const squared2 = ach.map(fn, v);
+   */
+  map(fn: string | AchronymeValue, arr: AchronymeValue): AchronymeValue {
+    const fnExpr = typeof fn === 'string' ? fn : fn._varName;
+    return this._createFromExpression(`map(${fnExpr}, ${arr._varName})`);
+  }
+
+  /**
+   * Filter function over a vector
+   * @example
+   * const v = ach.vector([1, 2, 3, 4, 5]);
+   * const evens = ach.filter('x => x % 2 == 0', v);
+   */
+  filter(predicate: string | AchronymeValue, arr: AchronymeValue): AchronymeValue {
+    const predExpr = typeof predicate === 'string' ? predicate : predicate._varName;
+    return this._createFromExpression(`filter(${predExpr}, ${arr._varName})`);
+  }
+
+  /**
+   * Reduce function over a vector
+   * @example
+   * const v = ach.vector([1, 2, 3, 4]);
+   * const sum = ach.reduce('a, b => a + b', v, 0);
+   */
+  reduce(fn: string | AchronymeValue, arr: AchronymeValue, initial: number): AchronymeValue {
+    const fnExpr = typeof fn === 'string' ? fn : fn._varName;
+    return this._createFromExpression(`reduce(${fnExpr}, ${arr._varName}, ${initial})`);
+  }
+
+  /**
+   * Pipe - compose functions left to right
+   * @example
+   * const double = ach.lambda(['x'], 'x * 2');
+   * const addTen = ach.lambda(['x'], 'x + 10');
+   * const result = ach.pipe(double, addTen, ach.number(5));
+   * // result = (5 * 2) + 10 = 20
+   */
+  pipe(...fnsAndValue: AchronymeValue[]): AchronymeValue {
+    if (fnsAndValue.length < 2) {
+      throw new AchronymeArgumentError('pipe() requires at least two arguments');
+    }
+    const args = fnsAndValue.map(v => v._varName).join(', ');
+    return this._createFromExpression(`pipe(${args})`);
+  }
+
+  /**
+   * Compose - compose functions right to left
+   */
+  compose(...fns: AchronymeValue[]): AchronymeValue {
+    if (fns.length === 0) {
+      throw new AchronymeArgumentError('compose() requires at least one argument');
+    }
+    const args = fns.map(v => v._varName).join(', ');
+    return this._createFromExpression(`compose(${args})`);
+  }
+
+  // ============================================================================
+  // Vector/Matrix Operations
+  // ============================================================================
+
+  /**
+   * Dot product of two vectors
+   */
+  dot(v1: AchronymeValue, v2: AchronymeValue): AchronymeValue {
+    return this._createFromExpression(`dot(${v1._varName}, ${v2._varName})`);
+  }
+
+  /**
+   * Cross product of two vectors
+   */
+  cross(v1: AchronymeValue, v2: AchronymeValue): AchronymeValue {
+    return this._createFromExpression(`cross(${v1._varName}, ${v2._varName})`);
+  }
+
+  /**
+   * Norm (magnitude) of a vector
+   */
+  norm(v: AchronymeValue): AchronymeValue {
+    return this._createFromExpression(`norm(${v._varName})`);
+  }
+
+  /**
+   * Transpose a matrix
+   */
+  transpose(m: AchronymeValue): AchronymeValue {
+    return this._createFromExpression(`transpose(${m._varName})`);
+  }
+
+  /**
+   * Determinant of a matrix
+   */
+  det(m: AchronymeValue): AchronymeValue {
+    return this._createFromExpression(`det(${m._varName})`);
+  }
+
+  /**
+   * Inverse of a matrix
+   */
+  inverse(m: AchronymeValue): AchronymeValue {
+    return this._createFromExpression(`inverse(${m._varName})`);
+  }
+
+  // ============================================================================
+  // Constants
+  // ============================================================================
+
+  /**
+   * Get PI constant
+   */
+  get PI(): AchronymeValue {
+    return this._createFromExpression('PI');
+  }
+
+  /**
+   * Get E constant (Euler's number)
+   */
+  get E(): AchronymeValue {
+    return this._createFromExpression('E');
+  }
+
+  /**
+   * Get PHI constant (Golden ratio)
+   */
+  get PHI(): AchronymeValue {
+    return this._createFromExpression('PHI');
+  }
+
+  /**
+   * Get TAU constant (2*PI)
+   */
+  get TAU(): AchronymeValue {
+    return this._createFromExpression('TAU');
+  }
+
+  // ============================================================================
+  // Raw Eval (Advanced Usage)
+  // ============================================================================
+
+  /**
+   * Direct evaluation of an expression (advanced usage)
+   * Returns a raw string result
+   * @example
+   * const result = ach.eval('sin(PI / 4) * 2');
+   */
+  eval(expression: string): string {
+    return this._eval(expression);
+  }
+
+  /**
+   * Evaluate an expression and wrap result in AchronymeValue
+   * @example
+   * const result = ach.evalValue('sin(PI / 4) * 2');
+   * console.log(await result.toNumber());
+   */
+  evalValue(expression: string): AchronymeValue {
+    return this._createFromExpression(expression);
+  }
+}

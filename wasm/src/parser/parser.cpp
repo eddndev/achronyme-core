@@ -126,18 +126,20 @@ std::unique_ptr<ASTNode> Parser::additive() {
     return node;
 }
 
-// term → factor (('*' | '/') factor)*
+// term → factor (('*' | '/' | '%') factor)*
 std::unique_ptr<ASTNode> Parser::term() {
     auto node = factor();
 
-    while (match(TokenType::STAR) || match(TokenType::SLASH)) {
+    while (match(TokenType::STAR) || match(TokenType::SLASH) || match(TokenType::MODULO)) {
         TokenType op = previous().type;
         auto right = factor();
 
         if (op == TokenType::STAR) {
             node = std::make_unique<BinaryOpNode>(BinaryOp::MULTIPLY, std::move(node), std::move(right));
-        } else {
+        } else if (op == TokenType::SLASH) {
             node = std::make_unique<BinaryOpNode>(BinaryOp::DIVIDE, std::move(node), std::move(right));
+        } else {
+            node = std::make_unique<BinaryOpNode>(BinaryOp::MODULO, std::move(node), std::move(right));
         }
     }
 
