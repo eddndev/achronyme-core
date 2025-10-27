@@ -188,27 +188,8 @@ void FunctionRegistry::registerBuiltInFunctions() {
     // Variadic Functions (min, max)
     // ========================================================================
 
-    registerFunction("min", [](const std::vector<Value>& args) {
-        if (args.empty()) {
-            throw std::runtime_error("min() requires at least one argument");
-        }
-        double minVal = args[0].asNumber();
-        for (size_t i = 1; i < args.size(); ++i) {
-            minVal = std::min(minVal, args[i].asNumber());
-        }
-        return Value(minVal);
-    }, -1);  // -1 = variadic
-
-    registerFunction("max", [](const std::vector<Value>& args) {
-        if (args.empty()) {
-            throw std::runtime_error("max() requires at least one argument");
-        }
-        double maxVal = args[0].asNumber();
-        for (size_t i = 1; i < args.size(); ++i) {
-            maxVal = std::max(maxVal, args[i].asNumber());
-        }
-        return Value(maxVal);
-    }, -1);  // -1 = variadic
+    // Note: min/max are implemented below as unified functions that handle both
+    // variadic scalars and single vector arguments
 
     // ========================================================================
     // Additional Useful Functions
@@ -290,6 +271,89 @@ void FunctionRegistry::registerBuiltInFunctions() {
     }, 1);
 
     // ========================================================================
+    // Native Vector Operations (Optimized for Performance)
+    // ========================================================================
+
+    registerFunction("vadd", [](const std::vector<Value>& args) {
+        // vadd(v1, v2) → element-wise addition of vectors
+        Vector v1 = args[0].asVector();
+        Vector v2 = args[1].asVector();
+
+        if (v1.size() != v2.size()) {
+            throw std::runtime_error("vadd() requires vectors of same size");
+        }
+
+        Vector result(v1.size());
+        for (size_t i = 0; i < v1.size(); ++i) {
+            result[i] = v1[i] + v2[i];
+        }
+        return Value(result);
+    }, 2);
+
+    registerFunction("vsub", [](const std::vector<Value>& args) {
+        // vsub(v1, v2) → element-wise subtraction of vectors
+        Vector v1 = args[0].asVector();
+        Vector v2 = args[1].asVector();
+
+        if (v1.size() != v2.size()) {
+            throw std::runtime_error("vsub() requires vectors of same size");
+        }
+
+        Vector result(v1.size());
+        for (size_t i = 0; i < v1.size(); ++i) {
+            result[i] = v1[i] - v2[i];
+        }
+        return Value(result);
+    }, 2);
+
+    registerFunction("vmul", [](const std::vector<Value>& args) {
+        // vmul(v1, v2) → element-wise multiplication of vectors
+        Vector v1 = args[0].asVector();
+        Vector v2 = args[1].asVector();
+
+        if (v1.size() != v2.size()) {
+            throw std::runtime_error("vmul() requires vectors of same size");
+        }
+
+        Vector result(v1.size());
+        for (size_t i = 0; i < v1.size(); ++i) {
+            result[i] = v1[i] * v2[i];
+        }
+        return Value(result);
+    }, 2);
+
+    registerFunction("vdiv", [](const std::vector<Value>& args) {
+        // vdiv(v1, v2) → element-wise division of vectors
+        Vector v1 = args[0].asVector();
+        Vector v2 = args[1].asVector();
+
+        if (v1.size() != v2.size()) {
+            throw std::runtime_error("vdiv() requires vectors of same size");
+        }
+
+        Vector result(v1.size());
+        for (size_t i = 0; i < v1.size(); ++i) {
+            if (v2[i] == 0.0) {
+                throw std::runtime_error("vdiv() division by zero");
+            }
+            result[i] = v1[i] / v2[i];
+        }
+        return Value(result);
+    }, 2);
+
+    registerFunction("vscale", [](const std::vector<Value>& args) {
+        // vscale(v, scalar) → scale vector by scalar
+        Vector v = args[0].asVector();
+        double scalar = args[1].asNumber();
+
+        Vector result(v.size());
+        for (size_t i = 0; i < v.size(); ++i) {
+            result[i] = v[i] * scalar;
+        }
+        return Value(result);
+    }, 2);
+
+    // ========================================================================
     // Phase 3: Matrix Functions
     // ========================================================================
 
@@ -327,6 +391,113 @@ void FunctionRegistry::registerBuiltInFunctions() {
     registerFunction("pipe", pipeFunction, -1);  // variadic: pipe(value, f1, f2, ...)
     // compose requires returning a function (deferred for now)
     // registerFunction("compose", composeFunction, -1);
+
+    // ========================================================================
+    // Native Statistical Functions (Optimized)
+    // ========================================================================
+
+    registerFunction("sum", [](const std::vector<Value>& args) {
+        // sum(vector) → scalar - optimized native sum
+        if (args[0].isVector()) {
+            const Vector& v = args[0].asVector();
+            double total = 0.0;
+            for (size_t i = 0; i < v.size(); ++i) {
+                total += v[i];
+            }
+            return Value(total);
+        }
+        throw std::runtime_error("sum() requires a vector argument");
+    }, 1);
+
+    registerFunction("mean", [](const std::vector<Value>& args) {
+        // mean(vector) → scalar - optimized native mean
+        if (args[0].isVector()) {
+            const Vector& v = args[0].asVector();
+            if (v.size() == 0) return Value(0.0);
+            double total = 0.0;
+            for (size_t i = 0; i < v.size(); ++i) {
+                total += v[i];
+            }
+            return Value(total / v.size());
+        }
+        throw std::runtime_error("mean() requires a vector argument");
+    }, 1);
+
+    registerFunction("max", [](const std::vector<Value>& args) {
+        // max can handle both: max(v1, v2, v3, ...) or max(vector)
+        if (args.empty()) {
+            throw std::runtime_error("max() requires at least one argument");
+        }
+
+        // If single argument and it's a vector, find max of vector elements
+        if (args.size() == 1 && args[0].isVector()) {
+            const Vector& v = args[0].asVector();
+            if (v.size() == 0) throw std::runtime_error("max() requires non-empty vector");
+            double maxVal = v[0];
+            for (size_t i = 1; i < v.size(); ++i) {
+                if (v[i] > maxVal) maxVal = v[i];
+            }
+            return Value(maxVal);
+        }
+
+        // Otherwise, treat as variadic scalars: max(a, b, c, ...)
+        double maxVal = args[0].asNumber();
+        for (size_t i = 1; i < args.size(); ++i) {
+            maxVal = std::max(maxVal, args[i].asNumber());
+        }
+        return Value(maxVal);
+    }, -1);  // variadic
+
+    registerFunction("min", [](const std::vector<Value>& args) {
+        // min can handle both: min(v1, v2, v3, ...) or min(vector)
+        if (args.empty()) {
+            throw std::runtime_error("min() requires at least one argument");
+        }
+
+        // If single argument and it's a vector, find min of vector elements
+        if (args.size() == 1 && args[0].isVector()) {
+            const Vector& v = args[0].asVector();
+            if (v.size() == 0) throw std::runtime_error("min() requires non-empty vector");
+            double minVal = v[0];
+            for (size_t i = 1; i < v.size(); ++i) {
+                if (v[i] < minVal) minVal = v[i];
+            }
+            return Value(minVal);
+        }
+
+        // Otherwise, treat as variadic scalars: min(a, b, c, ...)
+        double minVal = args[0].asNumber();
+        for (size_t i = 1; i < args.size(); ++i) {
+            minVal = std::min(minVal, args[i].asNumber());
+        }
+        return Value(minVal);
+    }, -1);  // variadic
+
+    registerFunction("std", [](const std::vector<Value>& args) {
+        // std(vector) → scalar - standard deviation
+        if (args[0].isVector()) {
+            const Vector& v = args[0].asVector();
+            if (v.size() == 0) return Value(0.0);
+
+            // Calculate mean
+            double mean = 0.0;
+            for (size_t i = 0; i < v.size(); ++i) {
+                mean += v[i];
+            }
+            mean /= v.size();
+
+            // Calculate variance
+            double variance = 0.0;
+            for (size_t i = 0; i < v.size(); ++i) {
+                double diff = v[i] - mean;
+                variance += diff * diff;
+            }
+            variance /= v.size();
+
+            return Value(std::sqrt(variance));
+        }
+        throw std::runtime_error("std() requires a vector argument");
+    }, 1);
 
     // ========================================================================
     // Phase 4B: DSP Functions

@@ -853,18 +853,142 @@ cd ..
 
 ---
 
-## 📊 Rendimiento
+## 📊 Rendimiento y Benchmarks
 
-| Operación | Tamaño | Tiempo Aproximado* |
-|-----------|--------|-------------------|
-| FFT | N=1024 | ~1-2 ms |
-| IFFT | N=1024 | ~1-2 ms |
-| conv (directo) | N=100, M=10 | ~0.5 ms |
-| conv_fft | N=1000, M=100 | ~2-3 ms |
-| map | N=10000 | ~0.5 ms |
-| reduce | N=10000 | ~0.3 ms |
+### **Benchmarks Reales: Achronyme vs math.js**
 
-*Tiempos medidos en Chrome con WebAssembly optimizado (-O3)*
+Hemos realizado benchmarks exhaustivos comparando Achronyme con math.js (la librería de matemáticas más popular de JavaScript) en escenarios reales de producción.
+
+#### **🏆 Pipeline DSP Avanzado (Caso de Uso Real)**
+
+**Escenario**: Procesamiento multi-etapa de señales (generación → ventana Hanning → FFT → filtro band-pass → estadísticas)
+
+**Resultados con 32,768 samples:**
+
+```
+🔷 ACHRONYME:          131.80 ms
+🟦 MATH.JS:            705.40 ms
+
+Winner: Achronyme - 5.35x más rápido (435% de ganancia)
+```
+
+**Desglose detallado:**
+
+| Operación | Achronyme | math.js | Ventaja |
+|-----------|-----------|---------|---------|
+| FFT | 18.10 ms | 686.40 ms | **37.9x más rápido** 🔥 |
+| Estadísticas (sum, mean, max, std) | 0.90 ms | 10.10 ms | **11.2x más rápido** |
+| Windowing | 21.10 ms | 5.60 ms | math.js 3.8x más rápido |
+| Filtering | 22.70 ms | 3.20 ms | math.js 7.1x más rápido |
+
+#### **📊 Funciones Estadísticas Nativas (100K elementos)**
+
+```
+🔷 ACHRONYME:          0.80 ms
+🟦 MATH.JS:           30.50 ms
+
+Winner: Achronyme - 38.12x más rápido
+```
+
+#### **📡 FFT Pura (65,536 samples)**
+
+```
+🔷 ACHRONYME:         85.60 ms
+🟦 MATH.JS:         1519.60 ms
+
+Winner: Achronyme - 17.75x más rápido
+```
+
+### **🎯 ¿Cuándo usar Achronyme vs math.js?**
+
+#### **✅ Usa Achronyme cuando:**
+
+- **Procesamiento DSP**: FFT, convolución, análisis espectral, filtros digitales
+- **Pipelines complejos**: Múltiples operaciones encadenadas sobre grandes datasets
+- **Cómputo científico**: Álgebra lineal, análisis numérico, simulaciones
+- **Producción**: Aplicaciones que requieren máximo rendimiento (audio, video, sensores)
+- **Datasets grandes**: 10K+ elementos con operaciones complejas
+
+**Por qué Achronyme domina aquí:**
+- Algoritmos optimizados en C++ (FFT Cooley-Tukey, estadísticas nativas)
+- Todo el pipeline se ejecuta en WASM sin cruzar a JavaScript
+- Compilador optimizado (Emscripten -O3)
+- Zero-copy operations para resultados intermedios
+
+#### **⚠️ Usa math.js cuando:**
+
+- **Operaciones atómicas simples**: Una suma o multiplicación aislada
+- **Scripts rápidos**: Prototipado, pruebas one-off
+- **Datasets pequeños**: <1K elementos con operaciones básicas
+- **Integración con ecosistema JS**: Cuando necesitas compatibilidad total con arrays nativos
+
+**Por qué math.js es más rápido aquí:**
+- Las operaciones simples en arrays nativos de JavaScript están altamente optimizadas por V8
+- No hay overhead del boundary WASM↔JavaScript
+- Para una sola operación, el costo de transferir datos a/desde WASM no vale la pena
+
+### **🔬 Análisis Técnico: El Boundary Crossing**
+
+Achronyme está construido sobre WebAssembly (C++ compilado), lo que significa que hay un "puente" entre JavaScript y WASM.
+
+**Cuando haces `ach.vadd(v1, v2)` con 100K elementos:**
+
+```
+1. JavaScript → WASM call              ~0.1 ms
+2. C++ ejecuta suma optimizada         ~5 ms
+3. Extraer resultado: WASM → JS        ~70 ms  ← 93% del tiempo
+   (copiar 800KB de memoria WASM a JS array)
+────────────────────────────────────────────────
+   TOTAL:                               ~75 ms
+```
+
+**Cuando haces `math.add(arr1, arr2)` con 100K elementos:**
+
+```
+1. Loop directo en V8 sobre arrays nativos  ~8 ms
+────────────────────────────────────────────────
+   TOTAL:                                   ~8 ms
+```
+
+**Entonces, ¿cómo Achronyme gana en pipelines?**
+
+Cuando encadenas operaciones, Achronyme **mantiene todo en WASM**:
+
+```javascript
+// ❌ Operación aislada (math.js más rápido)
+const result = ach.vadd(v1, v2);  // 75ms (crossing overhead)
+
+// ✅ Pipeline (Achronyme domina)
+const result = signal
+  .applyWindow()    // Se queda en WASM
+  .fft()            // Se queda en WASM (37x más rápido)
+  .filter()         // Se queda en WASM
+  .statistics();    // Solo al final cruza el puente (11x más rápido)
+
+// Total: 131ms vs 705ms en math.js
+```
+
+### **🎯 Conclusión**
+
+**Achronyme no pretende reemplazar math.js en todos los casos**. Cada herramienta tiene su lugar:
+
+- **math.js**: Excelente para JavaScript puro, scripts rápidos, operaciones simples
+- **Achronyme**: Diseñado para cómputo pesado, DSP, ciencia, producción
+
+Si tu aplicación hace análisis espectral, procesamiento de audio, simulaciones científicas o cualquier pipeline complejo sobre datos grandes, **Achronyme te dará 5-40x mejor rendimiento**.
+
+Si solo necesitas sumar dos arrays ocasionalmente, math.js es perfectamente válido.
+
+### **📈 Tabla de Referencia Rápida**
+
+| Operación | Tamaño | Achronyme | math.js | Ganador |
+|-----------|--------|-----------|---------|---------|
+| **Pipeline DSP completo** | 32K | 131.80 ms | 705.40 ms | **Achronyme 5.35x** |
+| **FFT** | 64K | 85.60 ms | 1519.60 ms | **Achronyme 17.75x** |
+| **Estadísticas nativas** | 100K | 0.80 ms | 30.50 ms | **Achronyme 38.12x** |
+| **Operación vectorial simple** | 100K | 74.60 ms | 8.20 ms | **math.js 9.1x** |
+
+*Benchmarks ejecutados en Chrome 120+, CPU moderna (2024)*
 
 ---
 

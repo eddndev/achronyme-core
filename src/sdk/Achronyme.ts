@@ -519,7 +519,11 @@ export class Achronyme {
   }
 
   /**
-   * Minimum of values
+   * Minimum value - works with both variadic scalars and vectors
+   * @example
+   * ach.min(1, 5, 3) // 1 (variadic scalars)
+   * const v = ach.vector([1, 5, 3]);
+   * ach.min(v) // 1 (vector)
    */
   min(...values: (AchronymeValue | number)[]): AchronymeValue {
     if (values.length === 0) {
@@ -530,7 +534,11 @@ export class Achronyme {
   }
 
   /**
-   * Maximum of values
+   * Maximum value - works with both variadic scalars and vectors
+   * @example
+   * ach.max(1, 5, 3) // 5 (variadic scalars)
+   * const v = ach.vector([1, 5, 3]);
+   * ach.max(v) // 5 (vector)
    */
   max(...values: (AchronymeValue | number)[]): AchronymeValue {
     if (values.length === 0) {
@@ -632,6 +640,40 @@ export class Achronyme {
   }
 
   // ============================================================================
+  // Native Statistical Functions (Optimized)
+  // ============================================================================
+
+  /**
+   * Sum of all elements in a vector (native C++ implementation, much faster than reduce)
+   * @example
+   * const v = ach.vector([1, 2, 3, 4, 5]);
+   * const total = await ach.sum(v).toNumber(); // 15
+   */
+  sum(arr: AchronymeValue): AchronymeValue {
+    return this._createFromExpression(`sum(${arr._varName})`);
+  }
+
+  /**
+   * Mean (average) of all elements in a vector (native C++ implementation)
+   * @example
+   * const v = ach.vector([1, 2, 3, 4, 5]);
+   * const avg = await ach.mean(v).toNumber(); // 3
+   */
+  mean(arr: AchronymeValue): AchronymeValue {
+    return this._createFromExpression(`mean(${arr._varName})`);
+  }
+
+  /**
+   * Standard deviation of a vector (native C++ implementation)
+   * @example
+   * const v = ach.vector([2, 4, 4, 4, 5, 5, 7, 9]);
+   * const stdDev = await ach.std(v).toNumber();
+   */
+  std(arr: AchronymeValue): AchronymeValue {
+    return this._createFromExpression(`std(${arr._varName})`);
+  }
+
+  // ============================================================================
   // Higher-Order Functions
   // ============================================================================
 
@@ -722,6 +764,45 @@ export class Achronyme {
    */
   norm(v: AchronymeValue): AchronymeValue {
     return this._createFromExpression(`norm(${v._varName})`);
+  }
+
+  /**
+   * Native vector addition (element-wise) - much faster than v1 + v2
+   * @example
+   * const v1 = ach.vector([1, 2, 3]);
+   * const v2 = ach.vector([4, 5, 6]);
+   * const result = ach.vadd(v1, v2); // [5, 7, 9]
+   */
+  vadd(v1: AchronymeValue, v2: AchronymeValue): AchronymeValue {
+    return this._createFromExpression(`vadd(${v1._varName}, ${v2._varName})`);
+  }
+
+  /**
+   * Native vector subtraction (element-wise) - much faster than v1 - v2
+   */
+  vsub(v1: AchronymeValue, v2: AchronymeValue): AchronymeValue {
+    return this._createFromExpression(`vsub(${v1._varName}, ${v2._varName})`);
+  }
+
+  /**
+   * Native vector multiplication (element-wise) - much faster than v1 * v2
+   */
+  vmul(v1: AchronymeValue, v2: AchronymeValue): AchronymeValue {
+    return this._createFromExpression(`vmul(${v1._varName}, ${v2._varName})`);
+  }
+
+  /**
+   * Native vector division (element-wise) - much faster than v1 / v2
+   */
+  vdiv(v1: AchronymeValue, v2: AchronymeValue): AchronymeValue {
+    return this._createFromExpression(`vdiv(${v1._varName}, ${v2._varName})`);
+  }
+
+  /**
+   * Native vector scaling - multiply vector by scalar
+   */
+  vscale(v: AchronymeValue, scalar: number): AchronymeValue {
+    return this._createFromExpression(`vscale(${v._varName}, ${scalar})`);
   }
 
   /**
