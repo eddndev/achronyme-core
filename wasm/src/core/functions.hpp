@@ -73,6 +73,15 @@ Value fftFunction(const std::vector<Value>& args);
 Value fftMagFunction(const std::vector<Value>& args);
 Value ifftFunction(const std::vector<Value>& args);
 
+// Convolution
+Value convFunction(const std::vector<Value>& args);
+Value convFFTFunction(const std::vector<Value>& args);
+
+// Window functions
+Value hanningFunction(const std::vector<Value>& args);
+Value hammingFunction(const std::vector<Value>& args);
+Value blackmanFunction(const std::vector<Value>& args);
+
 } // namespace core
 } // namespace achronyme
 

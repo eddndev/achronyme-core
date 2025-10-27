@@ -339,6 +339,15 @@ void FunctionRegistry::registerBuiltInFunctions() {
     registerFunction("fft", fftFunction, 1);  // fft(signal) -> Matrix [N x 2]
     registerFunction("fft_mag", fftMagFunction, 1);  // fft_mag(signal) -> Vector
     registerFunction("ifft", ifftFunction, 1);  // ifft(spectrum) -> Vector
+
+    // Convolution
+    registerFunction("conv", convFunction, 2);  // conv(sig1, sig2) -> Vector
+    registerFunction("conv_fft", convFFTFunction, 2);  // conv_fft(sig1, sig2) -> Vector (faster)
+
+    // Window functions
+    registerFunction("hanning", hanningFunction, 1);  // hanning(N) -> Vector
+    registerFunction("hamming", hammingFunction, 1);  // hamming(N) -> Vector
+    registerFunction("blackman", blackmanFunction, 1);  // blackman(N) -> Vector
 }
 
 } // namespace core
