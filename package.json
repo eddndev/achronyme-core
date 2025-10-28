@@ -1,6 +1,6 @@
 {
   "name": "@achronyme/core",
-  "version": "0.3.0-beta-7",
+  "version": "0.3.0-beta-8",
   "type": "module",
   "description": "High-performance mathematical computation engine with DSP and functional programming - TypeScript SDK over WebAssembly core",
   "main": "dist/sdk/index.js",
@@ -20,16 +20,21 @@
     "README.md"
   ],
   "scripts": {
-    "build:wasm": "bash scripts/build-wasm.sh",
+    "build:wasm": "node scripts/build-cross-platform.mjs wasm",
+    "build:wasm:dev": "node scripts/build-cross-platform.mjs wasm-dev",
     "build:js": "tsc",
     "build": "npm run build:wasm && npm run build:js",
+    "build:dev": "npm run build:wasm:dev && npm run build:js",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:sdk": "node test-sdk.mjs",
+    "test:dsp": "node test-dsp-intensive.mjs",
+    "test:all": "npm run test:sdk && npm run test:dsp",
     "test:cpp": "echo 'C++ tests require native build. See wasm/README.md'",
     "benchmark": "node dist/benchmark.js",
     "optimize": "bash scripts/optimize-wasm.sh",
     "prepublishOnly": "npm run build && npm run optimize",
-    "clean": "rm -rf dist wasm/build"
+    "clean": "node scripts/clean.mjs"
   },
   "keywords": [
     "wasm",

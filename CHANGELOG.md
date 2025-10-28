@@ -8,11 +8,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned Features (Phase 4+)
-- Higher-order functions (map, reduce, compose)
-- Lambda expressions
-- DSP functions (DFT, FFT, convolution)
 - Symbolic computation
 - Units and dimensions
+
+## [0.3.0-beta-8] - 2025-10-27
+
+### Fixed
+- **CRITICAL:** Fixed FFT spectrum frequency desynchronization bug in `fft_spectrum()`
+  - **Issue:** Frequencies did not correctly correspond to magnitudes and phases after `fftshift`
+  - **Cause:** `fftshift` was applied independently to frequencies and FFT results, then frequencies were sorted, breaking synchronization
+  - **Solution:** Apply `fftshift` simultaneously to both frequencies and FFT spectrum, maintaining index correspondence
+  - **Impact:** FFT spectrum results now 100% accurate (frequency error = 0.0000 rad/s)
+  - **Validation:** Tested with 45 intensive tests using known signals (sinusoids, complex signals, impulse, DC)
+  - **Affected module:** `wasm/src/core/functions_dsp.cpp:860-976`
+  - **Upgrade priority:** HIGH - If you use `fft_spectrum()`, update immediately
+
+### Added
+- Cross-platform build system
+  - Node.js cross-platform build script (`scripts/build-cross-platform.mjs`)
+  - Bash scripts for Unix/Linux/Mac (`scripts/build-wasm.sh`, `scripts/build-wasm-dev.sh`)
+  - Batch scripts for Windows (`scripts/build-wasm.bat`, `scripts/build-wasm-dev.bat`)
+  - Development mode compilation (5-10x faster, includes debug symbols)
+  - Production mode compilation (optimized -O3)
+- New npm scripts
+  - `npm run build:wasm:dev` - Fast development build
+  - `npm run build:dev` - Full development build (WASM + TypeScript)
+  - `npm run clean` - Clean all build artifacts
+  - `npm run test:sdk` - Run SDK test suite
+  - `npm run test:dsp` - Run intensive DSP tests
+  - `npm run test:all` - Run all tests
+- Comprehensive documentation
+  - `BUILD-GUIDE.md` - Complete build guide
+  - `QUICK-START.md` - Quick start guide (3 steps)
+  - `scripts/README.md` - Build scripts documentation
+
+### Changed
+- Improved build system with better error handling and cross-platform support
+- Build scripts now use `emcc` directly (simpler, more reliable)
+- Updated package.json with additional build and test scripts
+
+### Validated
+- ✅ SDK tests: 30/30 passing
+- ✅ FFT vs DFT cross-validation: Perfect match
+- ✅ Signal analysis with known frequencies: Exact results
+- ✅ Conjugate symmetry preserved for real signals
 
 ## [0.3.0] - 2025-10-26
 

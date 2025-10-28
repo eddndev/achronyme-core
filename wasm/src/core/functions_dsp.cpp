@@ -902,53 +902,64 @@ Value fftSpectrumFunction(const std::vector<Value>& args) {
 
     auto fftResult = fft_recursive(x);
 
-    // Step 2: Compute frequency vector
+    // Step 2: Compute frequency vector (without adjustment yet)
     // Frequency bins: k * fs / N for k = 0, 1, ..., N-1
     std::vector<double> frequencies;
     frequencies.reserve(N);
 
     for (size_t k = 0; k < N; ++k) {
         double freq = (double)k * fs / N;
-        // Shift to [-fs/2, fs/2] if needed
-        if (doShift && freq > fs / 2.0) {
-            freq -= fs;
-        }
-        // Convert to angular frequency if needed
-        if (toAngular) {
-            freq *= 2.0 * 3.141592653589793; // ω = 2πf
-        }
         frequencies.push_back(freq);
     }
 
-    // Step 3: Apply fftshift to FFT result if requested
+    // Step 3: Apply fftshift to BOTH frequencies and FFT result if requested
     std::vector<std::complex<double>> shiftedFFT;
+    std::vector<double> shiftedFreqs;
+
     if (doShift) {
         shiftedFFT.reserve(N);
+        shiftedFreqs.reserve(N);
         size_t mid = (N + 1) / 2;
 
-        // Copy second half first, then first half
+        // Copy second half first, then first half (for both FFT and frequencies)
         for (size_t i = mid; i < N; ++i) {
             shiftedFFT.push_back(fftResult[i]);
+            shiftedFreqs.push_back(frequencies[i]);
         }
         for (size_t i = 0; i < mid; ++i) {
             shiftedFFT.push_back(fftResult[i]);
+            shiftedFreqs.push_back(frequencies[i]);
+        }
+
+        // Now adjust frequencies to center around 0: [-fs/2, fs/2]
+        for (size_t i = 0; i < N; ++i) {
+            if (shiftedFreqs[i] > fs / 2.0) {
+                shiftedFreqs[i] -= fs;
+            }
+            // Convert to angular frequency if needed
+            if (toAngular) {
+                shiftedFreqs[i] *= 2.0 * 3.141592653589793; // ω = 2πf
+            }
         }
     } else {
         shiftedFFT = fftResult;
+        shiftedFreqs = frequencies;
+
+        // Convert to angular frequency if needed (no shift case)
+        if (toAngular) {
+            for (size_t i = 0; i < N; ++i) {
+                shiftedFreqs[i] *= 2.0 * 3.141592653589793; // ω = 2πf
+            }
+        }
     }
 
-    // Step 4: Sort frequencies if shifted (to maintain ascending order)
-    if (doShift) {
-        std::sort(frequencies.begin(), frequencies.end());
-    }
-
-    // Step 5: Filter by omega range if specified
+    // Step 4: Filter by omega range if specified
     std::vector<double> filteredOmega;
     std::vector<double> filteredMagnitude;
     std::vector<double> filteredPhase;
 
     for (size_t i = 0; i < N; ++i) {
-        double omega = frequencies[i];
+        double omega = shiftedFreqs[i];
 
         // Apply range filter if specified
         if (omegaRange > 0.0 && (omega < -omegaRange || omega > omegaRange)) {
@@ -962,7 +973,7 @@ Value fftSpectrumFunction(const std::vector<Value>& args) {
 
     size_t resultSize = filteredOmega.size();
 
-    // Step 6: Build result matrix [N x 3]: [omega, magnitude, phase]
+    // Step 5: Build result matrix [N x 3]: [omega, magnitude, phase]
     std::vector<double> matrixData;
     matrixData.reserve(resultSize * 3);
 
