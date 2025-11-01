@@ -17,13 +17,14 @@
  * spectrum.dispose();
  */
 
-import createAchronymeModule from '../../achronyme-core.mjs';
+import createAchronymeModule from '../achronyme-core.mjs';
 import { AchronymeValue } from './AchronymeValue.js';
 import {
   WasmModule,
   AchronymeOptions,
   MemoryStats,
   ComplexNumber,
+  Handle,
 } from './types.js';
 import {
   AchronymeNotInitializedError,
@@ -39,10 +40,18 @@ export class Achronyme {
   private options: AchronymeOptions;
   private initialized: boolean = false;
 
+  // Handle tracking for fast path
+  private handleToVar: Map<Handle, string> = new Map();
+  private varToHandle: Map<string, Handle> = new Map();
+  private fastPathOperationsCount: number = 0;
+  private slowPathOperationsCount: number = 0;
+
   constructor(options: AchronymeOptions = {}) {
     this.options = {
       debug: false,
       maxVariables: 10000,
+      fastPathThreshold: 8,
+      alwaysUseFastPath: false,
       ...options,
     };
   }
@@ -133,6 +142,168 @@ export class Achronyme {
     return this._createFromExpression(expr);
   }
 
+  // ============================================================================
+  // Fast Path Memory Management
+  // ============================================================================
+
+  /**
+   * @internal
+   * Allocate Float64 array in WASM heap
+   */
+  private _allocFloat64(data: ArrayLike<number>): number {
+    if (!this.module) throw new AchronymeNotInitializedError();
+
+    const byteLength = data.length * 8; // 8 bytes per double
+    const ptr = this.module._malloc(byteLength);
+
+    // Write data to heap
+    const heap = new Float64Array(
+      this.module.HEAPF64.buffer,
+      ptr,
+      data.length
+    );
+
+    // Copy data
+    for (let i = 0; i < data.length; i++) {
+      heap[i] = data[i];
+    }
+
+    return ptr;
+  }
+
+  /**
+   * @internal
+   * Read Float64 array from WASM heap
+   */
+  private _readFloat64FromHandle(handle: Handle): Float64Array {
+    if (!this.module) throw new AchronymeNotInitializedError();
+
+    // Allocate space for output length
+    const lengthPtr = this.module._malloc(4); // size_t
+
+    try {
+      // Get pointer to data
+      const dataPtr = this.module.getVectorData(handle, lengthPtr);
+
+      // Read length
+      const length = this.module.HEAPU32[lengthPtr / 4];
+
+      // Create view (zero-copy)
+      return new Float64Array(
+        this.module.HEAPF64.buffer,
+        dataPtr,
+        length
+      );
+    } finally {
+      this.module._free(lengthPtr);
+    }
+  }
+
+  /**
+   * @internal
+   * Create vector using fast path (handle-based, no parsing)
+   */
+  private _createVectorFast(data: ArrayLike<number>): AchronymeValue {
+    if (!this.module) throw new AchronymeNotInitializedError();
+
+    try {
+      // Allocate and write data to WASM heap
+      const ptr = this._allocFloat64(data);
+
+      // Create handle from buffer
+      const handle = this.module.createVectorFromBuffer(ptr, data.length);
+
+      // Free temporary buffer (handle maintains its own copy)
+      this.module._free(ptr);
+
+      // Generate variable name and bind
+      const varName = this.generateVarName();
+      this.module.bindVariableToHandle(varName, handle);
+
+      // Track
+      this.variables.add(varName);
+      this.handleToVar.set(handle, varName);
+      this.varToHandle.set(varName, handle);
+      this.fastPathOperationsCount++;
+
+      if (this.options.debug) {
+        console.log(`[Achronyme] Created vector via FAST path: ${varName} (${data.length} elements, handle=${handle})`);
+      }
+
+      return new AchronymeValue(this, varName, handle);
+    } catch (e: any) {
+      throw wrapCppError(`Failed to create vector (fast path): ${e.message || e}`);
+    }
+  }
+
+  /**
+   * @internal
+   * Create matrix using fast path
+   */
+  private _createMatrixFast(data: number[][]): AchronymeValue {
+    if (!this.module) throw new AchronymeNotInitializedError();
+
+    try {
+      const rows = data.length;
+      const cols = data[0].length;
+
+      // Flatten matrix (row-major)
+      const flat = new Float64Array(rows * cols);
+      let idx = 0;
+      for (let i = 0; i < rows; i++) {
+        for (let j = 0; j < cols; j++) {
+          flat[idx++] = data[i][j];
+        }
+      }
+
+      // Allocate and write
+      const ptr = this._allocFloat64(flat);
+      const handle = this.module.createMatrixFromBuffer(ptr, rows, cols);
+      this.module._free(ptr);
+
+      // Track
+      const varName = this.generateVarName();
+      this.module.bindVariableToHandle(varName, handle);
+      this.variables.add(varName);
+      this.handleToVar.set(handle, varName);
+      this.varToHandle.set(varName, handle);
+      this.fastPathOperationsCount++;
+
+      if (this.options.debug) {
+        console.log(`[Achronyme] Created matrix via FAST path: ${varName} (${rows}x${cols}, handle=${handle})`);
+      }
+
+      return new AchronymeValue(this, varName, handle);
+    } catch (e: any) {
+      throw wrapCppError(`Failed to create matrix (fast path): ${e.message || e}`);
+    }
+  }
+
+  /**
+   * @internal
+   * Create value from handle and bind to variable
+   */
+  _createFromHandle(handle: Handle): AchronymeValue {
+    if (!this.module) throw new AchronymeNotInitializedError();
+
+    const varName = this.generateVarName();
+    this.module.bindVariableToHandle(varName, handle);
+
+    this.variables.add(varName);
+    this.handleToVar.set(handle, varName);
+    this.varToHandle.set(varName, handle);
+
+    return new AchronymeValue(this, varName, handle);
+  }
+
+  /**
+   * @internal
+   * Get handle for a variable (if it exists)
+   */
+  _getHandle(varName: string): Handle | undefined {
+    return this.varToHandle.get(varName);
+  }
+
   /**
    * @internal
    * Dispose a variable (called by AchronymeValue.dispose())
@@ -140,8 +311,26 @@ export class Achronyme {
   _disposeVariable(varName: string): void {
     if (this.variables.has(varName)) {
       this.variables.delete(varName);
-      if (this.options.debug) {
-        console.log(`[Achronyme] Disposed variable: ${varName}`);
+
+      // Release handle if exists
+      const handle = this.varToHandle.get(varName);
+      if (handle !== undefined && this.module) {
+        try {
+          this.module.releaseHandle(handle);
+          this.handleToVar.delete(handle);
+          this.varToHandle.delete(varName);
+
+          if (this.options.debug) {
+            console.log(`[Achronyme] Disposed variable: ${varName} (handle=${handle})`);
+          }
+        } catch (e) {
+          // Ignore errors during disposal
+          if (this.options.debug) {
+            console.warn(`[Achronyme] Warning: Failed to release handle ${handle}`);
+          }
+        }
+      } else if (this.options.debug) {
+        console.log(`[Achronyme] Disposed variable: ${varName} (no handle)`);
       }
     }
   }
@@ -166,11 +355,18 @@ export class Achronyme {
    * Get statistics about memory usage
    */
   getMemoryStats(): MemoryStats {
+    const totalOps = this.fastPathOperationsCount + this.slowPathOperationsCount;
+    const fastPathPercent = totalOps > 0
+      ? (this.fastPathOperationsCount / totalOps) * 100
+      : 0;
+
     return {
       totalVariables: this.varCounter,
       activeVariables: this.variables.size,
       disposedVariables: this.varCounter - this.variables.size,
       variableNames: Array.from(this.variables),
+      activeHandles: this.handleToVar.size,
+      fastPathUsagePercent: fastPathPercent,
     };
   }
 
@@ -225,18 +421,35 @@ export class Achronyme {
 
   /**
    * Create a vector value
+   * OPTIMIZED: Automatically uses fast path for large arrays
    * @example
    * const v = ach.vector([1, 2, 3, 4]);
+   * const large = ach.vector(new Float64Array(10000)); // Fast path!
    */
-  vector(data: number[]): AchronymeValue {
-    if (!Array.isArray(data)) {
-      throw new AchronymeArgumentError('vector() requires an array of numbers');
+  vector(data: number[] | Float64Array): AchronymeValue {
+    if (!Array.isArray(data) && !(data instanceof Float64Array)) {
+      throw new AchronymeArgumentError('vector() requires an array of numbers or Float64Array');
     }
-    return this.createFromValue(formatVector(data));
+
+    const threshold = this.options.fastPathThreshold || 8;
+    const useFastPath = this.options.alwaysUseFastPath || data.length >= threshold;
+
+    if (useFastPath) {
+      // FAST PATH: Handle-based, no parsing
+      return this._createVectorFast(data);
+    } else {
+      // SLOW PATH: Expression-based with parsing
+      this.slowPathOperationsCount++;
+      if (this.options.debug) {
+        console.log(`[Achronyme] Created vector via SLOW path (${data.length} elements < threshold ${threshold})`);
+      }
+      return this.createFromValue(formatVector(Array.from(data)));
+    }
   }
 
   /**
    * Create a matrix value
+   * OPTIMIZED: Automatically uses fast path for large matrices
    * @example
    * const m = ach.matrix([[1, 2], [3, 4]]);
    */
@@ -244,7 +457,23 @@ export class Achronyme {
     if (!Array.isArray(data) || !Array.isArray(data[0])) {
       throw new AchronymeArgumentError('matrix() requires a 2D array of numbers');
     }
-    return this.createFromValue(formatMatrix(data));
+
+    // Calculate total elements
+    const totalElements = data.reduce((sum, row) => sum + row.length, 0);
+    const threshold = (this.options.fastPathThreshold || 8) * 2; // Higher threshold for matrices
+    const useFastPath = this.options.alwaysUseFastPath || totalElements >= threshold;
+
+    if (useFastPath) {
+      // FAST PATH
+      return this._createMatrixFast(data);
+    } else {
+      // SLOW PATH
+      this.slowPathOperationsCount++;
+      if (this.options.debug) {
+        console.log(`[Achronyme] Created matrix via SLOW path (${totalElements} elements < threshold ${threshold})`);
+      }
+      return this.createFromValue(formatMatrix(data));
+    }
   }
 
   /**
@@ -554,18 +783,71 @@ export class Achronyme {
 
   /**
    * Fast Fourier Transform
+   * OPTIMIZED: Uses fast path for handle-based values
    * @example
    * const signal = ach.vector([1, 2, 3, 4, 5, 6, 7, 8]);
    * const spectrum = ach.fft(signal);
    */
   fft(signal: AchronymeValue): AchronymeValue {
+    if (!this.module) throw new AchronymeNotInitializedError();
+
+    // Check if signal has a handle (was created via fast path)
+    const inputHandle = this.varToHandle.get(signal._varName);
+
+    if (inputHandle !== undefined) {
+      // FAST PATH: Operate directly on handles
+      try {
+        const resultHandle = this.module.fft_fast(inputHandle);
+        this.fastPathOperationsCount++;
+
+        if (this.options.debug) {
+          console.log(`[Achronyme] FFT via FAST path (handle ${inputHandle} -> ${resultHandle})`);
+        }
+
+        return this._createFromHandle(resultHandle);
+      } catch (e: any) {
+        // Fallback to slow path on error
+        if (this.options.debug) {
+          console.warn(`[Achronyme] FFT fast path failed, falling back to slow path: ${e.message}`);
+        }
+      }
+    }
+
+    // SLOW PATH: Expression-based
+    this.slowPathOperationsCount++;
+    if (this.options.debug) {
+      console.log(`[Achronyme] FFT via SLOW path (no handle for ${signal._varName})`);
+    }
     return this._createFromExpression(`fft(${signal._varName})`);
   }
 
   /**
    * FFT Magnitude (absolute value of complex FFT result)
+   * OPTIMIZED: Uses fast path for handle-based values
    */
   fft_mag(signal: AchronymeValue): AchronymeValue {
+    if (!this.module) throw new AchronymeNotInitializedError();
+
+    const inputHandle = this.varToHandle.get(signal._varName);
+
+    if (inputHandle !== undefined) {
+      try {
+        const resultHandle = this.module.fft_mag_fast(inputHandle);
+        this.fastPathOperationsCount++;
+
+        if (this.options.debug) {
+          console.log(`[Achronyme] FFT_MAG via FAST path`);
+        }
+
+        return this._createFromHandle(resultHandle);
+      } catch (e: any) {
+        if (this.options.debug) {
+          console.warn(`[Achronyme] FFT_MAG fast path failed: ${e.message}`);
+        }
+      }
+    }
+
+    this.slowPathOperationsCount++;
     return this._createFromExpression(`fft_mag(${signal._varName})`);
   }
 
@@ -657,6 +939,7 @@ export class Achronyme {
    *
    * Generates N evenly spaced samples from start to end (inclusive).
    * This is MUCH faster than generating the array in JS with a loop!
+   * ALWAYS uses fast path (no parsing).
    *
    * @param start - Starting value
    * @param end - Ending value
@@ -668,7 +951,26 @@ export class Achronyme {
    * const samples = await t.toVector();
    */
   linspace(start: number, end: number, n: number): AchronymeValue {
-    return this._createFromExpression(`linspace(${start}, ${end}, ${n})`);
+    if (!this.module) throw new AchronymeNotInitializedError();
+
+    try {
+      // ALWAYS use fast path for linspace (it's meant to be fast!)
+      const resultHandle = this.module.linspace_fast(start, end, n);
+      this.fastPathOperationsCount++;
+
+      if (this.options.debug) {
+        console.log(`[Achronyme] Linspace via FAST path (${n} points)`);
+      }
+
+      return this._createFromHandle(resultHandle);
+    } catch (e: any) {
+      // Fallback to slow path
+      if (this.options.debug) {
+        console.warn(`[Achronyme] Linspace fast path failed: ${e.message}`);
+      }
+      this.slowPathOperationsCount++;
+      return this._createFromExpression(`linspace(${start}, ${end}, ${n})`);
+    }
   }
 
   /**

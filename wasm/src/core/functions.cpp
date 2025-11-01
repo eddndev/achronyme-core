@@ -62,15 +62,63 @@ void FunctionRegistry::registerBuiltInFunctions() {
     // ========================================================================
 
     registerFunction("sin", [](const std::vector<Value>& args) {
-        return Value(std::sin(args[0].asNumber()));
+        // Scalar path
+        if (args[0].isNumber()) {
+            return Value(std::sin(args[0].asNumber()));
+        }
+
+        // Vector path (element-wise)
+        if (args[0].isVector()) {
+            const Vector& vec = args[0].asVector();
+            std::vector<double> result;
+            result.reserve(vec.size());
+            for (size_t i = 0; i < vec.size(); ++i) {
+                result.push_back(std::sin(vec[i]));
+            }
+            return Value(Vector(result));
+        }
+
+        throw std::runtime_error("sin requires number or vector");
     }, 1);
 
     registerFunction("cos", [](const std::vector<Value>& args) {
-        return Value(std::cos(args[0].asNumber()));
+        // Scalar path
+        if (args[0].isNumber()) {
+            return Value(std::cos(args[0].asNumber()));
+        }
+
+        // Vector path (element-wise)
+        if (args[0].isVector()) {
+            const Vector& vec = args[0].asVector();
+            std::vector<double> result;
+            result.reserve(vec.size());
+            for (size_t i = 0; i < vec.size(); ++i) {
+                result.push_back(std::cos(vec[i]));
+            }
+            return Value(Vector(result));
+        }
+
+        throw std::runtime_error("cos requires number or vector");
     }, 1);
 
     registerFunction("tan", [](const std::vector<Value>& args) {
-        return Value(std::tan(args[0].asNumber()));
+        // Scalar path
+        if (args[0].isNumber()) {
+            return Value(std::tan(args[0].asNumber()));
+        }
+
+        // Vector path (element-wise)
+        if (args[0].isVector()) {
+            const Vector& vec = args[0].asVector();
+            std::vector<double> result;
+            result.reserve(vec.size());
+            for (size_t i = 0; i < vec.size(); ++i) {
+                result.push_back(std::tan(vec[i]));
+            }
+            return Value(Vector(result));
+        }
+
+        throw std::runtime_error("tan requires number or vector");
     }, 1);
 
     registerFunction("asin", [](const std::vector<Value>& args) {
@@ -107,7 +155,23 @@ void FunctionRegistry::registerBuiltInFunctions() {
     // ========================================================================
 
     registerFunction("exp", [](const std::vector<Value>& args) {
-        return Value(std::exp(args[0].asNumber()));
+        // Scalar path
+        if (args[0].isNumber()) {
+            return Value(std::exp(args[0].asNumber()));
+        }
+
+        // Vector path (element-wise)
+        if (args[0].isVector()) {
+            const Vector& vec = args[0].asVector();
+            std::vector<double> result;
+            result.reserve(vec.size());
+            for (size_t i = 0; i < vec.size(); ++i) {
+                result.push_back(std::exp(vec[i]));
+            }
+            return Value(Vector(result));
+        }
+
+        throw std::runtime_error("exp requires number or vector");
     }, 1);
 
     registerFunction("log", [](const std::vector<Value>& args) {
@@ -116,7 +180,23 @@ void FunctionRegistry::registerBuiltInFunctions() {
 
     // Aliases for natural log
     registerFunction("ln", [](const std::vector<Value>& args) {
-        return Value(std::log(args[0].asNumber()));
+        // Scalar path
+        if (args[0].isNumber()) {
+            return Value(std::log(args[0].asNumber()));
+        }
+
+        // Vector path (element-wise)
+        if (args[0].isVector()) {
+            const Vector& vec = args[0].asVector();
+            std::vector<double> result;
+            result.reserve(vec.size());
+            for (size_t i = 0; i < vec.size(); ++i) {
+                result.push_back(std::log(vec[i]));
+            }
+            return Value(Vector(result));
+        }
+
+        throw std::runtime_error("ln requires number or vector");
     }, 1);
 
     registerFunction("log10", [](const std::vector<Value>& args) {
@@ -132,7 +212,23 @@ void FunctionRegistry::registerBuiltInFunctions() {
     // ========================================================================
 
     registerFunction("sqrt", [](const std::vector<Value>& args) {
-        return Value(std::sqrt(args[0].asNumber()));
+        // Scalar path
+        if (args[0].isNumber()) {
+            return Value(std::sqrt(args[0].asNumber()));
+        }
+
+        // Vector path (element-wise)
+        if (args[0].isVector()) {
+            const Vector& vec = args[0].asVector();
+            std::vector<double> result;
+            result.reserve(vec.size());
+            for (size_t i = 0; i < vec.size(); ++i) {
+                result.push_back(std::sqrt(vec[i]));
+            }
+            return Value(Vector(result));
+        }
+
+        throw std::runtime_error("sqrt requires number or vector");
     }, 1);
 
     registerFunction("cbrt", [](const std::vector<Value>& args) {
@@ -168,13 +264,29 @@ void FunctionRegistry::registerBuiltInFunctions() {
     // ========================================================================
 
     registerFunction("abs", [](const std::vector<Value>& args) {
-        // abs() works for both numbers and complex numbers
+        // Complex number
         if (args[0].isComplex()) {
             Complex z = args[0].asComplex();
             return Value(z.magnitude());
-        } else {
+        }
+
+        // Scalar
+        if (args[0].isNumber()) {
             return Value(std::abs(args[0].asNumber()));
         }
+
+        // Vector path (element-wise)
+        if (args[0].isVector()) {
+            const Vector& vec = args[0].asVector();
+            std::vector<double> result;
+            result.reserve(vec.size());
+            for (size_t i = 0; i < vec.size(); ++i) {
+                result.push_back(std::abs(vec[i]));
+            }
+            return Value(Vector(result));
+        }
+
+        throw std::runtime_error("abs requires number, complex, or vector");
     }, 1);
 
     registerFunction("sign", [](const std::vector<Value>& args) {

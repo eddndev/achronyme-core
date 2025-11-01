@@ -1,66 +1,51 @@
-# Documentación de Achronyme Core
+# Documentación - Achronyme Core
 
-Bienvenido a la documentación completa de Achronyme Core.
+Documentación técnica del proyecto Achronyme Core.
 
----
+## 📚 Guías Principales
 
-## 📚 Guías Disponibles
+### Sistema de Handles (Nuevo - v0.3.0)
+- **`HANDLES-SYSTEM.md`** - Arquitectura técnica completa del sistema de handles
+- **`IMPLEMENTATION-SUMMARY.md`** - Resumen de implementación y guía de uso
+- **`README-HANDLES.md`** - Resumen ejecutivo del sistema de handles
+- **`COMPILE-AND-TEST.md`** - Instrucciones detalladas de compilación y testing
+- **`INSTRUCCIONES-COMPILACION.md`** - Guía de compilación paso a paso
+- **`RESUMEN-IMPLEMENTACION.md`** - Resumen completo de la implementación
 
-### [Especificación del Lenguaje SOC](./language-spec.md)
-Documentación completa del lenguaje Achronyme (Superior Order Calculator):
-- Gramática formal BNF
-- Tipos de datos (Number, Complex, Vector, Matrix, Function)
-- Operadores y precedencia
-- Sintaxis completa con ejemplos
-- Sistema de tipos con inferencia
-- Constantes matemáticas
+### Guías de Desarrollo
+- **`BUILD-GUIDE.md`** - Guía completa de construcción del proyecto
+- **`QUICK-START.md`** - Inicio rápido para desarrolladores
+- **`PUBLISH.md`** - Guía de publicación a npm
 
-### [Guía del SDK TypeScript](./sdk-guide.md)
-Todo lo que necesitas saber sobre el SDK de TypeScript:
-- ¿Por qué usar el SDK?
-- Instalación y configuración
-- Gestión de memoria (dispose pattern)
-- API completa de `Achronyme` y `AchronymeValue`
-- Ejemplos prácticos
-- Manejo de errores
+### SDK
+- Ver directorio `sdk/` para documentación del SDK
 
-### [Roadmap del Proyecto](./roadmap.md)
-El futuro de Achronyme:
-- Fases completadas (v0.1-v0.3)
-- En desarrollo (v0.4-v0.6)
-- Visión a largo plazo (v0.7+)
-- Ecosistema planificado (@achronyme/language, @achronyme/plot, @achronyme/cas)
-- Cómo contribuir
+## 📦 Archivo Histórico
 
-### [Comparación con Wolfram](./wolfram-comparison.md)
-Análisis realista y profesional:
-- Dónde Achronyme puede ganar
-- Dónde Wolfram siempre dominará
-- Estrategia ganadora
-- Modelo de negocio
-- Conclusión profesional
+El directorio `archive/` contiene documentación histórica y de referencia:
+- Comparaciones de arquitectura
+- Resúmenes de sesiones anteriores
+- Implementaciones previas del SDK
+- Checklists de releases
 
----
+## 🔍 Navegación Rápida
 
-## 🚀 Inicio Rápido
+### Para Comenzar
+1. Leer `../README.md` (raíz del proyecto)
+2. Seguir `QUICK-START.md`
+3. Compilar con `BUILD-GUIDE.md`
 
-Si es tu primera vez, te recomendamos este orden:
+### Para Entender el Sistema de Handles
+1. Empezar con `README-HANDLES.md`
+2. Detalles técnicos en `HANDLES-SYSTEM.md`
+3. Guía de uso en `IMPLEMENTATION-SUMMARY.md`
+4. Compilación en `COMPILE-AND-TEST.md`
 
-1. **[README principal](../README.md)** - Instalación y primer uso
-2. **[Guía del SDK](./sdk-guide.md)** - Aprende a usar el SDK TypeScript
-3. **[Especificación del lenguaje](./language-spec.md)** - Entiende el lenguaje SOC
-4. **[Ejemplos prácticos](../examples/)** - Código de ejemplo ejecutable
+### Para Contribuir
+1. Leer `../CONTRIBUTING.md`
+2. Seguir `BUILD-GUIDE.md`
+3. Revisar `../CHANGELOG.md`
 
 ---
 
-## 🔗 Más Recursos
-
-- **[README principal](../README.md)** - Inicio rápido y características
-- **[Ejemplos](../examples/)** - Código de ejemplo
-- **[GitHub](https://github.com/eddndev/achronyme-core)** - Repositorio
-- **[npm](https://www.npmjs.com/package/@achronyme/core)** - Paquete
-
----
-
-**Versión**: 0.3.0
-**Última actualización**: 2025
+**Última actualización**: 2025-11-01

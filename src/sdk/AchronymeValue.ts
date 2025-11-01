@@ -9,13 +9,14 @@
  */
 
 import type { Achronyme } from './Achronyme.js';
-import { ComplexNumber, ValueMetadata, AchronymeValueType } from './types.js';
+import { ComplexNumber, ValueMetadata, AchronymeValueType, Handle } from './types.js';
 import { AchronymeDisposedError, wrapCppError } from './errors.js';
 import { parseResult, parseComplex, parseVector, parseMatrix, detectType } from './utils.js';
 
 export class AchronymeValue {
   private _disposed: boolean = false;
   private readonly _metadata: ValueMetadata;
+  private readonly _handle?: Handle; // Optional handle for fast path
 
   /**
    * @internal
@@ -23,14 +24,18 @@ export class AchronymeValue {
    */
   constructor(
     private readonly ach: Achronyme,
-    private readonly varName: string
+    private readonly varName: string,
+    handle?: Handle
   ) {
     this._metadata = {
       varName,
       type: 'unknown',
       disposed: false,
       createdAt: Date.now(),
+      handle,
+      usedFastPath: handle !== undefined,
     };
+    this._handle = handle;
   }
 
   // ============================================================================
@@ -141,9 +146,43 @@ export class AchronymeValue {
 
   /**
    * Get the value as a vector (number array)
+   * OPTIMIZED: Uses direct memory read if handle exists
    * @throws AchronymeTypeError if value is not a vector
    */
   async toVector(): Promise<number[]> {
+    this.checkDisposed();
+
+    // Try fast path if handle exists
+    if (this._handle !== undefined) {
+      try {
+        const module = (this.ach as any).module;
+        if (!module) throw new Error('Module not initialized');
+
+        // Allocate space for length output
+        const lengthPtr = module._malloc(8); // size_t
+
+        try {
+          // Get pointer to vector data
+          const dataPtr = module.getVectorData(this._handle, lengthPtr);
+
+          // Read length
+          const length = module.HEAPU32[lengthPtr / 4];
+
+          // Create TypedArray view (zero-copy)
+          const view = new Float64Array(module.HEAPF64.buffer, dataPtr, length);
+
+          // Copy to regular array (necessary to preserve data)
+          return Array.from(view);
+        } finally {
+          module._free(lengthPtr);
+        }
+      } catch (e: any) {
+        // Fallback to slow path on error
+        console.warn(`[AchronymeValue] Fast toVector failed, using slow path: ${e.message}`);
+      }
+    }
+
+    // Slow path: parse from string
     const raw = await this.raw();
     return parseVector(raw);
   }
@@ -388,18 +427,21 @@ export class AchronymeValue {
 
   /**
    * Fast Fourier Transform
+   * OPTIMIZED: Uses fast path if this value has a handle
    */
   fft(): AchronymeValue {
     this.checkDisposed();
-    return (this.ach as any)._createFromExpression(`fft(${this.varName})`);
+    // Delegate to Achronyme method which handles fast path detection
+    return (this.ach as any).fft(this);
   }
 
   /**
    * FFT Magnitude
+   * OPTIMIZED: Uses fast path if this value has a handle
    */
   fft_mag(): AchronymeValue {
     this.checkDisposed();
-    return (this.ach as any)._createFromExpression(`fft_mag(${this.varName})`);
+    return (this.ach as any).fft_mag(this);
   }
 
   /**

@@ -79,6 +79,7 @@ function buildWasm() {
 
     // Build arguments
     const args = [
+      // Core files
       'wasm/src/core/constants.cpp',
       'wasm/src/core/complex.cpp',
       'wasm/src/core/vector.cpp',
@@ -88,18 +89,30 @@ function buildWasm() {
       'wasm/src/core/functions_dsp.cpp',
       'wasm/src/core/functions_hof.cpp',
       'wasm/src/core/value.cpp',
+      'wasm/src/core/handle_manager.cpp',       // NEW: Handle system
+      // Parser files
       'wasm/src/parser/lexer.cpp',
       'wasm/src/parser/parser.cpp',
       'wasm/src/parser/evaluator.cpp',
+      // Bindings files
       'wasm/src/bindings/main.cpp',
+      'wasm/src/bindings/fast_ops.cpp',         // NEW: Fast operations API
+      // Compiler options
       '-I', 'wasm/src',
       '-o', 'dist/achronyme-core.mjs',
+      // WASM settings
       '-s', 'WASM=1',
       '-s', 'ALLOW_MEMORY_GROWTH=1',
+      '-s', 'MAXIMUM_MEMORY=2GB',
+      '-s', 'INITIAL_MEMORY=64MB',
+      // Module settings
       '-s', 'MODULARIZE=1',
       '-s', 'EXPORT_ES6=1',
       '-s', 'EXPORT_NAME=AchronymeCore',
       '-s', 'ENVIRONMENT=web,worker,node',
+      // Runtime exports (required for handles)
+      '-s', 'EXPORTED_RUNTIME_METHODS=["HEAPF64","HEAPU32","HEAP8"]',
+      // C++ settings
       '--bind',
       '-fexceptions',
       '-std=c++17'

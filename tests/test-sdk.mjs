@@ -4,7 +4,7 @@
  * Simple test to verify the SDK works correctly
  */
 
-import { Achronyme } from './dist/sdk/sdk/index.js';
+import { Achronyme } from '../dist/sdk/index.js';
 
 console.log('='.repeat(60));
 console.log('ACHRONYME SDK - QUICK TEST');

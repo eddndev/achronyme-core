@@ -9,7 +9,7 @@ console.log('=== Testing NPM Package Entry Points ===\n');
 // Test 1: Main export (SDK)
 console.log('1. Testing main export (SDK)...');
 try {
-  const { Achronyme, AchronymeValue } = await import('./dist/sdk/index.js');
+  const { Achronyme, AchronymeValue } = await import('../dist/sdk/index.js');
   console.log('   ✓ Main export works');
   console.log('   ✓ Achronyme:', typeof Achronyme);
   console.log('   ✓ AchronymeValue:', typeof AchronymeValue);
@@ -30,7 +30,7 @@ try {
 // Test 2: WASM export (advanced)
 console.log('\n2. Testing WASM export (advanced)...');
 try {
-  const { default: createModule } = await import('./dist/achronyme-core.mjs');
+  const { default: createModule } = await import('../dist/achronyme-core.mjs');
   console.log('   ✓ WASM export works');
 
   const Module = await createModule();

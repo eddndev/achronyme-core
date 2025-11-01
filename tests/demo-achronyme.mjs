@@ -1,4 +1,4 @@
-import createAchronymeModule from './dist/achronyme-core.mjs';
+import createAchronymeModule from '../dist/achronyme-core.mjs';
 
 console.log('╔═══════════════════════════════════════════════════════════════╗');
 console.log('║         ACHRONYME CORE - COMPREHENSIVE DEMO & TESTS          ║');

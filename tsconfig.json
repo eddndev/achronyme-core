@@ -5,7 +5,7 @@
     "lib": ["ES2020", "DOM"],
     "declaration": true,
     "outDir": "./dist",
-    "rootDir": "./js/src",
+    "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -14,6 +14,6 @@
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true
   },
-  "include": ["js/src/**/*"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "wasm", "js/__tests__"]
 }

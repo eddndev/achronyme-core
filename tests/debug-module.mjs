@@ -1,5 +1,5 @@
 // Debug: Check what the module exports
-const imported = await import('./dist/achronyme-core.js');
+const imported = await import('../dist/achronyme-core.mjs');
 
 console.log('Imported object keys:', Object.keys(imported));
 console.log('Has default?:', imported.default !== undefined);
