@@ -57,8 +57,8 @@ emcc \
   -s EXPORT_ES6=1 \
   -s EXPORT_NAME='AchronymeCore' \
   -s ENVIRONMENT='web,worker,node' \
-  -s EXPORTED_RUNTIME_METHODS='["HEAPF64","HEAPU32","HEAP8"]' \
   -s EXPORTED_FUNCTIONS='["_malloc","_free"]' \
+  -s EXPORTED_RUNTIME_METHODS='["HEAPF64","HEAPU32"]' \
   --bind \
   -fexceptions \
   -O3 \

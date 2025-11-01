@@ -157,11 +157,8 @@ export class Achronyme {
     const ptr = this.module._malloc(byteLength);
 
     // Write data to heap
-    const heap = new Float64Array(
-      this.module.HEAPF64.buffer,
-      ptr,
-      data.length
-    );
+    // Access heap through HEAPF64 - Emscripten ensures this is always available after init
+    const heap = this.module.HEAPF64.subarray(ptr / 8, ptr / 8 + data.length);
 
     // Copy data
     for (let i = 0; i < data.length; i++) {
@@ -189,11 +186,8 @@ export class Achronyme {
       const length = this.module.HEAPU32[lengthPtr / 4];
 
       // Create view (zero-copy)
-      return new Float64Array(
-        this.module.HEAPF64.buffer,
-        dataPtr,
-        length
-      );
+      // Use subarray for Emscripten 4.0 compatibility
+      return this.module.HEAPF64.subarray(dataPtr / 8, dataPtr / 8 + length);
     } finally {
       this.module._free(lengthPtr);
     }

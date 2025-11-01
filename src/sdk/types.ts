@@ -72,6 +72,7 @@ export interface WasmModule {
   // Emscripten Memory
   _malloc(size: number): number;
   _free(ptr: number): void;
+  HEAP8: Int8Array;
   HEAPF64: Float64Array;
   HEAPU32: Uint32Array;
 }

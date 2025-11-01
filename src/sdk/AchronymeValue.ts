@@ -169,7 +169,8 @@ export class AchronymeValue {
           const length = module.HEAPU32[lengthPtr / 4];
 
           // Create TypedArray view (zero-copy)
-          const view = new Float64Array(module.HEAPF64.buffer, dataPtr, length);
+          // Use subarray for Emscripten 4.0 compatibility
+          const view = module.HEAPF64.subarray(dataPtr / 8, dataPtr / 8 + length);
 
           // Copy to regular array (necessary to preserve data)
           return Array.from(view);
