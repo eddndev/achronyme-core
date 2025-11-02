@@ -75,6 +75,7 @@ public:
 
     // Get raw variant (for pattern matching)
     const ValueType& data() const { return data_; }
+    ValueType& data() { return data_; }
 
 private:
     ValueType data_;

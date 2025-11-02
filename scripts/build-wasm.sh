@@ -42,11 +42,14 @@ emcc \
   wasm/src/core/functions_hof.cpp \
   wasm/src/core/value.cpp \
   wasm/src/core/handle_manager.cpp \
+  wasm/src/linalg/decompositions.cpp \
+  wasm/src/linalg/eigensolvers.cpp \
   wasm/src/parser/lexer.cpp \
   wasm/src/parser/parser.cpp \
   wasm/src/parser/evaluator.cpp \
   wasm/src/bindings/main.cpp \
   wasm/src/bindings/fast_ops.cpp \
+  wasm/src/bindings/linalg_bindings.cpp \
   -I wasm/src \
   -o dist/achronyme-core.mjs \
   -s WASM=1 \
@@ -57,8 +60,8 @@ emcc \
   -s EXPORT_ES6=1 \
   -s EXPORT_NAME='AchronymeCore' \
   -s ENVIRONMENT='web,worker,node' \
-  -s EXPORTED_FUNCTIONS='["_malloc","_free"]' \
   -s EXPORTED_RUNTIME_METHODS='["HEAPF64","HEAPU32"]' \
+  -sEXPORTED_FUNCTIONS='["_malloc","_free"]' \
   --bind \
   -fexceptions \
   -O3 \

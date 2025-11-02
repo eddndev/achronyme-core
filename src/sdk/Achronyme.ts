@@ -25,6 +25,11 @@ import {
   MemoryStats,
   ComplexNumber,
   Handle,
+  LUResult,
+  QRResult,
+  SVDResult,
+  EigenResult,
+  PowerIterationResult,
 } from './types.js';
 import {
   AchronymeNotInitializedError,
@@ -1276,6 +1281,435 @@ export class Achronyme {
    */
   inverse(m: AchronymeValue): AchronymeValue {
     return this._createFromExpression(`inverse(${m._varName})`);
+  }
+
+  // ============================================================================
+  // Linear Algebra - Advanced Matrix Decompositions (v0.4.0)
+  // ============================================================================
+
+  /**
+   * LU Decomposition with partial pivoting: PA = LU
+   *
+   * Factorizes matrix A into:
+   *   P × A = L × U
+   * where:
+   *   - P is a permutation matrix
+   *   - L is lower triangular with 1s on diagonal
+   *   - U is upper triangular
+   *
+   * Algorithm: Gaussian elimination with partial pivoting
+   * Complexity: O(n³)
+   *
+   * @param matrix Square matrix to decompose
+   * @returns Object with L, U, P matrices
+   * @throws Error if matrix is singular or not square
+   *
+   * @example
+   * const A = ach.matrix([[4, 3], [6, 3]]);
+   * const { L, U, P } = ach.lu(A);
+   * // Verify: P * A == L * U
+   */
+  lu(matrix: AchronymeValue): LUResult {
+    if (!this.module) throw new AchronymeNotInitializedError();
+
+    // Check if matrix has a handle (fast path)
+    const matrixHandle = this.varToHandle.get(matrix._varName);
+
+    if (matrixHandle !== undefined) {
+      try {
+        const result = this.module.lu_decomposition_js(matrixHandle);
+
+        const L = this._createFromHandle(result.L);
+        const U = this._createFromHandle(result.U);
+        const P = this._createFromHandle(result.P);
+
+        if (this.options.debug) {
+          console.log(`[Achronyme] LU decomposition via FAST path`);
+        }
+
+        return { L, U, P };
+      } catch (e: any) {
+        throw wrapCppError(`LU decomposition failed: ${e.message || e}`);
+      }
+    }
+
+    // Slow path: not supported for decompositions (require matrix handles)
+    throw new AchronymeArgumentError('LU decomposition requires a matrix created via ach.matrix()');
+  }
+
+  /**
+   * QR Decomposition: A = QR
+   *
+   * Factorizes matrix A into:
+   *   A = Q × R
+   * where:
+   *   - Q is orthogonal (Q^T × Q = I)
+   *   - R is upper triangular
+   *
+   * Algorithm: Householder reflections
+   * Complexity: O(mn²) for m×n matrix
+   *
+   * @param matrix Matrix to decompose (m×n, m >= n)
+   * @returns Object with Q and R matrices
+   *
+   * @example
+   * const A = ach.matrix([[12, -51, 4], [6, 167, -68], [-4, 24, -41]]);
+   * const { Q, R } = ach.qr(A);
+   * // Verify: A == Q * R
+   */
+  qr(matrix: AchronymeValue): QRResult {
+    if (!this.module) throw new AchronymeNotInitializedError();
+
+    const matrixHandle = this.varToHandle.get(matrix._varName);
+
+    if (matrixHandle !== undefined) {
+      try {
+        const result = this.module.qr_decomposition_js(matrixHandle);
+
+        const Q = this._createFromHandle(result.Q);
+        const R = this._createFromHandle(result.R);
+
+        if (this.options.debug) {
+          console.log(`[Achronyme] QR decomposition via FAST path`);
+        }
+
+        return { Q, R };
+      } catch (e: any) {
+        throw wrapCppError(`QR decomposition failed: ${e.message || e}`);
+      }
+    }
+
+    throw new AchronymeArgumentError('QR decomposition requires a matrix created via ach.matrix()');
+  }
+
+  /**
+   * Cholesky Decomposition: A = L×L^T
+   *
+   * Factorizes symmetric positive definite matrix A into:
+   *   A = L × L^T
+   * where:
+   *   - L is lower triangular
+   *
+   * Algorithm: Cholesky-Banachiewicz
+   * Complexity: O(n³/3) - Faster than LU
+   * Requirements: A must be symmetric and positive definite
+   *
+   * @param matrix Symmetric positive definite matrix
+   * @returns Lower triangular matrix L
+   * @throws Error if matrix is not positive definite
+   *
+   * @example
+   * const A = ach.matrix([[4, 12, -16], [12, 37, -43], [-16, -43, 98]]);
+   * const L = ach.cholesky(A);
+   * // Verify: A == L * L^T
+   */
+  cholesky(matrix: AchronymeValue): AchronymeValue {
+    if (!this.module) throw new AchronymeNotInitializedError();
+
+    const matrixHandle = this.varToHandle.get(matrix._varName);
+
+    if (matrixHandle !== undefined) {
+      try {
+        const resultHandle = this.module.cholesky_decomposition_js(matrixHandle);
+
+        if (this.options.debug) {
+          console.log(`[Achronyme] Cholesky decomposition via FAST path`);
+        }
+
+        return this._createFromHandle(resultHandle);
+      } catch (e: any) {
+        throw wrapCppError(`Cholesky decomposition failed: ${e.message || e}`);
+      }
+    }
+
+    throw new AchronymeArgumentError('Cholesky decomposition requires a matrix created via ach.matrix()');
+  }
+
+  /**
+   * Singular Value Decomposition: A = UΣV^T
+   *
+   * Factorizes matrix A into:
+   *   A = U × Σ × V^T
+   * where:
+   *   - U: m×m orthogonal (left singular vectors)
+   *   - Σ: m×n diagonal (singular values, non-negative)
+   *   - V: n×n orthogonal (right singular vectors)
+   *
+   * Algorithm: Golub-Reinsch with bidiagonalization
+   * Complexity: O(min(m,n)² × max(m,n))
+   *
+   * Applications:
+   *   - Principal Component Analysis (PCA)
+   *   - Data compression
+   *   - Pseudoinverse computation
+   *   - Low-rank approximation
+   *
+   * @param matrix Matrix to decompose (m×n)
+   * @returns Object with U, S (singular values as vector), V
+   *
+   * @example
+   * const A = ach.matrix([[1, 2], [3, 4], [5, 6]]);
+   * const { U, S, V } = ach.svd(A);
+   */
+  svd(matrix: AchronymeValue): SVDResult {
+    if (!this.module) throw new AchronymeNotInitializedError();
+
+    const matrixHandle = this.varToHandle.get(matrix._varName);
+
+    if (matrixHandle !== undefined) {
+      try {
+        const result = this.module.svd_decomposition_js(matrixHandle);
+
+        const U = this._createFromHandle(result.U);
+        const S = this._createFromHandle(result.S);
+        const V = this._createFromHandle(result.V);
+
+        if (this.options.debug) {
+          console.log(`[Achronyme] SVD via FAST path`);
+        }
+
+        return { U, S, V };
+      } catch (e: any) {
+        throw wrapCppError(`SVD failed: ${e.message || e}`);
+      }
+    }
+
+    throw new AchronymeArgumentError('SVD requires a matrix created via ach.matrix()');
+  }
+
+  /**
+   * Check if a matrix is symmetric
+   *
+   * @param matrix Matrix to check
+   * @param tol Tolerance for symmetry check (default: 1e-12)
+   * @returns true if A[i,j] == A[j,i] within tolerance
+   *
+   * @example
+   * const A = ach.matrix([[1, 2], [2, 1]]);
+   * const symmetric = ach.isSymmetric(A); // true
+   */
+  isSymmetric(matrix: AchronymeValue, tol: number = 1e-12): boolean {
+    if (!this.module) throw new AchronymeNotInitializedError();
+
+    const matrixHandle = this.varToHandle.get(matrix._varName);
+
+    if (matrixHandle !== undefined) {
+      try {
+        return this.module.is_symmetric_js(matrixHandle, tol);
+      } catch (e: any) {
+        throw wrapCppError(`isSymmetric failed: ${e.message || e}`);
+      }
+    }
+
+    throw new AchronymeArgumentError('isSymmetric requires a matrix created via ach.matrix()');
+  }
+
+  /**
+   * Check if a matrix is positive definite
+   *
+   * Uses Sylvester's criterion (all leading principal minors > 0)
+   *
+   * @param matrix Matrix to check
+   * @returns true if matrix is positive definite
+   *
+   * @example
+   * const A = ach.matrix([[2, -1], [-1, 2]]);
+   * const pd = ach.isPositiveDefinite(A); // true
+   */
+  isPositiveDefinite(matrix: AchronymeValue): boolean {
+    if (!this.module) throw new AchronymeNotInitializedError();
+
+    const matrixHandle = this.varToHandle.get(matrix._varName);
+
+    if (matrixHandle !== undefined) {
+      try {
+        return this.module.is_positive_definite_js(matrixHandle);
+      } catch (e: any) {
+        throw wrapCppError(`isPositiveDefinite failed: ${e.message || e}`);
+      }
+    }
+
+    throw new AchronymeArgumentError('isPositiveDefinite requires a matrix created via ach.matrix()');
+  }
+
+  /**
+   * Create identity matrix of size n×n
+   *
+   * @param n Size of identity matrix
+   * @returns n×n identity matrix (1s on diagonal, 0s elsewhere)
+   *
+   * @example
+   * const I = ach.identity(3);
+   * // [[1, 0, 0],
+   * //  [0, 1, 0],
+   * //  [0, 0, 1]]
+   */
+  identity(n: number): AchronymeValue {
+    if (!this.module) throw new AchronymeNotInitializedError();
+
+    try {
+      const resultHandle = this.module.identity_js(n);
+
+      if (this.options.debug) {
+        console.log(`[Achronyme] Created identity matrix ${n}×${n}`);
+      }
+
+      return this._createFromHandle(resultHandle);
+    } catch (e: any) {
+      throw wrapCppError(`identity failed: ${e.message || e}`);
+    }
+  }
+
+  // ============================================================================
+  // Eigenvalue and Eigenvector Solvers (v0.4.0)
+  // ============================================================================
+
+  /**
+   * Power Iteration - Find dominant eigenvalue and eigenvector
+   *
+   * Iteratively computes the largest eigenvalue (by magnitude) and its
+   * corresponding eigenvector using the power iteration method.
+   *
+   * Algorithm: Power iteration with normalization
+   * Complexity: O(n² × iterations)
+   * Convergence: Linear (depends on eigenvalue separation)
+   *
+   * @param matrix Square matrix
+   * @param maxIterations Maximum number of iterations (default: 1000)
+   * @param tolerance Convergence tolerance (default: 1e-10)
+   * @returns Object with dominant eigenvalue and eigenvector
+   *
+   * @example
+   * const A = ach.matrix([[4, 1], [2, 3]]);
+   * const { eigenvalue, eigenvector } = ach.powerIteration(A);
+   * console.log(eigenvalue); // ~5.372
+   * console.log(await eigenvector.toVector());
+   */
+  powerIteration(
+    matrix: AchronymeValue,
+    maxIterations: number = 1000,
+    tolerance: number = 1e-10
+  ): PowerIterationResult {
+    if (!this.module) throw new AchronymeNotInitializedError();
+
+    const matrixHandle = this.varToHandle.get(matrix._varName);
+
+    if (matrixHandle !== undefined) {
+      try {
+        const result = this.module.power_iteration_js(matrixHandle, maxIterations, tolerance);
+
+        const eigenvalue = result.eigenvalue as number;
+        const eigenvector = this._createFromHandle(result.eigenvector as Handle);
+
+        if (this.options.debug) {
+          console.log(`[Achronyme] Power iteration: eigenvalue = ${eigenvalue}`);
+        }
+
+        return { eigenvalue, eigenvector };
+      } catch (e: any) {
+        throw wrapCppError(`Power iteration failed: ${e.message || e}`);
+      }
+    }
+
+    throw new AchronymeArgumentError('powerIteration requires a matrix created via ach.matrix()');
+  }
+
+  /**
+   * Compute all eigenvalues using QR algorithm
+   *
+   * Uses iterative QR decomposition to find all eigenvalues of a matrix.
+   * Works best for symmetric or nearly symmetric matrices.
+   *
+   * Algorithm: QR iteration
+   * Complexity: O(n³ × iterations)
+   *
+   * @param matrix Square matrix
+   * @param maxIterations Maximum iterations (default: 1000)
+   * @param tolerance Convergence tolerance (default: 1e-10)
+   * @returns Vector of eigenvalues
+   *
+   * Note: For non-symmetric matrices, may return real parts of complex eigenvalues
+   *
+   * @example
+   * const A = ach.matrix([[4, 1], [2, 3]]);
+   * const eigenvalues = ach.eigenvalues(A);
+   * console.log(await eigenvalues.toVector()); // [~5.372, ~1.628]
+   */
+  eigenvalues(
+    matrix: AchronymeValue,
+    maxIterations: number = 1000,
+    tolerance: number = 1e-10
+  ): AchronymeValue {
+    if (!this.module) throw new AchronymeNotInitializedError();
+
+    const matrixHandle = this.varToHandle.get(matrix._varName);
+
+    if (matrixHandle !== undefined) {
+      try {
+        const resultHandle = this.module.qr_eigenvalues_js(matrixHandle, maxIterations, tolerance);
+
+        if (this.options.debug) {
+          console.log(`[Achronyme] Computed eigenvalues via QR algorithm`);
+        }
+
+        return this._createFromHandle(resultHandle);
+      } catch (e: any) {
+        throw wrapCppError(`Eigenvalues computation failed: ${e.message || e}`);
+      }
+    }
+
+    throw new AchronymeArgumentError('eigenvalues requires a matrix created via ach.matrix()');
+  }
+
+  /**
+   * Compute eigenvalues and eigenvectors for symmetric matrices
+   *
+   * Uses QR algorithm with accumulation to compute both eigenvalues and
+   * eigenvectors. Only works reliably for symmetric matrices.
+   *
+   * Algorithm: QR algorithm with eigenvector accumulation
+   * Complexity: O(n³ × iterations)
+   * Requirements: Matrix must be symmetric
+   *
+   * @param matrix Symmetric square matrix
+   * @param maxIterations Maximum iterations (default: 1000)
+   * @param tolerance Convergence tolerance (default: 1e-10)
+   * @returns Object with eigenvalues (vector) and eigenvectors (matrix columns)
+   *
+   * @example
+   * const A = ach.matrix([[2, 1], [1, 2]]); // Symmetric
+   * const { eigenvalues, eigenvectors } = ach.eig(A);
+   * console.log(await eigenvalues.toVector()); // [3, 1]
+   * console.log(await eigenvectors.toMatrix());
+   * // Each column is an eigenvector
+   */
+  eig(
+    matrix: AchronymeValue,
+    maxIterations: number = 1000,
+    tolerance: number = 1e-10
+  ): EigenResult {
+    if (!this.module) throw new AchronymeNotInitializedError();
+
+    const matrixHandle = this.varToHandle.get(matrix._varName);
+
+    if (matrixHandle !== undefined) {
+      try {
+        const result = this.module.eigen_symmetric_js(matrixHandle, maxIterations, tolerance);
+
+        const eigenvalues = this._createFromHandle(result.eigenvalues as Handle);
+        const eigenvectors = this._createFromHandle(result.eigenvectors as Handle);
+
+        if (this.options.debug) {
+          console.log(`[Achronyme] Computed eigenvalues and eigenvectors`);
+        }
+
+        return { eigenvalues, eigenvectors };
+      } catch (e: any) {
+        throw wrapCppError(`Eigen decomposition failed: ${e.message || e}`);
+      }
+    }
+
+    throw new AchronymeArgumentError('eig requires a symmetric matrix created via ach.matrix()');
   }
 
   // ============================================================================

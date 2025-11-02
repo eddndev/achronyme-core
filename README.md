@@ -46,7 +46,7 @@ console.log('Dominant frequency:', await spectrum.toVector());
 - **🔢 Tipos avanzados**: Number, Complex, Vector, Matrix, Function
 - **📡 DSP nativo**: FFT Cooley-Tukey, convolución, ventanas, filtros
 - **λ Programación funcional**: Lambdas, closures, map/filter/reduce
-- **📐 Álgebra lineal**: Operaciones matriciales, determinante, inversa
+- **📐 Álgebra lineal**: Operaciones matriciales, determinante, inversa, y descomposiciones avanzadas (LU, QR, SVD, Cholesky, Eigenvalues).
 - **💾 Zero-copy**: Sistema de handles evita serialización JS ↔ WASM
 - **TypeScript SDK**: API tipo-segura con gestión de memoria explícita
 - **🌐 Universal**: Web, Node.js, y compilable a binarios nativos
@@ -291,17 +291,17 @@ Ver [Especificación completa del lenguaje](./docs/language-spec.md) para sintax
 
 ## 🗺️ Roadmap
 
-### ✅ Completado (v0.3)
+### ✅ Completado (v0.4)
 
+- **Phase 5**: Álgebra lineal avanzada (LU, QR, SVD, eigenvalues)
 - Parser y evaluador de expresiones
 - Tipos complejos (Complex, Vector, Matrix)
 - DSP básico (FFT, convolución, ventanas)
 - Lambdas y higher-order functions
 - SDK TypeScript tipo-seguro
 
-### 🚧 En Desarrollo (v0.4-0.6)
+### 🚧 En Desarrollo (v0.5-0.6)
 
-- **Phase 5**: Álgebra lineal avanzada (LU, QR, SVD, eigenvalues)
 - **Phase 6**: Cálculo numérico (derivación, integración, EDOs)
 - **Phase 7**: Optimización (gradiente, Newton, simplex)
 
@@ -348,7 +348,7 @@ Ver [LICENSE](./LICENSE) para detalles completos.
 
 ---
 
-**Versión actual**: 0.3.4
+**Versión actual**: 0.4.0
 
 **Reproduce los benchmarks tú mismo:**
 ```bash

@@ -5,6 +5,7 @@
 #include "../parser/evaluator.hpp"
 #include "../core/handle_manager.hpp"
 #include "fast_ops.hpp"
+#include "linalg_bindings.hpp"
 
 using namespace emscripten;
 using namespace achronyme;
@@ -133,6 +134,34 @@ EMSCRIPTEN_BINDINGS(achronyme_core) {
     function("fftshift_fast", &bindings::fftshift_fast);
     function("ifftshift_fast", &bindings::ifftshift_fast);
     function("fft_spectrum_fast", &bindings::fft_spectrum_fast);
+
+    // ========================================================================
+    // Linear Algebra (NEW - Advanced Matrix Decompositions)
+    // ========================================================================
+
+    // LU Decomposition
+    function("lu_decomposition_js", &bindings::lu_decomposition_js);
+    function("lu_no_pivot_js", &bindings::lu_no_pivot_js);
+
+    // QR Decomposition
+    function("qr_decomposition_js", &bindings::qr_decomposition_js);
+    function("qr_gram_schmidt_js", &bindings::qr_gram_schmidt_js);
+
+    // Cholesky Decomposition
+    function("cholesky_decomposition_js", &bindings::cholesky_decomposition_js);
+
+    // SVD Decomposition
+    function("svd_decomposition_js", &bindings::svd_decomposition_js);
+
+    // Helper Functions
+    function("is_symmetric_js", &bindings::is_symmetric_js);
+    function("is_positive_definite_js", &bindings::is_positive_definite_js);
+    function("identity_js", &bindings::identity_js);
+
+    // Eigenvalue Solvers
+    function("power_iteration_js", &bindings::power_iteration_js);
+    function("qr_eigenvalues_js", &bindings::qr_eigenvalues_js);
+    function("eigen_symmetric_js", &bindings::eigen_symmetric_js);
 
     // Handle Management
     function("releaseHandle", &bindings::releaseHandle);

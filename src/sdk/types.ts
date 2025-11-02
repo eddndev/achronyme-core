@@ -63,6 +63,22 @@ export interface WasmModule {
     omegaRange: number
   ): Handle;
 
+  // Linear Algebra (Advanced Matrix Decompositions)
+  lu_decomposition_js(matrixHandle: Handle): { L: Handle; U: Handle; P: Handle };
+  lu_no_pivot_js(matrixHandle: Handle): { L: Handle; U: Handle };
+  qr_decomposition_js(matrixHandle: Handle): { Q: Handle; R: Handle };
+  qr_gram_schmidt_js(matrixHandle: Handle): { Q: Handle; R: Handle };
+  cholesky_decomposition_js(matrixHandle: Handle): Handle;
+  svd_decomposition_js(matrixHandle: Handle): { U: Handle; S: Handle; V: Handle };
+  is_symmetric_js(matrixHandle: Handle, tol?: number): boolean;
+  is_positive_definite_js(matrixHandle: Handle): boolean;
+  identity_js(n: number): Handle;
+
+  // Eigenvalue Solvers
+  power_iteration_js(matrixHandle: Handle, maxIterations?: number, tolerance?: number): { eigenvalue: number; eigenvector: Handle };
+  qr_eigenvalues_js(matrixHandle: Handle, maxIterations?: number, tolerance?: number): Handle;
+  eigen_symmetric_js(matrixHandle: Handle, maxIterations?: number, tolerance?: number): { eigenvalues: Handle; eigenvectors: Handle };
+
   // Handle Management
   releaseHandle(handle: Handle): void;
   isValidHandle(handle: Handle): boolean;
@@ -185,3 +201,57 @@ export interface FFTResult {
  * Convolution mode
  */
 export type ConvolutionMode = 'direct' | 'fft';
+
+/**
+ * LU Decomposition result: PA = LU
+ */
+export interface LUResult {
+  /** Lower triangular matrix with 1s on diagonal */
+  L: any; // AchronymeValue (avoiding circular dependency)
+  /** Upper triangular matrix */
+  U: any; // AchronymeValue
+  /** Permutation matrix */
+  P: any; // AchronymeValue
+}
+
+/**
+ * QR Decomposition result: A = QR
+ */
+export interface QRResult {
+  /** Orthogonal matrix (Q^T × Q = I) */
+  Q: any; // AchronymeValue
+  /** Upper triangular matrix */
+  R: any; // AchronymeValue
+}
+
+/**
+ * SVD Decomposition result: A = UΣV^T
+ */
+export interface SVDResult {
+  /** Left singular vectors (m×m orthogonal) */
+  U: any; // AchronymeValue
+  /** Singular values (vector, non-negative) */
+  S: any; // AchronymeValue
+  /** Right singular vectors (n×n orthogonal) */
+  V: any; // AchronymeValue
+}
+
+/**
+ * Eigenvalue decomposition result for symmetric matrices
+ */
+export interface EigenResult {
+  /** Eigenvalues (vector) */
+  eigenvalues: any; // AchronymeValue
+  /** Eigenvectors as matrix columns */
+  eigenvectors: any; // AchronymeValue
+}
+
+/**
+ * Power iteration result (dominant eigenvalue/eigenvector)
+ */
+export interface PowerIterationResult {
+  /** Dominant eigenvalue */
+  eigenvalue: number;
+  /** Corresponding eigenvector */
+  eigenvector: any; // AchronymeValue
+}

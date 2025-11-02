@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/matrix.hpp"
+#include "../core/vector.hpp"
 #include <tuple>
 #include <stdexcept>
 

@@ -36,13 +36,13 @@ Handle createMatrixFromBuffer(uintptr_t dataPtr, size_t rows, size_t cols) {
 // ============================================================================
 
 uintptr_t getVectorData(Handle handle, size_t* outLength) {
-    const Value& value = globalHandleManager.get(handle);
+    Value& value = globalHandleManager.get(handle);
 
     if (!value.isVector()) {
         throw std::runtime_error("Handle does not contain a vector");
     }
 
-    const Vector& vec = value.asVector();
+    Vector& vec = std::get<Vector>(value.data());
     if (outLength != nullptr) {
         *outLength = vec.size();
     }
@@ -53,13 +53,13 @@ uintptr_t getVectorData(Handle handle, size_t* outLength) {
 }
 
 uintptr_t getMatrixData(Handle handle, size_t* outRows, size_t* outCols) {
-    const Value& value = globalHandleManager.get(handle);
+    Value& value = globalHandleManager.get(handle);
 
     if (!value.isMatrix()) {
         throw std::runtime_error("Handle does not contain a matrix");
     }
 
-    const Matrix& mat = value.asMatrix();
+    Matrix& mat = std::get<Matrix>(value.data());
     if (outRows != nullptr) {
         *outRows = mat.rows();
     }
@@ -71,13 +71,13 @@ uintptr_t getMatrixData(Handle handle, size_t* outRows, size_t* outCols) {
 }
 
 size_t copyVectorToBuffer(Handle handle, uintptr_t destPtr, size_t maxLength) {
-    const Value& value = globalHandleManager.get(handle);
+    Value& value = globalHandleManager.get(handle);
 
     if (!value.isVector()) {
         throw std::runtime_error("Handle does not contain a vector");
     }
 
-    const Vector& vec = value.asVector();
+    Vector& vec = std::get<Vector>(value.data());
     size_t copyLength = std::min(vec.size(), maxLength);
 
     double* dest = reinterpret_cast<double*>(destPtr);
@@ -88,23 +88,23 @@ size_t copyVectorToBuffer(Handle handle, uintptr_t destPtr, size_t maxLength) {
 }
 
 size_t getVectorLength(Handle handle) {
-    const Value& value = globalHandleManager.get(handle);
+    Value& value = globalHandleManager.get(handle);
 
     if (!value.isVector()) {
         throw std::runtime_error("Handle does not contain a vector");
     }
 
-    return value.asVector().size();
+    return std::get<Vector>(value.data()).size();
 }
 
 uintptr_t getVectorDataPtr(Handle handle) {
-    const Value& value = globalHandleManager.get(handle);
+    Value& value = globalHandleManager.get(handle);
 
     if (!value.isVector()) {
         throw std::runtime_error("Handle does not contain a vector");
     }
 
-    const Vector& vec = value.asVector();
+    Vector& vec = std::get<Vector>(value.data());
     return reinterpret_cast<uintptr_t>(vec.elements().data());
 }
 

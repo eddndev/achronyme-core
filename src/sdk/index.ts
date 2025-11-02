@@ -29,6 +29,11 @@ export type {
   WindowFunction,
   FFTResult,
   ConvolutionMode,
+  LUResult,
+  QRResult,
+  SVDResult,
+  EigenResult,
+  PowerIterationResult,
 } from './types.js';
 
 export {

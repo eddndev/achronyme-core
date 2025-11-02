@@ -1,4 +1,5 @@
 #include "decompositions.hpp"
+#include "eigensolvers.hpp"
 #include <cmath>
 #include <algorithm>
 #include <limits>
@@ -15,7 +16,7 @@ bool is_symmetric(const Matrix& A, double tol) {
 
     for (size_t i = 0; i < A.rows(); ++i) {
         for (size_t j = i + 1; j < A.cols(); ++j) {
-            if (std::abs(A(i, j) - A(j, i)) > tol) {
+            if (std::abs(A.at(i, j) - A.at(j, i)) > tol) {
                 return false;
             }
         }
@@ -36,11 +37,11 @@ bool is_positive_definite(const Matrix& A) {
 }
 
 Matrix identity(size_t n) {
-    std::vector<std::vector<double>> data(n, std::vector<double>(n, 0.0));
+    std::vector<double> data(n * n, 0.0);
     for (size_t i = 0; i < n; ++i) {
-        data[i][i] = 1.0;
+        data[i * n + i] = 1.0;
     }
-    return Matrix(data);
+    return Matrix(n, n, data);
 }
 
 Matrix permutation_matrix(const std::vector<size_t>& pivots, size_t n) {
@@ -49,7 +50,7 @@ Matrix permutation_matrix(const std::vector<size_t>& pivots, size_t n) {
         if (pivots[i] != i) {
             // Swap rows i and pivots[i]
             for (size_t j = 0; j < n; ++j) {
-                std::swap(P(i, j), P(pivots[i], j));
+                std::swap(P.at(i, j), P.at(pivots[i], j));
             }
         }
     }
@@ -78,10 +79,10 @@ std::tuple<Matrix, Matrix, Matrix> lu_decomposition(const Matrix& A) {
     for (size_t k = 0; k < n - 1; ++k) {
         // Find pivot (largest element in column k, from row k downwards)
         size_t pivot_row = k;
-        double max_val = std::abs(U(k, k));
+        double max_val = std::abs(U.at(k, k));
 
         for (size_t i = k + 1; i < n; ++i) {
-            double val = std::abs(U(i, k));
+            double val = std::abs(U.at(i, k));
             if (val > max_val) {
                 max_val = val;
                 pivot_row = i;
@@ -99,23 +100,23 @@ std::tuple<Matrix, Matrix, Matrix> lu_decomposition(const Matrix& A) {
 
             // Swap rows in U
             for (size_t j = 0; j < n; ++j) {
-                std::swap(U(k, j), U(pivot_row, j));
+                std::swap(U.at(k, j), U.at(pivot_row, j));
             }
 
             // Swap rows in L (only the already-computed part)
             for (size_t j = 0; j < k; ++j) {
-                std::swap(L(k, j), L(pivot_row, j));
+                std::swap(L.at(k, j), L.at(pivot_row, j));
             }
         }
 
         // Elimination
         for (size_t i = k + 1; i < n; ++i) {
-            double factor = U(i, k) / U(k, k);
-            L(i, k) = factor;
+            double factor = U.at(i, k) / U.at(k, k);
+            L.at(i, k) = factor;
 
             // Update U
             for (size_t j = k; j < n; ++j) {
-                U(i, j) -= factor * U(k, j);
+                U.at(i, j) -= factor * U.at(k, j);
             }
         }
     }
@@ -138,17 +139,17 @@ std::tuple<Matrix, Matrix> lu_no_pivot(const Matrix& A) {
 
     for (size_t k = 0; k < n - 1; ++k) {
         // Check for zero pivot
-        if (std::abs(U(k, k)) < std::numeric_limits<double>::epsilon() * 100) {
+        if (std::abs(U.at(k, k)) < std::numeric_limits<double>::epsilon() * 100) {
             throw std::runtime_error("Zero pivot encountered - matrix requires pivoting");
         }
 
         // Elimination
         for (size_t i = k + 1; i < n; ++i) {
-            double factor = U(i, k) / U(k, k);
-            L(i, k) = factor;
+            double factor = U.at(i, k) / U.at(k, k);
+            L.at(i, k) = factor;
 
             for (size_t j = k; j < n; ++j) {
-                U(i, j) -= factor * U(k, j);
+                U.at(i, j) -= factor * U.at(k, j);
             }
         }
     }
@@ -168,16 +169,16 @@ std::tuple<Matrix, Matrix> qr_gram_schmidt(const Matrix& A) {
         throw std::runtime_error("QR requires m >= n");
     }
 
-    // Initialize Q and R
-    std::vector<std::vector<double>> Q_data(m, std::vector<double>(n, 0.0));
-    std::vector<std::vector<double>> R_data(n, std::vector<double>(n, 0.0));
+    // Initialize Q and R (flattened row-major)
+    std::vector<double> Q_data(m * n, 0.0);
+    std::vector<double> R_data(n * n, 0.0);
 
     // Gram-Schmidt orthogonalization
     for (size_t j = 0; j < n; ++j) {
         // Start with column j of A
         std::vector<double> v(m);
         for (size_t i = 0; i < m; ++i) {
-            v[i] = A(i, j);
+            v[i] = A.at(i, j);
         }
 
         // Subtract projections onto previous Q columns
@@ -185,13 +186,13 @@ std::tuple<Matrix, Matrix> qr_gram_schmidt(const Matrix& A) {
             // R(k,j) = Q_k^T * A_j (dot product)
             double dot = 0.0;
             for (size_t i = 0; i < m; ++i) {
-                dot += Q_data[i][k] * A(i, j);
+                dot += Q_data[i * n + k] * A.at(i, j);
             }
-            R_data[k][j] = dot;
+            R_data[k * n + j] = dot;
 
             // v = v - R(k,j) * Q_k
             for (size_t i = 0; i < m; ++i) {
-                v[i] -= dot * Q_data[i][k];
+                v[i] -= dot * Q_data[i * n + k];
             }
         }
 
@@ -204,15 +205,15 @@ std::tuple<Matrix, Matrix> qr_gram_schmidt(const Matrix& A) {
             throw std::runtime_error("Matrix columns are linearly dependent");
         }
 
-        R_data[j][j] = norm;
+        R_data[j * n + j] = norm;
 
         // Q_j = v / ||v||
         for (size_t i = 0; i < m; ++i) {
-            Q_data[i][j] = v[i] / norm;
+            Q_data[i * n + j] = v[i] / norm;
         }
     }
 
-    return {Matrix(Q_data), Matrix(R_data)};
+    return {Matrix(m, n, Q_data), Matrix(n, n, R_data)};
 }
 
 std::tuple<Matrix, Matrix> qr_decomposition(const Matrix& A) {
@@ -236,8 +237,8 @@ Matrix cholesky_decomposition(const Matrix& A) {
         throw std::runtime_error("Cholesky requires symmetric matrix");
     }
 
-    // Initialize L
-    std::vector<std::vector<double>> L_data(n, std::vector<double>(n, 0.0));
+    // Initialize L (flattened row-major)
+    std::vector<double> L_data(n * n, 0.0);
 
     // Cholesky-Banachiewicz algorithm
     for (size_t i = 0; i < n; ++i) {
@@ -247,27 +248,27 @@ Matrix cholesky_decomposition(const Matrix& A) {
             if (j == i) {
                 // Diagonal element
                 for (size_t k = 0; k < j; ++k) {
-                    sum += L_data[j][k] * L_data[j][k];
+                    sum += L_data[j * n + k] * L_data[j * n + k];
                 }
 
-                double val = A(j, j) - sum;
+                double val = A.at(j, j) - sum;
                 if (val <= 0.0) {
                     throw std::runtime_error("Matrix is not positive definite");
                 }
 
-                L_data[j][j] = std::sqrt(val);
+                L_data[j * n + j] = std::sqrt(val);
             } else {
                 // Off-diagonal element
                 for (size_t k = 0; k < j; ++k) {
-                    sum += L_data[i][k] * L_data[j][k];
+                    sum += L_data[i * n + k] * L_data[j * n + k];
                 }
 
-                L_data[i][j] = (A(i, j) - sum) / L_data[j][j];
+                L_data[i * n + j] = (A.at(i, j) - sum) / L_data[j * n + j];
             }
         }
     }
 
-    return Matrix(L_data);
+    return Matrix(n, n, L_data);
 }
 
 // ============================================================================
@@ -275,9 +276,75 @@ Matrix cholesky_decomposition(const Matrix& A) {
 // ============================================================================
 
 std::tuple<Matrix, Vector, Matrix> svd_decomposition(const Matrix& A) {
-    // TODO: Implement Golub-Reinsch SVD algorithm
-    // This is complex and will be implemented in next iteration
-    throw std::runtime_error("SVD not yet implemented - coming in next update");
+    const size_t m = A.rows();
+    const size_t n = A.cols();
+
+    // Compute A^T * A (n x n matrix)
+    Matrix At = A.transpose();
+    Matrix AtA = At * A;
+
+    // Compute eigenvalues and eigenvectors of A^T * A
+    // Eigenvalues are squares of singular values
+    // Eigenvectors are right singular vectors (V)
+    auto [eigenvalues_vec, V] = eigen_symmetric(AtA);
+
+    // Sort eigenvalues and eigenvectors in descending order
+    std::vector<double> eigenvalues = eigenvalues_vec.elements();
+    std::vector<size_t> indices(n);
+    for (size_t i = 0; i < n; ++i) indices[i] = i;
+
+    std::sort(indices.begin(), indices.end(), [&eigenvalues](size_t i, size_t j) {
+        return eigenvalues[i] > eigenvalues[j];
+    });
+
+    // Reorder eigenvalues and build singular values
+    std::vector<double> singular_values(n);
+    std::vector<double> V_sorted_data(n * n);
+
+    for (size_t i = 0; i < n; ++i) {
+        size_t idx = indices[i];
+        // Singular value = sqrt(eigenvalue)
+        singular_values[i] = std::sqrt(std::max(0.0, eigenvalues[idx]));
+
+        // Copy column idx to column i
+        for (size_t row = 0; row < n; ++row) {
+            V_sorted_data[row * n + i] = V.at(row, idx);
+        }
+    }
+
+    Matrix V_sorted(n, n, V_sorted_data);
+
+    // Compute U = A * V * Σ^(-1)
+    // For each column i of V, compute u_i = (1/σ_i) * A * v_i
+    std::vector<double> U_data(m * n, 0.0);
+
+    for (size_t i = 0; i < n; ++i) {
+        if (singular_values[i] > 1e-10) {  // Skip near-zero singular values
+            // Extract column i from V
+            std::vector<double> v_col(n);
+            for (size_t j = 0; j < n; ++j) {
+                v_col[j] = V_sorted.at(j, i);
+            }
+
+            // Compute A * v
+            std::vector<double> Av(m, 0.0);
+            for (size_t row = 0; row < m; ++row) {
+                for (size_t col = 0; col < n; ++col) {
+                    Av[row] += A.at(row, col) * v_col[col];
+                }
+            }
+
+            // u_i = (1/σ_i) * A * v_i
+            for (size_t row = 0; row < m; ++row) {
+                U_data[row * n + i] = Av[row] / singular_values[i];
+            }
+        }
+    }
+
+    Matrix U(m, n, U_data);
+    Vector S(singular_values);
+
+    return {U, S, V_sorted};
 }
 
 }  // namespace linalg
