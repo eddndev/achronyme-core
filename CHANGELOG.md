@@ -36,105 +36,93 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ✅ All 11 linear algebra tests now pass consistently.
 - ✅ No regressions introduced in existing SDK, DSP, or Handle system tests.
 
-
 ## [0.3.0] - 2025-11-01
 
 ### Added - Performance Revolution 🚀
-- **Sistema de Handles (Fast Path)**: Mejora de performance de 10-1000x
-  - HandleManager en C++ para gestión eficiente de memoria
-  - Zero-copy operations con referencias directas a memoria WASM
-  - Fast path automático para vectores ≥8 elementos (configurable)
-  - Slow path compatible para vectores pequeños y debugging
-  - Tracking de estadísticas: `getMemoryStats()` muestra % fast path usage
-  - Benchmarks reales: Vector 100K (900x), FFT 4096 (150x), Pipeline DSP (33x)
-
-- **Funciones Matemáticas Vectorizadas** (nativas en C++)
-  - `exp(vector)` - Exponencial element-wise (~100x más rápido que map)
-  - `ln(vector)` - Logaritmo natural element-wise
-  - `sqrt(vector)` - Raíz cuadrada element-wise
-  - `abs(vector)` - Valor absoluto element-wise
-  - `sin(vector)` - Seno element-wise
-  - `cos(vector)` - Coseno element-wise
-  - `tan(vector)` - Tangente element-wise
-  - **Nota**: API transparente - funciones aceptan escalares Y vectores automáticamente
-
-- **Optimizaciones DSP Fast Path**
-  - `fft_fast()` - FFT optimizado con handles (directo en memoria)
-  - `fft_mag_fast()` - FFT magnitude sin serialización intermedia
-  - `fft_phase_fast()` - FFT phase sin overhead de parsing
-  - `linspace()` - Generación optimizada desde inicio con handles
-  - Pipelines DSP completos sin salir de memoria WASM
-
-### Added - Testing & Quality
-- **Suite de Tests Exhaustiva** (~200 tests totales)
-  - `test-stability.mjs` - 20 tests de estabilidad (10K ops, 1M elementos, stress)
-  - `test-accuracy.mjs` - 25 tests de precisión matemática (tolerancia 1e-6)
-  - `test-edge-cases.mjs` - 25 tests de casos límite
-  - Todos los tests: 0 memory leaks, >90% fast path usage
-  - Validación completa del sistema de handles
-
-### Added - Documentation
-- **Documentación Técnica Completa**
-  - `FAST-PATH-VS-SLOW-PATH-EXPLICACION.md` - Guía completa del sistema (11,000+ palabras)
-  - `FAST-PATH-DIAGRAMS.md` - Diagramas visuales de arquitectura y flujos
-  - `LEGACY-TESTS-FIX-SUMMARY.md` - Resumen de correcciones de compatibilidad
-  - `TEST-SUITE-SUMMARY.md` - Resumen de suite de tests y resultados
-  - `RESUMEN-SESION.md` - Resumen ejecutivo de implementación
+- **Handles System (Fast Path)**: 10-1000x performance improvement.
+  - C++ HandleManager for efficient memory management.
+  - Zero-copy operations with direct references to WASM memory.
+  - Automatic fast path for vectors ≥8 elements (configurable).
+  - Backward-compatible slow path for small vectors and debugging.
+  - Statistics tracking: `getMemoryStats()` shows fast path usage %.
+  - Real-world benchmarks: Vector 100K (900x), FFT 4096 (150x), DSP Pipeline (33x).
+- **Vectorized Math Functions** (native in C++):
+  - `exp(vector)` - Element-wise exponential (~100x faster than map).
+  - `ln(vector)` - Element-wise natural logarithm.
+  - `sqrt(vector)` - Element-wise square root.
+  - `abs(vector)` - Element-wise absolute value.
+  - `sin(vector)`, `cos(vector)`, `tan(vector)` - Element-wise trigonometric functions.
+  - **Note**: Transparent API - functions automatically accept both scalars and vectors.
+- **DSP Fast Path Optimizations**:
+  - `fft_fast()` - Optimized FFT with handles (direct memory access).
+  - `fft_mag_fast()` - FFT magnitude without intermediate serialization.
+  - `fft_phase_fast()` - FFT phase without parsing overhead.
+  - `linspace()` - Optimized generation from the start with handles.
+  - Full DSP pipelines without leaving WASM memory.
+- **Exhaustive Test Suite** (~200 total tests):
+  - `test-stability.mjs` - 20 stability tests (10K ops, 1M elements, stress).
+  - `test-accuracy.mjs` - 25 math precision tests (1e-6 tolerance).
+  - `test-edge-cases.mjs` - 25 edge case tests.
+  - All tests: 0 memory leaks, >90% fast path usage.
+  - Full validation of the handles system.
+- **Complete Technical Documentation**:
+  - `FAST-PATH-VS-SLOW-PATH-EXPLICACION.md` - Complete system guide.
+  - `FAST-PATH-DIAGRAMS.md` - Visual diagrams of architecture and flows.
+  - `LEGACY-TESTS-FIX-SUMMARY.md` - Summary of compatibility fixes.
+  - `TEST-SUITE-SUMMARY.md` - Summary of test suite and results.
+  - `RESUMEN-SESION.md` - Executive summary of implementation.
 
 ### Fixed - Compatibility
-- **Emscripten 4.0 Compatibility**
-  - Actualizado acceso a heap WASM (HEAPF64.buffer → HEAPF64.subarray)
-  - Agregado `EXPORTED_RUNTIME_METHODS='["HEAPF64","HEAPU32"]'` al build
-  - Corregido tipos TypeScript para incluir HEAP8
-  - Build scripts actualizados para Emscripten 4.0.15
-
-- **Tests Legacy Actualizados** (10 archivos)
-  - Corregidos import paths duplicados (`sdk/sdk/` → `sdk/`)
-  - Corregida API incorrecta (`.fft_mag()` sobre espectros → señales)
-  - Corregidas rutas relativas en test-npm-import.mjs y debug-module.mjs
-  - Todos los tests legacy ahora compatibles y pasando
+- **Emscripten 4.0 Compatibility**:
+  - Updated WASM heap access (`HEAPF64.buffer` → `HEAPF64.subarray`).
+  - Added `EXPORTED_RUNTIME_METHODS='["HEAPF64","HEAPU32"]'` to build.
+  - Fixed TypeScript types to include `HEAP8`.
+  - Build scripts updated for Emscripten 4.0.15.
+- **Legacy Tests Updated** (10 files):
+  - Fixed duplicate import paths (`sdk/sdk/` → `sdk/`).
+  - Fixed incorrect API usage (`.fft_mag()` on spectra → signals).
+  - Fixed relative paths in `test-npm-import.mjs` and `debug-module.mjs`.
+  - All legacy tests now compatible and passing.
 
 ### Changed
-- **Performance Improvements**
-  - Vector creation (100K elementos): ~450ms → ~0.5ms (900x mejora)
-  - FFT 4096 samples: ~180ms → ~1.2ms (150x mejora)
-  - Pipeline DSP completo: ~100ms → ~3ms (33x mejora)
-  - Memory overhead: Reducido drásticamente con zero-copy
-
-- **API Enhancement** (sin breaking changes)
-  - Funciones matemáticas ahora aceptan vectores automáticamente
-  - Sistema de handles completamente transparente para el usuario
-  - Decisión fast/slow automática basada en tamaño de datos
-  - API pública 100% backward compatible
+- **Performance Improvements**:
+  - Vector creation (100K elements): ~450ms → ~0.5ms (900x improvement).
+  - FFT 4096 samples: ~180ms → ~1.2ms (150x improvement).
+  - Full DSP pipeline: ~100ms → ~3ms (33x improvement).
+  - Memory overhead: Drastically reduced with zero-copy.
+- **API Enhancement** (no breaking changes):
+  - Math functions now automatically accept vectors.
+  - Handles system is completely transparent to the user.
+  - Automatic fast/slow path decision based on data size.
+  - Public API is 100% backward compatible.
 
 ### Technical Details
-- **Fast Path Threshold**: 8 elementos (configurable via `fastPathThreshold`)
-- **Memory Management**: `shared_ptr<Value>` con HandleManager
-- **Zero-Copy**: Datos permanecen en memoria WASM durante operaciones
-- **Statistics**: `fastPathOperationsCount`, `slowPathOperationsCount` tracked
-- **Fallback**: Automático a slow path si fast path falla (robusto)
+- **Fast Path Threshold**: 8 elements (configurable via `fastPathThreshold`).
+- **Memory Management**: `shared_ptr<Value>` with HandleManager.
+- **Zero-Copy**: Data remains in WASM memory during operations.
+- **Statistics**: `fastPathOperationsCount`, `slowPathOperationsCount` tracked.
+- **Fallback**: Automatic fallback to slow path if fast path fails (robust).
 
 ### Migration Guide
-**Para usuarios del paquete npm**: No se requieren cambios.
-```javascript
-// Código existente funciona sin modificaciones
-const v = ach.vector([1,2,3,4,5,6,7,8]);
-const result = v.exp();  // Ahora ~100x más rápido!
-```
-
-**Para desarrolladores que compilan desde source**:
-- Requiere Emscripten 4.0+ (probado con 4.0.15)
-- Actualizar emsdk y recompilar: `npm run build`
+- **For npm package users**: No changes required.
+  ```javascript
+  // Existing code works without modification
+  const v = ach.vector([1,2,3,4,5,6,7,8]);
+  const result = v.exp();  // Now ~100x faster!
+  ```
+- **For developers compiling from source**:
+  - Requires Emscripten 4.0+ (tested with 4.0.15).
+  - Update emsdk and recompile: `npm run build`.
 
 ### Breaking Changes
-- Requiere Emscripten 4.0+ para compilar desde source
-- No hay breaking changes en la API pública
+- Requires Emscripten 4.0+ to compile from source.
+- No breaking changes in the public API.
 
 ### Validation
-- ✅ ~200 tests pasando (test-stability, test-accuracy, test-edge-cases, test-sdk)
-- ✅ 0 memory leaks en todos los tests críticos
-- ✅ Fast path usage: >90% en casos de uso reales (DSP pipelines)
-- ✅ Backward compatibility: 100% (todos los tests legacy actualizados)
+- ✅ ~200 tests passing (test-stability, test-accuracy, test-edge-cases, test-sdk).
+- ✅ 0 memory leaks in all critical tests.
+- ✅ Fast path usage: >90% in real-world use cases (DSP pipelines).
+- ✅ Backward compatibility: 100% (all legacy tests updated).
 
 ---
 
