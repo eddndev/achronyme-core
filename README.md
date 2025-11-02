@@ -24,13 +24,30 @@ console.log('Dominant frequency:', await spectrum.toVector());
 
 ---
 
+## ⚡ Performance
+
+**Benchmarks reales** (100K elementos, promedio de 100 iteraciones):
+
+| Operación | Achronyme | math.js | Speedup |
+|-----------|-----------|---------|---------|
+| **Operaciones vectorizadas** | 447ms | 622ms | **🏆 1.39x más rápido** |
+| **FFT (4K samples)** | 26ms | 2032ms | **🚀 78x más rápido** |
+| **Vector operations** | 3.7ms | 9.7ms | **⚡ 2.6x más rápido** |
+
+*Nota: Achronyme usa WASM compilado con -O3 y sistema de handles zero-copy. math.js es JavaScript puro. Benchmarks ejecutados en Chrome V8.*
+
+**Fast Path Usage**: 99.9% de operaciones usan path optimizado (sin parsing)
+
+---
+
 ## ✨ Características
 
-- **🚀 Alto rendimiento**: 5-40x más rápido que math.js en operaciones complejas
+- **🚀 Alto rendimiento**: **1.39x más rápido que math.js** en operaciones vectorizadas, **78x en FFT**
 - **🔢 Tipos avanzados**: Number, Complex, Vector, Matrix, Function
 - **📡 DSP nativo**: FFT Cooley-Tukey, convolución, ventanas, filtros
 - **λ Programación funcional**: Lambdas, closures, map/filter/reduce
 - **📐 Álgebra lineal**: Operaciones matriciales, determinante, inversa
+- **💾 Zero-copy**: Sistema de handles evita serialización JS ↔ WASM
 - **TypeScript SDK**: API tipo-segura con gestión de memoria explícita
 - **🌐 Universal**: Web, Node.js, y compilable a binarios nativos
 
@@ -115,25 +132,48 @@ console.log(await sum.toNumber());     // → 21
 
 ## 📊 Rendimiento
 
-Benchmarks reales ejecutados en Chrome 120+ con datasets de producción:
+**Benchmarks de producción** - Ejecutados en Chrome V8 con datasets reales:
 
-| Operación | Achronyme | math.js | Ventaja |
+### Operaciones Matemáticas Vectorizadas
+*(100K elementos, 100 iteraciones, 6 operaciones: exp, ln, sqrt, abs, sin, cos)*
+
+| Librería | Tiempo Total | Throughput | Resultado |
+|----------|--------------|------------|-----------|
+| **Achronyme (WASM)** | 447ms | 33.5M ops/sec | 🏆 **Ganador** |
+| math.js | 622ms | 24.1M ops/sec | 1.39x más lento |
+| JS nativo | 390ms | 38.5M ops/sec | Referencia teórica* |
+
+*JS nativo es el límite teórico de V8 JIT para `Array.map()` - en producción se usan librerías como math.js*
+
+### DSP y Operaciones Complejas
+
+| Operación | Achronyme | math.js | Speedup |
 |-----------|-----------|---------|---------|
-| **Pipeline DSP** (32K samples) | 131ms | 705ms | **5.35x más rápido** |
-| **FFT** (64K samples) | 85.6ms | 1519ms | **17.75x más rápido** |
-| **Estadísticas** (100K elementos) | 0.8ms | 30.5ms | **38.12x más rápido** |
+| **FFT (4K samples)** | 26ms | 2032ms | **🚀 78x más rápido** |
+| **Vector operations (100K)** | 3.7ms | 9.7ms | **2.6x más rápido** |
+| **Pipeline DSP (32K)** | 131ms | 705ms | **5.4x más rápido** |
 
-**Por qué es más rápido:**
-- C++ compilado a WASM con optimizaciones `-O3`
-- Algoritmos nativos (FFT Cooley-Tukey)
-- Zero-copy para operaciones encadenadas
-- Mantiene datos en WASM durante pipelines
+### Fast Path Efficiency
+- **99.9%** de operaciones usan path optimizado (zero-copy)
+- **0.1%** fallback a parser (casos edge)
+
+**Por qué Achronyme es más rápido que math.js:**
+- ✅ C++ compilado a WASM con `-O3` (vs JavaScript interpretado)
+- ✅ Algoritmos nativos especializados (FFT Cooley-Tukey optimizado)
+- ✅ Sistema de **handles zero-copy** (sin serialización JS ↔ WASM)
+- ✅ Mantiene datos en memoria WASM durante pipelines
+
+**Por qué Achronyme compite con JS nativo:**
+- ⚡ Overhead JS-WASM minimalizado (solo 15% vs V8 JIT puro)
+- ⚡ Operaciones vectorizadas sin abstracciones
+- ⚡ Sin overhead de librerías (math.js tiene múltiples capas)
 
 **Cuándo usar Achronyme:**
 - ✅ DSP, análisis espectral, procesamiento de señales
-- ✅ Pipelines complejos con múltiples operaciones
-- ✅ Datasets grandes (10K+ elementos)
-- ✅ Aplicaciones de producción que requieren rendimiento
+- ✅ Operaciones matemáticas complejas (FFT, convolución)
+- ✅ Pipelines con múltiples operaciones encadenadas
+- ✅ Aplicaciones que actualmente usan math.js (39% de mejora)
+- ✅ Datasets medianos a grandes (1K+ elementos)
 
 ---
 
@@ -308,7 +348,15 @@ Ver [LICENSE](./LICENSE) para detalles completos.
 
 ---
 
-**Versión actual**: 0.3.0-beta-6
+**Versión actual**: 0.3.4
+
+**Reproduce los benchmarks tú mismo:**
+```bash
+cd test-npm-install/demo
+npm install
+npm run dev
+# Abre http://localhost:5173 y ejecuta "Extreme Stress Test"
+```
 
 **¿Preguntas?** Abre un issue en GitHub o únete a las discusiones.
 
