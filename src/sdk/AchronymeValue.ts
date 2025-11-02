@@ -99,6 +99,14 @@ export class AchronymeValue {
     return this.varName;
   }
 
+  /**
+   * @internal
+   * Get the handle (for internal use by Achronyme and diagnostics)
+   */
+  get handle(): Handle | undefined {
+    return this._handle;
+  }
+
   // ============================================================================
   // Value Extraction
   // ============================================================================
@@ -158,25 +166,15 @@ export class AchronymeValue {
         const module = (this.ach as any).module;
         if (!module) throw new Error('Module not initialized');
 
-        // Allocate space for length output
-        const lengthPtr = module._malloc(8); // size_t
+        // Use new pointer-free API for Emscripten 4.0 compatibility
+        const length = module.getVectorLength(this._handle);
+        const dataPtr = module.getVectorDataPtr(this._handle);
 
-        try {
-          // Get pointer to vector data
-          const dataPtr = module.getVectorData(this._handle, lengthPtr);
+        // Create TypedArray view (zero-copy)
+        const view = module.HEAPF64.subarray(dataPtr / 8, dataPtr / 8 + length);
 
-          // Read length
-          const length = module.HEAPU32[lengthPtr / 4];
-
-          // Create TypedArray view (zero-copy)
-          // Use subarray for Emscripten 4.0 compatibility
-          const view = module.HEAPF64.subarray(dataPtr / 8, dataPtr / 8 + length);
-
-          // Copy to regular array (necessary to preserve data)
-          return Array.from(view);
-        } finally {
-          module._free(lengthPtr);
-        }
+        // Copy to regular array (necessary to preserve data)
+        return Array.from(view);
       } catch (e: any) {
         // Fallback to slow path on error
         console.warn(`[AchronymeValue] Fast toVector failed, using slow path: ${e.message}`);
@@ -223,6 +221,15 @@ export class AchronymeValue {
    */
   add(other: AchronymeValue | number): AchronymeValue {
     this.checkDisposed();
+
+    // Fast path: Si ambos tienen handles, usar vadd_fast
+    if (typeof other !== 'number' && this._handle !== undefined && other._handle !== undefined) {
+      const module = (this.ach as any).module;
+      const resultHandle = module.vadd_fast(this._handle, other._handle);
+      return new AchronymeValue(this.ach, `__vadd_${this._handle}_${other._handle}`, resultHandle);
+    }
+
+    // Slow path: fallback al parser
     const otherExpr = typeof other === 'number' ? other.toString() : other._varName;
     return (this.ach as any)._createFromExpression(`${this.varName} + ${otherExpr}`);
   }
@@ -232,6 +239,15 @@ export class AchronymeValue {
    */
   sub(other: AchronymeValue | number): AchronymeValue {
     this.checkDisposed();
+
+    // Fast path: Si ambos tienen handles, usar vsub_fast
+    if (typeof other !== 'number' && this._handle !== undefined && other._handle !== undefined) {
+      const module = (this.ach as any).module;
+      const resultHandle = module.vsub_fast(this._handle, other._handle);
+      return new AchronymeValue(this.ach, `__vsub_${this._handle}_${other._handle}`, resultHandle);
+    }
+
+    // Slow path: fallback al parser
     const otherExpr = typeof other === 'number' ? other.toString() : other._varName;
     return (this.ach as any)._createFromExpression(`${this.varName} - ${otherExpr}`);
   }
@@ -241,6 +257,22 @@ export class AchronymeValue {
    */
   mul(other: AchronymeValue | number): AchronymeValue {
     this.checkDisposed();
+
+    // Fast path: Si ambos tienen handles, usar vmul_fast (element-wise para vectores)
+    if (typeof other !== 'number' && this._handle !== undefined && other._handle !== undefined) {
+      const module = (this.ach as any).module;
+      const resultHandle = module.vmul_fast(this._handle, other._handle);
+      return new AchronymeValue(this.ach, `__vmul_${this._handle}_${other._handle}`, resultHandle);
+    }
+
+    // Fast path: Si es escalar, usar vscale_fast
+    if (typeof other === 'number' && this._handle !== undefined) {
+      const module = (this.ach as any).module;
+      const resultHandle = module.vscale_fast(this._handle, other);
+      return new AchronymeValue(this.ach, `__vscale_${this._handle}_${other}`, resultHandle);
+    }
+
+    // Slow path: fallback al parser
     const otherExpr = typeof other === 'number' ? other.toString() : other._varName;
     return (this.ach as any)._createFromExpression(`${this.varName} * ${otherExpr}`);
   }
@@ -250,6 +282,15 @@ export class AchronymeValue {
    */
   div(other: AchronymeValue | number): AchronymeValue {
     this.checkDisposed();
+
+    // Fast path: Si ambos tienen handles, usar vdiv_fast
+    if (typeof other !== 'number' && this._handle !== undefined && other._handle !== undefined) {
+      const module = (this.ach as any).module;
+      const resultHandle = module.vdiv_fast(this._handle, other._handle);
+      return new AchronymeValue(this.ach, `__vdiv_${this._handle}_${other._handle}`, resultHandle);
+    }
+
+    // Slow path: fallback al parser
     const otherExpr = typeof other === 'number' ? other.toString() : other._varName;
     return (this.ach as any)._createFromExpression(`${this.varName} / ${otherExpr}`);
   }

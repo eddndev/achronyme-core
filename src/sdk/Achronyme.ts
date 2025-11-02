@@ -552,6 +552,14 @@ export class Achronyme {
    * Sine function
    */
   sin(x: AchronymeValue | number): AchronymeValue {
+    // Fast path: si x tiene handle, usar sin_fast
+    if (typeof x !== 'number' && (x as any)._handle !== undefined) {
+      const handle = (x as any)._handle;
+      const resultHandle = this.module!.sin_fast(handle);
+      return new AchronymeValue(this, `__sin_${handle}`, resultHandle);
+    }
+
+    // Slow path: usar parser
     const arg = typeof x === 'number' ? x.toString() : x._varName;
     return this._createFromExpression(`sin(${arg})`);
   }
@@ -560,6 +568,14 @@ export class Achronyme {
    * Cosine function
    */
   cos(x: AchronymeValue | number): AchronymeValue {
+    // Fast path: si x tiene handle, usar cos_fast
+    if (typeof x !== 'number' && (x as any)._handle !== undefined) {
+      const handle = (x as any)._handle;
+      const resultHandle = this.module!.cos_fast(handle);
+      return new AchronymeValue(this, `__cos_${handle}`, resultHandle);
+    }
+
+    // Slow path: usar parser
     const arg = typeof x === 'number' ? x.toString() : x._varName;
     return this._createFromExpression(`cos(${arg})`);
   }
@@ -568,6 +584,14 @@ export class Achronyme {
    * Tangent function
    */
   tan(x: AchronymeValue | number): AchronymeValue {
+    // Fast path: si x tiene handle, usar tan_fast
+    if (typeof x !== 'number' && (x as any)._handle !== undefined) {
+      const handle = (x as any)._handle;
+      const resultHandle = this.module!.tan_fast(handle);
+      return new AchronymeValue(this, `__tan_${handle}`, resultHandle);
+    }
+
+    // Slow path: usar parser
     const arg = typeof x === 'number' ? x.toString() : x._varName;
     return this._createFromExpression(`tan(${arg})`);
   }
@@ -633,6 +657,14 @@ export class Achronyme {
    * Square root
    */
   sqrt(x: AchronymeValue | number): AchronymeValue {
+    // Fast path: si x tiene handle, usar sqrt_fast
+    if (typeof x !== 'number' && (x as any)._handle !== undefined) {
+      const handle = (x as any)._handle;
+      const resultHandle = this.module!.sqrt_fast(handle);
+      return new AchronymeValue(this, `__sqrt_${handle}`, resultHandle);
+    }
+
+    // Slow path: usar parser
     const arg = typeof x === 'number' ? x.toString() : x._varName;
     return this._createFromExpression(`sqrt(${arg})`);
   }
@@ -649,6 +681,14 @@ export class Achronyme {
    * Exponential (e^x)
    */
   exp(x: AchronymeValue | number): AchronymeValue {
+    // Fast path: si x tiene handle, usar exp_fast
+    if (typeof x !== 'number' && (x as any)._handle !== undefined) {
+      const handle = (x as any)._handle;
+      const resultHandle = this.module!.exp_fast(handle);
+      return new AchronymeValue(this, `__exp_${handle}`, resultHandle);
+    }
+
+    // Slow path: usar parser
     const arg = typeof x === 'number' ? x.toString() : x._varName;
     return this._createFromExpression(`exp(${arg})`);
   }
@@ -657,6 +697,14 @@ export class Achronyme {
    * Natural logarithm
    */
   ln(x: AchronymeValue | number): AchronymeValue {
+    // Fast path: si x tiene handle, usar ln_fast
+    if (typeof x !== 'number' && (x as any)._handle !== undefined) {
+      const handle = (x as any)._handle;
+      const resultHandle = this.module!.ln_fast(handle);
+      return new AchronymeValue(this, `__ln_${handle}`, resultHandle);
+    }
+
+    // Slow path: usar parser
     const arg = typeof x === 'number' ? x.toString() : x._varName;
     return this._createFromExpression(`ln(${arg})`);
   }
@@ -697,6 +745,14 @@ export class Achronyme {
    * Absolute value
    */
   abs(x: AchronymeValue | number): AchronymeValue {
+    // Fast path: si x tiene handle, usar abs_fast
+    if (typeof x !== 'number' && (x as any)._handle !== undefined) {
+      const handle = (x as any)._handle;
+      const resultHandle = this.module!.abs_fast(handle);
+      return new AchronymeValue(this, `__abs_${handle}`, resultHandle);
+    }
+
+    // Slow path: usar parser
     const arg = typeof x === 'number' ? x.toString() : x._varName;
     return this._createFromExpression(`abs(${arg})`);
   }

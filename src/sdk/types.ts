@@ -20,6 +20,8 @@ export interface WasmModule {
   createVectorFromBuffer(dataPtr: number, length: number): Handle;
   createMatrixFromBuffer(dataPtr: number, rows: number, cols: number): Handle;
   getVectorData(handle: Handle, outLengthPtr: number): number;
+  getVectorLength(handle: Handle): number;
+  getVectorDataPtr(handle: Handle): number;
   getMatrixData(handle: Handle, outRowsPtr: number, outColsPtr: number): number;
   copyVectorToBuffer(handle: Handle, destPtr: number, maxLength: number): number;
 

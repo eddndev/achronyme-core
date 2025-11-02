@@ -87,6 +87,27 @@ size_t copyVectorToBuffer(Handle handle, uintptr_t destPtr, size_t maxLength) {
     return copyLength;
 }
 
+size_t getVectorLength(Handle handle) {
+    const Value& value = globalHandleManager.get(handle);
+
+    if (!value.isVector()) {
+        throw std::runtime_error("Handle does not contain a vector");
+    }
+
+    return value.asVector().size();
+}
+
+uintptr_t getVectorDataPtr(Handle handle) {
+    const Value& value = globalHandleManager.get(handle);
+
+    if (!value.isVector()) {
+        throw std::runtime_error("Handle does not contain a vector");
+    }
+
+    const Vector& vec = value.asVector();
+    return reinterpret_cast<uintptr_t>(vec.elements().data());
+}
+
 // ============================================================================
 // DSP Operations (Fast Path)
 // ============================================================================
@@ -225,56 +246,154 @@ Handle norm_fast(Handle h) {
 }
 
 // ============================================================================
-// Mathematical Functions (Vectorized Fast Path)
+// Mathematical Functions (Vectorized Fast Path - OPTIMIZED)
 // ============================================================================
 
 Handle sin_fast(Handle h) {
     const Value& v = globalHandleManager.get(h);
-    std::vector<Value> args = { v };
-    Value result = FunctionRegistry::instance().getFunction("sin")(args);
-    return globalHandleManager.create(std::move(result));
+
+    if (v.isNumber()) {
+        return globalHandleManager.create(Value(std::sin(v.asNumber())));
+    }
+
+    if (v.isVector()) {
+        Vector vec = v.asVector();  // Copy, not reference (asVector returns by value)
+        const size_t n = vec.size();
+        std::vector<double> result;
+        result.reserve(n);
+        for (size_t i = 0; i < n; ++i) {
+            result.push_back(std::sin(vec[i]));
+        }
+        return globalHandleManager.create(Value(Vector(result)));
+    }
+
+    throw std::runtime_error("sin_fast: Value must be number or vector");
 }
 
 Handle cos_fast(Handle h) {
     const Value& v = globalHandleManager.get(h);
-    std::vector<Value> args = { v };
-    Value result = FunctionRegistry::instance().getFunction("cos")(args);
-    return globalHandleManager.create(std::move(result));
+
+    if (v.isNumber()) {
+        return globalHandleManager.create(Value(std::cos(v.asNumber())));
+    }
+
+    if (v.isVector()) {
+        Vector vec = v.asVector();  // Copy, not reference
+        const size_t n = vec.size();
+        std::vector<double> result;
+        result.reserve(n);
+        for (size_t i = 0; i < n; ++i) {
+            result.push_back(std::cos(vec[i]));
+        }
+        return globalHandleManager.create(Value(Vector(result)));
+    }
+
+    throw std::runtime_error("cos_fast: Value must be number or vector");
 }
 
 Handle tan_fast(Handle h) {
     const Value& v = globalHandleManager.get(h);
-    std::vector<Value> args = { v };
-    Value result = FunctionRegistry::instance().getFunction("tan")(args);
-    return globalHandleManager.create(std::move(result));
+
+    if (v.isNumber()) {
+        return globalHandleManager.create(Value(std::tan(v.asNumber())));
+    }
+
+    if (v.isVector()) {
+        Vector vec = v.asVector();  // Copy, not reference
+        const size_t n = vec.size();
+        std::vector<double> result;
+        result.reserve(n);
+        for (size_t i = 0; i < n; ++i) {
+            result.push_back(std::tan(vec[i]));
+        }
+        return globalHandleManager.create(Value(Vector(result)));
+    }
+
+    throw std::runtime_error("tan_fast: Value must be number or vector");
 }
 
 Handle exp_fast(Handle h) {
     const Value& v = globalHandleManager.get(h);
-    std::vector<Value> args = { v };
-    Value result = FunctionRegistry::instance().getFunction("exp")(args);
-    return globalHandleManager.create(std::move(result));
+
+    if (v.isNumber()) {
+        return globalHandleManager.create(Value(std::exp(v.asNumber())));
+    }
+
+    if (v.isVector()) {
+        Vector vec = v.asVector();  // Copy, not reference
+        const size_t n = vec.size();
+        std::vector<double> result;
+        result.reserve(n);
+        for (size_t i = 0; i < n; ++i) {
+            result.push_back(std::exp(vec[i]));
+        }
+        return globalHandleManager.create(Value(Vector(result)));
+    }
+
+    throw std::runtime_error("exp_fast: Value must be number or vector");
 }
 
 Handle ln_fast(Handle h) {
     const Value& v = globalHandleManager.get(h);
-    std::vector<Value> args = { v };
-    Value result = FunctionRegistry::instance().getFunction("ln")(args);
-    return globalHandleManager.create(std::move(result));
+
+    if (v.isNumber()) {
+        return globalHandleManager.create(Value(std::log(v.asNumber())));
+    }
+
+    if (v.isVector()) {
+        Vector vec = v.asVector();  // Copy, not reference
+        const size_t n = vec.size();
+        std::vector<double> result;
+        result.reserve(n);
+        for (size_t i = 0; i < n; ++i) {
+            result.push_back(std::log(vec[i]));
+        }
+        return globalHandleManager.create(Value(Vector(result)));
+    }
+
+    throw std::runtime_error("ln_fast: Value must be number or vector");
 }
 
 Handle abs_fast(Handle h) {
     const Value& v = globalHandleManager.get(h);
-    std::vector<Value> args = { v };
-    Value result = FunctionRegistry::instance().getFunction("abs")(args);
-    return globalHandleManager.create(std::move(result));
+
+    if (v.isNumber()) {
+        return globalHandleManager.create(Value(std::abs(v.asNumber())));
+    }
+
+    if (v.isVector()) {
+        Vector vec = v.asVector();  // Copy, not reference
+        const size_t n = vec.size();
+        std::vector<double> result;
+        result.reserve(n);
+        for (size_t i = 0; i < n; ++i) {
+            result.push_back(std::abs(vec[i]));
+        }
+        return globalHandleManager.create(Value(Vector(result)));
+    }
+
+    throw std::runtime_error("abs_fast: Value must be number or vector");
 }
 
 Handle sqrt_fast(Handle h) {
     const Value& v = globalHandleManager.get(h);
-    std::vector<Value> args = { v };
-    Value result = FunctionRegistry::instance().getFunction("sqrt")(args);
-    return globalHandleManager.create(std::move(result));
+
+    if (v.isNumber()) {
+        return globalHandleManager.create(Value(std::sqrt(v.asNumber())));
+    }
+
+    if (v.isVector()) {
+        Vector vec = v.asVector();  // Copy, not reference
+        const size_t n = vec.size();
+        std::vector<double> result;
+        result.reserve(n);
+        for (size_t i = 0; i < n; ++i) {
+            result.push_back(std::sqrt(vec[i]));
+        }
+        return globalHandleManager.create(Value(Vector(result)));
+    }
+
+    throw std::runtime_error("sqrt_fast: Value must be number or vector");
 }
 
 // ============================================================================

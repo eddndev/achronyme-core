@@ -97,6 +97,8 @@ EMSCRIPTEN_BINDINGS(achronyme_core) {
 
     // Data Extraction
     function("getVectorData", &bindings::getVectorData, allow_raw_pointers());
+    function("getVectorLength", &bindings::getVectorLength);
+    function("getVectorDataPtr", &bindings::getVectorDataPtr);
     function("getMatrixData", &bindings::getMatrixData, allow_raw_pointers());
     function("copyVectorToBuffer", &bindings::copyVectorToBuffer);
 

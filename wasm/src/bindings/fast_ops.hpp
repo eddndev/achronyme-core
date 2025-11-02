@@ -53,6 +53,20 @@ Handle createMatrixFromBuffer(uintptr_t dataPtr, size_t rows, size_t cols);
 uintptr_t getVectorData(Handle handle, size_t* outLength);
 
 /**
+ * Obtener longitud de un vector (sin punteros para Emscripten 4.0)
+ * @param handle Handle del vector
+ * @return Longitud del vector
+ */
+size_t getVectorLength(Handle handle);
+
+/**
+ * Obtener puntero a los datos de un vector (sin parámetros de salida para Emscripten 4.0)
+ * @param handle Handle del vector
+ * @return Puntero a los datos (válido mientras exista el handle)
+ */
+uintptr_t getVectorDataPtr(Handle handle);
+
+/**
  * Obtener datos de una matriz
  * @param handle Handle de la matriz
  * @param outRows Puntero para número de filas

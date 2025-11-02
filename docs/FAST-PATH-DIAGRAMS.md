@@ -577,10 +577,10 @@ const stats = ach.getMemoryStats();
 │ Expresiones complejas│ SLOW PATH        │ Parser más flexible   │
 │ ad-hoc               │                  │                       │
 └──────────────────────┴──────────────────┴───────────────────────┘
-```
 
 ---
 
+```
 **Autor**: eddndev@achronymelabs
 **Fecha**: 2025-11-01
 **Propósito**: Documentación visual del sistema Fast Path vs Slow Path
