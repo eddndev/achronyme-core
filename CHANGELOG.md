@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Planned Features (Phase 5+)
+- Symbolic computation
+- Units and dimensions
+
 ## [0.4.0] - 2025-11-01
 
 ### Added - Advanced Linear Algebra 📐
@@ -32,10 +36,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ✅ All 11 linear algebra tests now pass consistently.
 - ✅ No regressions introduced in existing SDK, DSP, or Handle system tests.
 
-
-### Planned Features (Phase 4+)
-- Symbolic computation
-- Units and dimensions
 
 ## [0.3.0] - 2025-11-01
 
