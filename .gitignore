@@ -60,6 +60,7 @@ compile_commands.json
 *.tmp
 *.temp
 .cache/
+ACHRONYME-PLOT-BLUEPRINT.md
 
 # TypeScript
 *.tsbuildinfo
