@@ -351,6 +351,70 @@ export class Achronyme {
     }
 
     // ========================================================================
+    // Expression Evaluation (SOC Language)
+    // ========================================================================
+
+    /**
+     * Evaluate SOC expression string
+     *
+     * Supports:
+     * - Lambda expressions: `x => x * 2`
+     * - Variable declarations: `let f = x => x + 1`
+     * - Function calls: `f(5)`
+     * - All mathematical operations
+     * - Higher-order functions (map, filter, reduce, pipe)
+     *
+     * @param expr SOC expression string
+     * @returns Result as string
+     *
+     * @example
+     * ```typescript
+     * // Simple expression
+     * ach.eval("2 + 3 * 4"); // "14"
+     *
+     * // Lambda expression
+     * ach.eval("x => x * 2"); // "function"
+     *
+     * // Multi-statement
+     * ach.eval("let f = x => x * 2");
+     * ach.eval("f(5)"); // "10"
+     *
+     * // With vectors
+     * ach.eval("map(x => x * 2, [1, 2, 3])"); // "[2, 4, 6]"
+     *
+     * // Higher-order functions
+     * ach.eval("filter(x => x > 3, [1, 2, 3, 4, 5])"); // "[4, 5]"
+     * ach.eval("reduce((acc, x) => acc + x, 0, [1, 2, 3])"); // "6"
+     * ach.eval("pipe(x => x + 1, x => x * 2)(5)"); // "12"
+     * ```
+     */
+    eval(expr: string): string {
+        try {
+            return this.session.wasm._eval(expr);
+        } catch (error) {
+            throw new Error(`Eval failed: ${error}`);
+        }
+    }
+
+    /**
+     * Reset the SOC evaluator state
+     *
+     * Clears all variables and functions declared with `let`
+     * Useful when you need a clean evaluator state
+     *
+     * @example
+     * ```typescript
+     * ach.eval("let x = 5");
+     * ach.eval("x"); // "5"
+     * ach.resetEvaluator();
+     * ach.eval("x"); // Error: Unknown variable 'x'
+     * ```
+     */
+    resetEvaluator(): void {
+        this.session.wasm.reset();
+    }
+
+    // ========================================================================
     // Mathematical Constants
     // ========================================================================
 

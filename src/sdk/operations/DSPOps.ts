@@ -212,13 +212,7 @@ export class DSPOps {
      * @returns Hanning window (Vector)
      */
     hanning(n: number): Vector {
-        const window = new Float64Array(n);
-
-        for (let i = 0; i < n; i++) {
-            window[i] = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (n - 1)));
-        }
-
-        const handle = this.session.wasm.createVector(Array.from(window));
+        const handle = this.session.wasm.hanningWindow(n);
         return new Vector(this.session, handle);
     }
 
@@ -229,13 +223,7 @@ export class DSPOps {
      * @returns Hamming window (Vector)
      */
     hamming(n: number): Vector {
-        const window = new Float64Array(n);
-
-        for (let i = 0; i < n; i++) {
-            window[i] = 0.54 - 0.46 * Math.cos((2 * Math.PI * i) / (n - 1));
-        }
-
-        const handle = this.session.wasm.createVector(Array.from(window));
+        const handle = this.session.wasm.hammingWindow(n);
         return new Vector(this.session, handle);
     }
 
@@ -246,17 +234,7 @@ export class DSPOps {
      * @returns Blackman window (Vector)
      */
     blackman(n: number): Vector {
-        const window = new Float64Array(n);
-        const a0 = 0.42;
-        const a1 = 0.5;
-        const a2 = 0.08;
-
-        for (let i = 0; i < n; i++) {
-            const factor = (2 * Math.PI * i) / (n - 1);
-            window[i] = a0 - a1 * Math.cos(factor) + a2 * Math.cos(2 * factor);
-        }
-
-        const handle = this.session.wasm.createVector(Array.from(window));
+        const handle = this.session.wasm.blackmanWindow(n);
         return new Vector(this.session, handle);
     }
 

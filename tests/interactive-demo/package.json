@@ -1,0 +1,17 @@
+{
+  "name": "achronyme-interactive-demo",
+  "version": "1.0.0",
+  "description": "Interactive demo and testbed for Achronyme WASM SDK",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "mathjs": "^12.4.0"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  }
+}

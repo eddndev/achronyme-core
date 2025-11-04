@@ -32,19 +32,8 @@ export class VectorOps {
      * @returns v1 + v2
      */
     vadd(v1: Vector, v2: Vector): Vector {
-        const d1 = v1.data;
-        const d2 = v2.data;
-
-        if (d1.length !== d2.length) {
-            throw new Error('Vectors must have same length');
-        }
-
-        const result = new Float64Array(d1.length);
-        for (let i = 0; i < d1.length; i++) {
-            result[i] = d1[i] + d2[i];
-        }
-
-        const handle = this.session.wasm.createVector(Array.from(result));
+        // Fast path: use WASM directly
+        const handle = this.session.wasm.vadd(v1.handle, v2.handle);
         return new Vector(this.session, handle);
     }
 
@@ -56,19 +45,8 @@ export class VectorOps {
      * @returns v1 - v2
      */
     vsub(v1: Vector, v2: Vector): Vector {
-        const d1 = v1.data;
-        const d2 = v2.data;
-
-        if (d1.length !== d2.length) {
-            throw new Error('Vectors must have same length');
-        }
-
-        const result = new Float64Array(d1.length);
-        for (let i = 0; i < d1.length; i++) {
-            result[i] = d1[i] - d2[i];
-        }
-
-        const handle = this.session.wasm.createVector(Array.from(result));
+        // Fast path: use WASM directly
+        const handle = this.session.wasm.vsub(v1.handle, v2.handle);
         return new Vector(this.session, handle);
     }
 
@@ -80,19 +58,8 @@ export class VectorOps {
      * @returns v1 ⊙ v2
      */
     vmul(v1: Vector, v2: Vector): Vector {
-        const d1 = v1.data;
-        const d2 = v2.data;
-
-        if (d1.length !== d2.length) {
-            throw new Error('Vectors must have same length');
-        }
-
-        const result = new Float64Array(d1.length);
-        for (let i = 0; i < d1.length; i++) {
-            result[i] = d1[i] * d2[i];
-        }
-
-        const handle = this.session.wasm.createVector(Array.from(result));
+        // Fast path: use WASM directly
+        const handle = this.session.wasm.vmul(v1.handle, v2.handle);
         return new Vector(this.session, handle);
     }
 
@@ -104,22 +71,8 @@ export class VectorOps {
      * @returns v1 / v2
      */
     vdiv(v1: Vector, v2: Vector): Vector {
-        const d1 = v1.data;
-        const d2 = v2.data;
-
-        if (d1.length !== d2.length) {
-            throw new Error('Vectors must have same length');
-        }
-
-        const result = new Float64Array(d1.length);
-        for (let i = 0; i < d1.length; i++) {
-            if (Math.abs(d2[i]) < 1e-10) {
-                throw new Error('Division by zero');
-            }
-            result[i] = d1[i] / d2[i];
-        }
-
-        const handle = this.session.wasm.createVector(Array.from(result));
+        // Fast path: use WASM directly
+        const handle = this.session.wasm.vdiv(v1.handle, v2.handle);
         return new Vector(this.session, handle);
     }
 

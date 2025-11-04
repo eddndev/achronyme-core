@@ -114,6 +114,22 @@ export class RustWASM {
         }
     }
 
+    /**
+     * Create matrix from JavaScript array (row-major order)
+     * @param data Flattened array in row-major order
+     * @param rows Number of rows
+     * @param cols Number of columns
+     * @returns Handle to the matrix
+     */
+    createMatrix(data: number[], rows: number, cols: number): Handle {
+        const mod = this.ensureInit();
+        try {
+            return mod.createMatrix(data, rows, cols);
+        } catch (error) {
+            throw new Error(`Failed to create matrix: ${error}`);
+        }
+    }
+
     // ========================================================================
     // Math Operations
     // ========================================================================
@@ -212,6 +228,33 @@ export class RustWASM {
         }
     }
 
+    hanningWindow(n: number): Handle {
+        const mod = this.ensureInit();
+        try {
+            return mod.hanningWindow(n);
+        } catch (error) {
+            throw new Error(`hanningWindow failed: ${error}`);
+        }
+    }
+
+    hammingWindow(n: number): Handle {
+        const mod = this.ensureInit();
+        try {
+            return mod.hammingWindow(n);
+        } catch (error) {
+            throw new Error(`hammingWindow failed: ${error}`);
+        }
+    }
+
+    blackmanWindow(n: number): Handle {
+        const mod = this.ensureInit();
+        try {
+            return mod.blackmanWindow(n);
+        } catch (error) {
+            throw new Error(`blackmanWindow failed: ${error}`);
+        }
+    }
+
     // ========================================================================
     // Linear Algebra Operations (Fast Path)
     // ========================================================================
@@ -223,7 +266,7 @@ export class RustWASM {
     lu_decomposition_js(handle: Handle): { L: Handle; U: Handle; P: Handle } {
         const mod = this.ensureInit();
         try {
-            return mod.lu_decomposition_js(handle);
+            return mod.lu(handle);
         } catch (error) {
             throw new Error(`lu_decomposition_js failed: ${error}`);
         }
@@ -236,7 +279,7 @@ export class RustWASM {
     qr_decomposition_js(handle: Handle): { Q: Handle; R: Handle } {
         const mod = this.ensureInit();
         try {
-            return mod.qr_decomposition_js(handle);
+            return mod.qr(handle);
         } catch (error) {
             throw new Error(`qr_decomposition_js failed: ${error}`);
         }
@@ -249,9 +292,22 @@ export class RustWASM {
     svd_decomposition_js(handle: Handle): { U: Handle; S: Handle; V: Handle } {
         const mod = this.ensureInit();
         try {
-            return mod.svd_decomposition_js(handle);
+            return mod.svd(handle);
         } catch (error) {
             throw new Error(`svd_decomposition_js failed: ${error}`);
+        }
+    }
+
+    /**
+     * Matrix Inverse
+     * @returns Handle to inverse matrix
+     */
+    matrixInverse(handle: Handle): Handle {
+        const mod = this.ensureInit();
+        try {
+            return mod.inverse(handle);
+        } catch (error) {
+            throw new Error(`Matrix inverse failed: ${error}`);
         }
     }
 

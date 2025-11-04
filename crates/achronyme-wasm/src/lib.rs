@@ -130,10 +130,53 @@ pub fn get_vector(handle: Handle) -> Result<Vec<f64>, JsValue> {
         let h = handles.borrow();
         match h.get(handle) {
             Some(Value::Vector(v)) => Ok(v.data().to_vec()),
-            Some(_) => Err(JsValue::from_str("Handle does not reference a vector")),
+            Some(Value::Matrix(m)) => {
+                // También permitir obtener datos de matrices (aplanados)
+                Ok(m.data.clone())
+            }
+            Some(_) => Err(JsValue::from_str("Handle does not reference a vector or matrix")),
             None => Err(JsValue::from_str("Invalid handle")),
         }
     })
+}
+
+/// Get matrix data and dimensions from handle
+#[wasm_bindgen(js_name = getMatrix)]
+pub fn get_matrix(handle: Handle) -> Result<JsValue, JsValue> {
+    HANDLES.with(|handles| {
+        let h = handles.borrow();
+        match h.get(handle) {
+            Some(Value::Matrix(m)) => {
+                let data = m.data.clone();
+                let rows = m.rows;
+                let cols = m.cols;
+
+                // Return as JavaScript object
+                let obj = js_sys::Object::new();
+                js_sys::Reflect::set(&obj, &"data".into(), &serde_wasm_bindgen::to_value(&data)?)?;
+                js_sys::Reflect::set(&obj, &"rows".into(), &JsValue::from_f64(rows as f64))?;
+                js_sys::Reflect::set(&obj, &"cols".into(), &JsValue::from_f64(cols as f64))?;
+
+                Ok(obj.into())
+            }
+            Some(_) => Err(JsValue::from_str("Handle does not reference a matrix")),
+            None => Err(JsValue::from_str("Invalid handle")),
+        }
+    })
+}
+
+/// Create matrix from JavaScript array (row-major order)
+#[wasm_bindgen(js_name = createMatrix)]
+pub fn create_matrix(data: Vec<f64>, rows: usize, cols: usize) -> Result<Handle, JsValue> {
+    if data.len() != rows * cols {
+        return Err(JsValue::from_str(&format!(
+            "Data length {} does not match dimensions {}x{}",
+            data.len(), rows, cols
+        )));
+    }
+    let matrix = Matrix::new(rows, cols, data)
+        .map_err(|e| JsValue::from_str(&e.to_string()))?;
+    Ok(HANDLES.with(|h| h.borrow_mut().create(Value::Matrix(matrix))))
 }
 
 #[wasm_bindgen(js_name = createMatrixFromBuffer)]
@@ -272,8 +315,6 @@ pub fn math_sqrt(handle: Handle) -> Result<Handle, JsValue> {
 
 #[wasm_bindgen(js_name = "dspFft")]
 pub fn dsp_fft(handle: Handle) -> Result<Handle, JsValue> {
-    use achronyme_types::complex::Complex;
-
     HANDLES.with(|h| {
         let result_matrix = {
             let handles = h.borrow();
@@ -892,6 +933,53 @@ pub fn lu_decomposition(handle: Handle) -> Result<LuResult, JsValue> {
 
         Ok(LuResult { l: l_handle, u: u_handle, p: p_handle })
     })
+}
+
+/// Matrix inverse
+#[wasm_bindgen(js_name = inverse)]
+pub fn matrix_inverse(handle: Handle) -> Result<Handle, JsValue> {
+    HANDLES.with(|h| {
+        let inv_matrix = {
+            let handles = h.borrow();
+            let value = handles.get(handle)
+                .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
+
+            match value {
+                Value::Matrix(m) => {
+                    achronyme_linalg::inverse(m)
+                        .map_err(|e| JsValue::from_str(&e))?
+                }
+                _ => return Err(JsValue::from_str("Matrix inverse requires matrix"))
+            }
+        };
+
+        Ok(h.borrow_mut().create(Value::Matrix(inv_matrix)))
+    })
+}
+
+// ============================================================================
+// DSP Window Functions
+// ============================================================================
+
+/// Hanning window
+#[wasm_bindgen(js_name = hanningWindow)]
+pub fn hanning_window(n: usize) -> Handle {
+    let window = achronyme_dsp::hanning_window(n);
+    HANDLES.with(|h| h.borrow_mut().create(Value::Vector(window)))
+}
+
+/// Hamming window
+#[wasm_bindgen(js_name = hammingWindow)]
+pub fn hamming_window(n: usize) -> Handle {
+    let window = achronyme_dsp::hamming_window(n);
+    HANDLES.with(|h| h.borrow_mut().create(Value::Vector(window)))
+}
+
+/// Blackman window
+#[wasm_bindgen(js_name = blackmanWindow)]
+pub fn blackman_window(n: usize) -> Handle {
+    let window = achronyme_dsp::blackman_window(n);
+    HANDLES.with(|h| h.borrow_mut().create(Value::Vector(window)))
 }
 
 // ============================================================================

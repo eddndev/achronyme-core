@@ -263,8 +263,8 @@ export class LinalgOps {
      * @returns Inverse matrix
      */
     inverse(matrix: Matrix): Matrix {
-        // TODO: Implement using LU decomposition
-        throw new Error('inverse() not yet implemented');
+        const handle = this.session.wasm.matrixInverse(matrix.handle);
+        return new Matrix(this.session, handle, matrix.rows, matrix.cols);
     }
 
     /**

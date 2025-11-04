@@ -1,199 +1,100 @@
-# Achronyme SDK Documentation
+# Achronyme SDK v2.0
 
-Documentación completa del SDK TypeScript de Achronyme para análisis matemático y procesamiento de señales.
+Modern TypeScript SDK for the Achronyme mathematical engine, built on Rust WASM with zero-copy views and automatic memory management.
 
-## Tabla de Contenidos
+## ✨ Features
 
-- [Tipos de Datos](./types.md) - Tipos TypeScript, interfaces y estructuras de datos
-- [Referencia de API](./api-reference.md) - Documentación completa de todas las funciones
-- [Funciones de Optimización](./optimization-functions.md) - Funciones de alto rendimiento para reducir overhead JS-WASM
-- [Ejemplos Prácticos](./examples.md) - Casos de uso y ejemplos completos
-- [Gestión de Memoria](./memory-management.md) - Buenas prácticas y patrones de memoria
+- **Session-Based Management**: RAII-style `use()` blocks for automatic, guaranteed memory cleanup.
+- **Zero-Copy Views**: Instant access to WASM memory via `Float64Array` views, eliminating slow data copies.
+- **Type-Safe API**: Fully typed with TypeScript for robust, predictable code.
+- **Modular Design**: Operations are grouped into logical modules (`math`, `dsp`, `linalg`, etc.), allowing for tree-shaking.
+- **High-Performance Core**: Powered by a Rust-based WASM engine for near-native speed.
+- **Powerful Expression Evaluator**: Includes a built-in evaluator for the SOC language, enabling complex operations in a single call.
 
-## Inicio Rápido
+## 🚀 Quick Start
 
-### Instalación
+### Installation
 
 ```bash
 npm install @achronyme/core
 ```
 
-### Uso Básico
+### Basic Usage (Recommended)
+
+The recommended approach is to use `ach.use()` to ensure all memory is automatically cleaned up.
 
 ```typescript
 import { Achronyme } from '@achronyme/core';
 
-// Inicializar
+// Initialize the engine
 const ach = new Achronyme();
 await ach.init();
 
-// Crear valores
-const x = ach.number(42);
-const v = ach.vector([1, 2, 3, 4, 5]);
+// Use a session for automatic resource management
+await ach.use(async () => {
+    // Create values (vectors, matrices, etc.)
+    const signal = ach.vector([...Array(1024).keys()]);
 
-// Operaciones
-const result = x.mul(2);
-console.log(await result.toNumber()); // 84
+    // Perform operations using the modular API
+    const sinSignal = ach.math.sin(signal);
 
-// Limpieza
-x.dispose();
-v.dispose();
-result.dispose();
+    // Run DSP functions
+    const spectrum = ach.dsp.fftMag(sinSignal);
+
+    // Access data with a zero-copy view (instant!)
+    const spectrumData = spectrum.data;
+    console.log('Spectrum preview:', spectrumData.slice(0, 5));
+
+    // ✅ All values (signal, sinSignal, spectrum) are
+    // automatically disposed when this block exits!
+});
+
+console.log('Active values after use() block:', ach.getActiveValuesCount()); // 0
 ```
 
-## Características Principales
+## 🏛️ Architecture
 
-### 🧮 Matemáticas
-
-- Operaciones aritméticas básicas (+, -, *, /, ^)
-- Funciones trigonométricas (sin, cos, tan, asin, acos, atan, atan2)
-- Funciones hiperbólicas (sinh, cosh, tanh)
-- Funciones exponenciales y logarítmicas (exp, ln, log, log2, log10)
-- Funciones de redondeo (floor, ceil, round, trunc)
-- Valor absoluto, signo, potencias
-
-### 📊 Álgebra Lineal
-
-- Vectores con operaciones elemento a elemento
-- Matrices con multiplicación, transposición, inversión
-- Producto punto y producto cruz
-- Determinante y traza
-- Operaciones vectoriales optimizadas (vadd, vsub, vmul, vdiv, vscale)
-
-### 📡 Procesamiento Digital de Señales (DSP)
-
-- FFT (Fast Fourier Transform) - O(N log N)
-- DFT (Discrete Fourier Transform) - O(N²)
-- IFFT (Inverse Fast Fourier Transform)
-- Espectros de magnitud y fase
-- Convolución (directa y con FFT)
-- Funciones ventana (Hanning, Hamming, Blackman)
-- **Funciones optimizadas de alto rendimiento** (fft_spectrum, linspace, fftshift)
-
-### 🔢 Estadísticas
-
-- Suma, media, desviación estándar
-- Mínimo y máximo (variádico y vectorial)
-
-### λ Programación Funcional
-
-- Lambdas y funciones de orden superior
-- map, filter, reduce
-- Composición de funciones (compose, pipe)
-
-### 💾 Gestión de Memoria
-
-- Sistema de dispose explícito
-- Estadísticas de memoria en tiempo real
-- Reset completo del entorno
-- Variables persistentes entre evaluaciones
-
-## Arquitectura
+The SDK is designed with a clear, modular structure:
 
 ```
-┌─────────────────────────────────────────────┐
-│         TypeScript SDK (High Level)         │
-│  ┌─────────────┐      ┌─────────────────┐  │
-│  │  Achronyme  │──────│ AchronymeValue  │  │
-│  └─────────────┘      └─────────────────┘  │
-└──────────────────┬──────────────────────────┘
-                   │ eval()
-┌──────────────────▼──────────────────────────┐
-│           C++ WASM Core (Low Level)         │
-│  ┌──────────┐  ┌────────┐  ┌─────────────┐ │
-│  │  Parser  │──│ Value  │──│  Functions  │ │
-│  └──────────┘  └────────┘  └─────────────┘ │
-└─────────────────────────────────────────────┘
+src/sdk/
+├── Achronyme.ts        # Main facade and entry point
+├── core/               # Core infrastructure
+│   ├── Session.ts         # RAII-style session management (`use` block)
+│   ├── HandleManager.ts   # Tracks WASM memory handles
+│   ├── RustBindings.ts    # Type-safe interface to the WASM module
+│   └── MemoryPool.ts      # (Optional) Buffer pooling for performance
+├── operations/         # Modules for different domains
+│   ├── MathOps.ts         # (ach.math) sin, cos, exp, etc.
+│   ├── DSPOps.ts          # (ach.dsp) fft, conv, windowing
+│   ├── LinalgOps.ts       # (ach.linalg) lu, qr, svd, det
+│   ├── VectorOps.ts       # (ach.vecOps) dot, cross, norm
+│   ├── StatsOps.ts        # (ach.stats) sum, mean, std
+│   └── HOFOps.ts          # (ach.hof) map, filter, reduce
+└── values/             # Data structure classes
+    ├── Value.ts           # Abstract base class for all values
+    ├── Vector.ts          # 1D data with zero-copy .data view
+    ├── Matrix.ts          # 2D data with zero-copy .data view
+    ├── Scalar.ts          # Single number wrapper
+    └── Complex.ts         # Complex number type
 ```
 
-## Conceptos Clave
+## 🧠 Memory Management
 
-### Values vs Primitivos
+The SDK provides two primary ways to manage memory:
 
-El SDK trabaja con dos tipos de valores:
+1.  **Session-based (Recommended)**: The `ach.use()` method creates a scope. Any Achronyme value created inside is automatically disposed of when the scope is exited, even if an error occurs. This is the safest and easiest way to prevent memory leaks.
 
-1. **TypeScript Primitivos** - `number`, `number[]`, `number[][]`
-2. **AchronymeValue** - Proxy a valores en el entorno C++
+2.  **Manual Cleanup**: For advanced use cases, you can manage memory manually. Any value you create must be explicitly freed using its `.dispose()` method.
 
-```typescript
-// Primitivo → AchronymeValue
-const x = ach.number(42);              // AchronymeValue
-const v = ach.vector([1, 2, 3]);       // AchronymeValue
+See the [Memory Management Guide](./memory-management.md) for detailed patterns and best practices.
 
-// AchronymeValue → Primitivo
-const num = await x.toNumber();        // number
-const arr = await v.toVector();        // number[]
-```
+## ⚡ Performance
 
-### Variables Persistentes
+The SDK is built for high performance. Key features include:
 
-Los valores se mantienen en el entorno C++ entre operaciones:
+-   **Zero-Copy Views**: Accessing the `.data` property of a `Vector` or `Matrix` returns a `Float64Array` that points directly to the WASM memory, avoiding any data duplication.
+-   **WASM-Native Functions**: All operations in the `ach.*Ops` modules are executed natively in Rust/WASM.
+-   **Expression Evaluator**: The `ach.eval()` method can execute complex chains of operations in a single call, minimizing the JS-WASM communication overhead.
 
-```typescript
-const x = ach.let('myVar', 42);        // Crear variable 'myVar'
-const y = ach.get('myVar');            // Obtener referencia
-const z = y.mul(2);                    // Usar la variable
-```
-
-### Fluent API
-
-Las operaciones son encadenables:
-
-```typescript
-const result = ach.vector([1, 2, 3, 4, 5])
-  .mul(2)           // [2, 4, 6, 8, 10]
-  .add(10)          // [12, 14, 16, 18, 20]
-  .map('x => x^2'); // [144, 196, 256, 324, 400]
-```
-
-## Rendimiento
-
-### Funciones Optimizadas ⚡
-
-Para análisis DSP de alto rendimiento, use las funciones optimizadas que minimizan cruces JS↔WASM:
-
-```typescript
-// ❌ Lento: Múltiples cruces JS↔WASM
-const t = generateTimeSamples();  // Bucle JS
-const signal = ach.vector(t);
-const fft = ach.fft(signal);
-const mag = await fft.toMatrix();
-const magnitude = mag.map(r => Math.sqrt(r[0]**2 + r[1]**2)); // Bucle JS
-
-// ✅ Rápido: Todo en C++
-const t = ach.linspace(0, 10, 1000);
-const signal = t.map('t => sin(2*PI*5*t)');
-const spectrum = ach.fft_spectrum(signal, 1000, true, true, 100);
-// Una sola operación, ~90% más rápido
-```
-
-Ver [Funciones de Optimización](./optimization-functions.md) para más detalles.
-
-## Gestión de Errores
-
-El SDK lanza errores tipados para diferentes situaciones:
-
-```typescript
-try {
-  const result = ach.eval('1 / 0');
-} catch (error) {
-  if (error instanceof AchronymeRuntimeError) {
-    console.error('Error en runtime:', error.message);
-  } else if (error instanceof AchronymeSyntaxError) {
-    console.error('Error de sintaxis:', error.message);
-  }
-}
-```
-
-Ver tipos de error completos en [Tipos de Datos](./types.md).
-
-## Recursos Adicionales
-
-- [GitHub Repository](https://github.com/anthropics/achronyme-core)
-- [Guía LLM](../llm-sdk-guide.md) - Instrucciones para LLMs
-- [Especificación del Lenguaje](../language-spec.md) - Sintaxis SOC
-- [Arquitectura](../ARCHITECTURE.md) - Detalles técnicos
-
-## Licencia
-
-MIT License - Ver LICENSE para más detalles.
+See the [Performance Guide](./optimization-functions.md) for more details.

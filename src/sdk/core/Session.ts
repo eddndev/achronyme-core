@@ -200,7 +200,7 @@ export class AchronymeSession {
             }
         }
 
-        const handle = this.wasm.createVector(flat);
+        const handle = this.wasm.createMatrix(flat, rows, cols);
         return new Matrix(this, handle, rows, cols);
     }
 

@@ -1,305 +1,119 @@
-# Funciones de Optimización - Achronyme SDK
+# Performance Guide - Achronyme SDK v2.0
 
-## Resumen
+The Achronyme SDK is designed for high performance by minimizing the overhead between the JavaScript environment and the high-speed WebAssembly (WASM) core. This guide covers the key patterns for writing fast and efficient code.
 
-Se han implementado funciones nativas en C++ para **reducir el overhead JS-WASM** en operaciones DSP frecuentes. Estas funciones eliminan múltiples cruces JS↔WASM y procesan datos en una sola pasada en C++, logrando mejoras de rendimiento de **hasta 90%**.
+## 1. The Golden Rule: Minimize JS-WASM Communication
 
----
+Every call from JavaScript to WASM (and back) has a small but non-zero overhead. High-performance code minimizes these round-trips.
 
-## Funciones Implementadas
-
-### TIER 1 - Funciones Críticas
-
-#### 1. `fft_phase(signal: Vector) → Vector`
-
-Calcula el espectro de fase FFT de una señal.
-
-**Antes (JS):**
-```typescript
-const fftResult = ach.fft(signal);
-const fftMatrix = await fftResult.toMatrix();
-const phase = fftMatrix.map(row => Math.atan2(row[1], row[0]));
-```
-
-**Ahora (Optimizado):**
-```typescript
-const phase = ach.fft_phase(signal);
-const phaseValues = await phase.toVector();
-```
-
-**Beneficios:**
-- ⚡ Elimina el costoso `map('c => atan2(...)')` en JavaScript
-- ⚡ Todo se calcula en una sola pasada en C++
-- ⚡ Impacto: **ALTO** - se usa en cada cálculo de espectro
+-   **Bad (Chatty)**: Many small operations, each crossing the JS-WASM boundary.
+-   **Good (Efficient)**: Fewer, larger operations that do more work within WASM.
 
 ---
 
-#### 2. `linspace(start: number, end: number, N: number) → Vector`
+## 2. Zero-Copy Data Access with `.data`
 
-Genera N muestras uniformemente espaciadas entre start y end.
+This is the **single most important performance feature** of the SDK.
 
-**Antes (JS):**
+When you access the `.data` property of a `Vector` or `Matrix`, you get a `Float64Array` that is a **direct view** into the WASM memory. Access is instantaneous because no data is copied.
+
+In contrast, `.toArray()` creates a **full copy** of the data, which is slow and memory-intensive for large datasets.
+
+### Example:
+
 ```typescript
-const tSamples: number[] = [];
-const dt = (tEnd - tStart) / (N - 1);
-for (let i = 0; i < N; i++) {
-    tSamples.push(tStart + i * dt);
-}
-const t = ach.vector(tSamples);
+await ach.use(async () => {
+    const v = ach.vector([...Array(10_000_000).keys()]); // 10 million elements
+
+    // ⚡ INSTANT (Zero-Copy)
+    console.time('data view');
+    const view = v.data;
+    console.timeEnd('data view'); // ~ <1ms
+
+    // 🐢 SLOW (Full Copy)
+    console.time('toArray copy');
+    const copy = v.toArray();
+    console.timeEnd('toArray copy'); // ~ 80ms+
+});
 ```
 
-**Ahora (Optimizado):**
-```typescript
-const t = ach.linspace(tStart, tEnd, N);
-```
-
-**Beneficios:**
-- ⚡ Genera el vector directamente en C++
-- ⚡ No requiere bucle en JavaScript
-- ⚡ Impacto: **MEDIO** - se usa al inicio de cálculos
-
-**Ejemplo:**
-```typescript
-const t = ach.linspace(0, 10, 100);  // 100 muestras de 0 a 10
-const samples = await t.toVector();
-// [0, 0.101, 0.202, ..., 9.899, 10]
-```
+**Best Practice:**
+-   Use `.data` for reading, iterating, or passing data to other libraries (like plotting tools).
+-   Use `.toArray()` only when you absolutely need a separate, mutable JavaScript copy of the data.
 
 ---
 
-### TIER 2 - Alto Impacto
+## 3. Prefer WASM-Native Operations
 
-#### 3. `fft_spectrum(signal, fs, shift?, angular?, omegaRange?) → Matrix [N x 3]`
+The SDK provides two ways to perform operations like `map`:
 
-Función **TODO-EN-UNO** que calcula omega, magnitud y fase en una sola pasada.
+1.  **JS Callback**: `vector.map(x => Math.sin(x))`
+2.  **WASM-Native Function**: `ach.math.sin(vector)`
 
-**Antes (JS) - Múltiples operaciones:**
+The WASM-native function is significantly faster because the entire loop runs inside WASM, avoiding the need to call a JavaScript function for every single element.
+
+### Example:
+
 ```typescript
-// 1. Calcular FFT
-const fftResult = ach.fft(signal);
-const fftMatrix = await fftResult.toMatrix();
+await ach.use(async () => {
+    const v = ach.linspace(0, 10, 1_000_000); // 1 million elements
 
-// 2. Calcular magnitudes (cruce JS↔WASM)
-const magnitude = fftMatrix.map(row =>
-    Math.sqrt(row[0]**2 + row[1]**2)
-);
+    // 🐢 SLOW: Calls a JS function 1,000,000 times
+    console.time('map with JS callback');
+    const result1 = v.map(x => Math.sin(x));
+    console.timeEnd('map with JS callback');
 
-// 3. Calcular fases (cruce JS↔WASM)
-const phase = fftMatrix.map(row =>
-    Math.atan2(row[1], row[0])
-);
-
-// 4. Generar vector de frecuencias (bucle JS)
-const omega = [];
-for (let k = 0; k < N; k++) {
-    let freq = k * fs / N;
-    if (freq > fs/2) freq -= fs;
-    omega.push(freq * 2 * Math.PI);
-}
-
-// 5. Aplicar fftshift (cruce JS↔WASM)
-// 6. Filtrar por rango (bucle JS)
+    // ⚡ FAST: Entire operation runs inside WASM
+    console.time('WASM-native sin');
+    const result2 = ach.math.sin(v);
+    console.timeEnd('WASM-native sin');
+});
 ```
 
-**Ahora (Optimizado) - Una sola operación:**
-```typescript
-const spectrum = ach.fft_spectrum(signal, fs, true, true, 20);
-const result = await spectrum.toMatrix();
-
-// result[i][0] = omega (rad/s)
-// result[i][1] = magnitude
-// result[i][2] = phase
-```
-
-**Parámetros:**
-- `signal`: Vector de señal de entrada
-- `fs`: Frecuencia de muestreo (Hz)
-- `shift`: Aplicar fftshift para centrar espectro (default: true)
-- `angular`: Convertir Hz → rad/s (default: true)
-- `omegaRange`: Filtrar frecuencias a [-range, range] (default: sin filtro)
-
-**Beneficios:**
-- ⚡⚡⚡ **MUY ALTO** - elimina ~90% del overhead
-- Computa FFT + magnitud + fase + omega + shift + filtro en una sola pasada
-- Reduce 5+ cruces JS↔WASM a solo 1
-
-**Ejemplo completo:**
-```typescript
-// Señal de 1000 muestras a 1 kHz
-const signal = ach.vector([...]);
-const fs = 1000;
-
-// Calcular espectro completo en un solo paso
-const spectrum = ach.fft_spectrum(signal, fs, true, true, 50);
-const result = await spectrum.toMatrix();
-
-// Extraer componentes
-const omega = result.map(row => row[0]);      // Frecuencias (rad/s)
-const magnitude = result.map(row => row[1]);  // Magnitudes
-const phase = result.map(row => row[2]);      // Fases
-
-// Graficar o procesar...
-```
+**Best Practice:** Always use the built-in `ach.math`, `ach.dsp`, etc. functions instead of `map` with a simple JS callback. Use `map` for custom logic that doesn't have a built-in equivalent.
 
 ---
 
-### TIER 3 - Utilidades
+## 4. Batch Operations with the `eval()` Engine
 
-#### 4. `fftshift(vector: Vector) → Vector`
+For complex sequences of calculations, the `eval()` engine is your most powerful tool. It can parse and execute an entire expression in a single call to WASM, completely eliminating the overhead of intermediate operations.
 
-Reordena el espectro FFT para centrar la frecuencia cero.
+### Example: `map(x => sqrt(abs(sin(x*2))), v)`
 
+**The Slow Way (step-by-step):**
 ```typescript
-const spectrum = ach.fft_mag(signal);
-const centered = ach.fftshift(spectrum);
+// 4 separate operations, 4 JS-WASM round-trips
+const v = ach.linspace(0, 10, 1000);
+const v2 = ach.vecOps.vscale(v, 2);
+const v3 = ach.math.sin(v2);
+const v4 = ach.math.abs(v3);
+const result = ach.math.sqrt(v4);
 ```
 
-**Comportamiento:**
-- Para vector de longitud N, mueve la segunda mitad al inicio
-- `[0, 1, 2, 3, 4, 5]` → `[3, 4, 5, 0, 1, 2]`
-
----
-
-#### 5. `ifftshift(vector: Vector) → Vector`
-
-Invierte la operación de fftshift.
-
+**The Fast Way (`eval`):**
 ```typescript
-const original = ach.ifftshift(shifted);
+// 1 operation, 1 JS-WASM round-trip
+ach.eval("let v = linspace(0, 10, 1000)");
+const result = ach.eval("map(x => sqrt(abs(sin(x*2))), v)");
 ```
+
+**Best Practice:** For multi-step formulas or data processing pipelines, compose them into a single `eval` string to achieve maximum performance.
 
 ---
 
-## Comparación de Rendimiento
+## 5. Use Built-in Utility Functions
 
-### Escenario: Análisis de espectro de 1024 muestras
+Functions like `ach.linspace`, `ach.identity`, `ach.zeros`, and `ach.ones` are implemented in Rust/WASM. They are much faster at creating large datasets than generating them in JavaScript and then passing them to `ach.vector`.
 
-| Método | Operaciones | Cruces JS↔WASM | Tiempo Relativo |
-|--------|-------------|-----------------|-----------------|
-| **Método Antiguo (JS)** | 6 pasos separados | 5+ cruces | 100% (baseline) |
-| **fft_spectrum() (Optimizado)** | 1 paso unificado | 1 cruce | **~10%** ⚡⚡⚡ |
+-   **Bad (Slow)**: `ach.vector(new Array(1_000_000).fill(0))`
+-   **Good (Fast)**: `ach.zeros(1_000_000)`
 
-**Mejora:** ~90% de reducción de overhead
+## Summary of Performance Patterns
 
----
-
-## Ejemplo de Uso Completo
-
-### Antes (Código antiguo con overhead)
-
-```typescript
-// ❌ Múltiples operaciones, muchos cruces JS↔WASM
-const N = 1000;
-const fs = 1000;
-const tStart = -5;
-const tEnd = 5;
-
-// 1. Generar muestras de tiempo (bucle JS)
-const tSamples: number[] = [];
-const dt = (tEnd - tStart) / (N - 1);
-for (let i = 0; i < N; i++) {
-    tSamples.push(tStart + i * dt);
-}
-
-// 2. Crear señal (cruce WASM)
-const signal = ach.vector(tSamples).map('t => exp(-abs(t))');
-
-// 3. FFT (cruce WASM)
-const fftResult = ach.fft(signal);
-const fftMatrix = await fftResult.toMatrix();
-
-// 4. Magnitud (bucle JS)
-const magnitude = fftMatrix.map(row => Math.sqrt(row[0]**2 + row[1]**2));
-
-// 5. Fase (bucle JS)
-const phase = fftMatrix.map(row => Math.atan2(row[1], row[0]));
-
-// 6. Omega (bucle JS + shift)
-const omega = [];
-for (let k = 0; k < N; k++) {
-    let freq = k * fs / N;
-    if (freq > fs/2) freq -= fs;
-    omega.push(freq * 2 * Math.PI);
-}
-omega.sort((a, b) => a - b);
-
-// 7. Filtrar por rango (bucle JS)
-const indices = omega.map((w, i) => Math.abs(w) <= 20 ? i : -1).filter(i => i >= 0);
-```
-
-### Después (Código optimizado, 4 líneas)
-
-```typescript
-// ✅ TODO en WASM, mínimo overhead
-const tSamples = ach.linspace(-5, 5, 1000);
-const signal = tSamples.map('t => exp(-abs(t))');
-const spectrum = ach.fft_spectrum(signal, 1000, true, true, 20);
-const result = await spectrum.toMatrix();
-
-// Listo! result contiene [omega, magnitude, phase]
-```
-
----
-
-## Tests
-
-Todos los tests pasaron exitosamente: **30/30** ✅
-
-```bash
-⚡ Optimization Functions (Reduce JS-WASM Overhead)
-✓ linspace - Generate linearly spaced samples
-✓ fft_phase - FFT phase spectrum
-✓ fftshift - Center FFT spectrum
-✓ ifftshift - Inverse of fftshift
-✓ fft_spectrum - All-in-one spectrum analysis
-✓ fft_spectrum with range filter
-```
-
----
-
-## Compilación
-
-### Compilar WASM:
-```bash
-emcc \
-  wasm/src/core/*.cpp \
-  wasm/src/parser/*.cpp \
-  wasm/src/bindings/main.cpp \
-  -I wasm/src \
-  -o dist/achronyme-core.mjs \
-  -s WASM=1 \
-  -s ALLOW_MEMORY_GROWTH=1 \
-  -s MODULARIZE=1 \
-  -s EXPORT_ES6=1 \
-  -s EXPORT_NAME='AchronymeCore' \
-  -s ENVIRONMENT='web,worker,node' \
-  --bind \
-  -fexceptions \
-  -O3 \
-  -std=c++17
-```
-
-### Compilar TypeScript:
-```bash
-node_modules/.bin/tsc --project tsconfig.sdk.json
-```
-
-### Ejecutar tests:
-```bash
-node test-sdk.mjs
-```
-
----
-
-## Conclusión
-
-Las nuevas funciones de optimización reducen dramáticamente el overhead entre JavaScript y WASM:
-
-- ✅ **fft_phase()**: Elimina map() costoso de atan2
-- ✅ **linspace()**: Genera vectores sin bucles JS
-- ✅ **fft_spectrum()**: TODO-EN-UNO con 90% menos overhead
-- ✅ **fftshift()/ifftshift()**: Utilidades nativas
-
-**Impacto total:** De ~5+ operaciones con múltiples cruces JS↔WASM a **1 sola operación**.
-
-🎯 **Prioridad recomendada:** Usar `fft_spectrum()` + `linspace()` para máximo rendimiento en análisis DSP.
+| Priority | Pattern | Why it's Fast |
+| :--- | :--- | :--- |
+| **High** | **Use `.data` for reads** | Avoids slow, memory-heavy data copies. |
+| **High** | **Use `eval()` for pipelines** | Executes many steps in one WASM call, minimizing overhead. |
+| **Medium** | **Prefer `ach.math.*` over `map()`** | Keeps loops inside the fast WASM environment. |
+| **Medium** | **Use `ach.linspace`, `ach.zeros`** | Creates data directly in WASM memory. |
+| **Low** | **Use `ach.use()`** | While primarily for safety, it's also efficient at batch-releasing memory. |
