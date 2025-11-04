@@ -103,24 +103,6 @@ pub fn reset() {
 // Memory Management (Emscripten-compatible interface)
 // ============================================================================
 
-#[wasm_bindgen]
-pub fn _malloc(size: usize) -> *mut u8 {
-    unsafe {
-        let layout = std::alloc::Layout::from_size_align_unchecked(size, 8);
-        std::alloc::alloc(layout)
-    }
-}
-
-#[wasm_bindgen]
-pub fn _free(ptr: *mut u8) {
-    unsafe {
-        if !ptr.is_null() {
-            let layout = std::alloc::Layout::from_size_align_unchecked(1, 8);
-            std::alloc::dealloc(ptr, layout);
-        }
-    }
-}
-
 // ============================================================================
 // Handle-Based API (Fast Path - Same as C++)
 // ============================================================================
@@ -167,38 +149,33 @@ pub fn createMatrixFromBuffer(data_ptr: *const f64, rows: usize, cols: usize) ->
 
 #[wasm_bindgen]
 pub fn bindVariableToHandle(name: &str, handle: Handle) -> Result<(), JsValue> {
-    HANDLES.with(|h| {
+    // First, get value from HANDLES
+    let value = HANDLES.with(|h| {
         let handles = h.borrow();
-        let value = handles.get(handle)
-            .ok_or_else(|| JsValue::from_str("Invalid handle"))?
-            .clone();
+        handles.get(handle)
+            .ok_or_else(|| JsValue::from_str("Invalid handle"))
+            .map(|v| v.clone())
+    })?;
 
-        EVALUATOR.with(|e| {
-            e.borrow_mut().environment_mut().define(name.to_string(), value)
-                .map_err(|err| JsValue::from_str(&err))
-        })
+    // Now bind to EVALUATOR (HANDLES borrow is dropped)
+    EVALUATOR.with(|e| {
+        e.borrow_mut().environment_mut().define(name.to_string(), value)
+            .map_err(|err| JsValue::from_str(&err))
     })
 }
 
 #[wasm_bindgen]
 pub fn releaseHandle(handle: Handle) {
-    HANDLES.with(|h| h.borrow_mut().release(handle));
+    // Direct release - no auto-cleanup, only manual via dispose() or session.use()
+    HANDLES.with(|h| {
+        h.borrow_mut().release(handle);
+    });
 }
 
-#[wasm_bindgen]
-pub fn getVectorData(handle: Handle, length_ptr: *mut usize) -> *const f64 {
-    HANDLES.with(|h| {
-        let handles = h.borrow();
-        if let Some(Value::Vector(vec)) = handles.get(handle) {
-            unsafe {
-                *length_ptr = vec.len();
-            }
-            vec.data().as_ptr()
-        } else {
-            std::ptr::null()
-        }
-    })
-}
+// REMOVED: getVectorData was unsafe - returned raw pointer while RefCell was borrowed
+// This could cause "already borrowed" panics if JavaScript tried to use the pointer
+// while other code was accessing the HandleManager.
+// Use getVector() instead which safely copies the data.
 
 // ============================================================================
 // Fast Path Math Operations (Same API as C++)
@@ -206,30 +183,32 @@ pub fn getVectorData(handle: Handle, length_ptr: *mut usize) -> *const f64 {
 
 fn apply_unary_op<F>(handle: Handle, f: F) -> Result<Handle, JsValue>
 where
-    F: Fn(&Vector) -> Vector
+    F: Fn(&Vector) -> Vector,
 {
-    // First, get the value and compute the result
-    let result = HANDLES.with(|h| {
-        let handles = h.borrow();
-        let value = handles.get(handle)
+    HANDLES.with(|h| {
+        let mut handles = h.borrow_mut();
+        // Clone the value to release the borrow on the HashMap's internal data
+        let value = handles
+            .get(handle)
+            .cloned()
             .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
 
-        match value {
-            Value::Vector(vec) => Ok(f(vec)),
+        let result_vec = match value {
+            Value::Vector(vec) => f(&vec),
             Value::Number(n) => {
-                let vec = Vector::new(vec![*n]);
-                Ok(f(&vec))
+                let vec = Vector::new(vec![n]);
+                f(&vec)
             }
-            _ => Err(JsValue::from_str("Operation requires vector or number"))
-        }
-    })?;
+            _ => return Err(JsValue::from_str("Operation requires vector or number")),
+        };
 
-    // Now create the new handle (borrow is dropped)
-    HANDLES.with(|h| Ok(h.borrow_mut().create(Value::Vector(result))))
+        Ok(handles.create(Value::Vector(result_vec)))
+    })
 }
 
+// Renamed from *_fast - all handle-based operations are fast path by definition
 #[wasm_bindgen]
-pub fn sin_fast(handle: Handle) -> Result<Handle, JsValue> {
+pub fn sin(handle: Handle) -> Result<Handle, JsValue> {
     apply_unary_op(handle, |v: &Vector| {
         let result: Vec<f64> = v.data().iter().map(|x| x.sin()).collect();
         Vector::new(result)
@@ -237,7 +216,7 @@ pub fn sin_fast(handle: Handle) -> Result<Handle, JsValue> {
 }
 
 #[wasm_bindgen]
-pub fn cos_fast(handle: Handle) -> Result<Handle, JsValue> {
+pub fn cos(handle: Handle) -> Result<Handle, JsValue> {
     apply_unary_op(handle, |v: &Vector| {
         let result: Vec<f64> = v.data().iter().map(|x| x.cos()).collect();
         Vector::new(result)
@@ -245,7 +224,7 @@ pub fn cos_fast(handle: Handle) -> Result<Handle, JsValue> {
 }
 
 #[wasm_bindgen]
-pub fn tan_fast(handle: Handle) -> Result<Handle, JsValue> {
+pub fn tan(handle: Handle) -> Result<Handle, JsValue> {
     apply_unary_op(handle, |v: &Vector| {
         let result: Vec<f64> = v.data().iter().map(|x| x.tan()).collect();
         Vector::new(result)
@@ -253,7 +232,7 @@ pub fn tan_fast(handle: Handle) -> Result<Handle, JsValue> {
 }
 
 #[wasm_bindgen]
-pub fn sqrt_fast(handle: Handle) -> Result<Handle, JsValue> {
+pub fn sqrt(handle: Handle) -> Result<Handle, JsValue> {
     apply_unary_op(handle, |v: &Vector| {
         let result: Vec<f64> = v.data().iter().map(|x| x.sqrt()).collect();
         Vector::new(result)
@@ -261,7 +240,7 @@ pub fn sqrt_fast(handle: Handle) -> Result<Handle, JsValue> {
 }
 
 #[wasm_bindgen]
-pub fn exp_fast(handle: Handle) -> Result<Handle, JsValue> {
+pub fn exp(handle: Handle) -> Result<Handle, JsValue> {
     apply_unary_op(handle, |v: &Vector| {
         let result: Vec<f64> = v.data().iter().map(|x| x.exp()).collect();
         Vector::new(result)
@@ -269,7 +248,7 @@ pub fn exp_fast(handle: Handle) -> Result<Handle, JsValue> {
 }
 
 #[wasm_bindgen]
-pub fn abs_fast(handle: Handle) -> Result<Handle, JsValue> {
+pub fn abs(handle: Handle) -> Result<Handle, JsValue> {
     apply_unary_op(handle, |v: &Vector| {
         let result: Vec<f64> = v.data().iter().map(|x| x.abs()).collect();
         Vector::new(result)
@@ -277,7 +256,7 @@ pub fn abs_fast(handle: Handle) -> Result<Handle, JsValue> {
 }
 
 #[wasm_bindgen]
-pub fn ln_fast(handle: Handle) -> Result<Handle, JsValue> {
+pub fn ln(handle: Handle) -> Result<Handle, JsValue> {
     apply_unary_op(handle, |v: &Vector| {
         let result: Vec<f64> = v.data().iter().map(|x| x.ln()).collect();
         Vector::new(result)
@@ -285,86 +264,84 @@ pub fn ln_fast(handle: Handle) -> Result<Handle, JsValue> {
 }
 
 // ============================================================================
-// DSP Fast Path
+// DSP Operations
 // ============================================================================
 
 #[wasm_bindgen]
-pub fn fft_fast(handle: Handle) -> Result<Handle, JsValue> {
-    // First, compute the FFT result
-    let matrix = HANDLES.with(|h| {
-        let handles = h.borrow();
-        let value = handles.get(handle)
-            .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
-
-        match value {
-            Value::Vector(vec) => {
-                let spectrum = achronyme_dsp::fft_real(vec);
-
-                // Convert to matrix [N x 2] (real, imaginary)
-                let n = spectrum.len();
-                let mut data = Vec::with_capacity(n * 2);
-                for c in spectrum {
-                    data.push(c.re);
-                    data.push(c.im);
+pub fn fft(handle: Handle) -> Result<Handle, JsValue> {
+    HANDLES.with(|h| {
+        // NO ? inside borrow scope
+        let matrix = {
+            let handles = h.borrow();
+            match handles.get(handle) {
+                Some(value) => {
+                    match value {
+                        Value::Vector(vec) => {
+                            let spectrum = achronyme_dsp::fft_real(vec);
+                            let n = spectrum.len();
+                            let mut data = Vec::with_capacity(n * 2);
+                            for c in spectrum {
+                                data.push(c.re);
+                                data.push(c.im);
+                            }
+                            Matrix::new(n, 2, data)
+                                .map_err(|e| JsValue::from_str(&e.to_string()))
+                        }
+                        _ => Err(JsValue::from_str("FFT requires vector"))
+                    }
                 }
-
-                Matrix::new(n, 2, data)
-                    .map_err(|e| JsValue::from_str(&e.to_string()))
+                None => Err(JsValue::from_str("Invalid handle"))
             }
-            _ => Err(JsValue::from_str("FFT requires vector"))
-        }
-    })?;
+        }?;
 
-    // Now create the handle (borrow is dropped)
-    HANDLES.with(|h| Ok(h.borrow_mut().create(Value::Matrix(matrix))))
+        Ok(h.borrow_mut().create(Value::Matrix(matrix)))
+    })
 }
 
 #[wasm_bindgen]
-pub fn fft_mag_fast(handle: Handle) -> Result<Handle, JsValue> {
-    // First, compute the FFT magnitudes
-    let result = HANDLES.with(|h| {
-        let handles = h.borrow();
-        let value = handles.get(handle)
-            .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
-
-        match value {
-            Value::Vector(vec) => {
-                // If given a vector, compute FFT then magnitudes
-                let spectrum = achronyme_dsp::fft_real(vec);
-                let magnitudes: Vec<f64> = spectrum.iter()
-                    .map(|c| (c.re * c.re + c.im * c.im).sqrt())
-                    .collect();
-
-                Ok(Vector::new(magnitudes))
-            }
-            Value::Matrix(mat) => {
-                // If given a matrix (FFT result), compute magnitudes from complex pairs
-                if mat.cols != 2 {
-                    return Err(JsValue::from_str("FFT matrix must have 2 columns (real, imag)"));
+pub fn fft_mag(handle: Handle) -> Result<Handle, JsValue> {
+    HANDLES.with(|h| {
+        // NO ? inside borrow scope
+        let result = {
+            let handles = h.borrow();
+            match handles.get(handle) {
+                Some(value) => {
+                    match value {
+                        Value::Vector(vec) => {
+                            let spectrum = achronyme_dsp::fft_real(vec);
+                            let magnitudes: Vec<f64> = spectrum.iter()
+                                .map(|c| (c.re * c.re + c.im * c.im).sqrt())
+                                .collect();
+                            Ok(Vector::new(magnitudes))
+                        }
+                        Value::Matrix(mat) => {
+                            if mat.cols != 2 {
+                                Err(JsValue::from_str("FFT matrix must have 2 columns (real, imag)"))
+                            } else {
+                                let data = &mat.data;
+                                let n = mat.rows;
+                                let mut magnitudes = Vec::with_capacity(n);
+                                for i in 0..n {
+                                    let re = data[i * 2];
+                                    let im = data[i * 2 + 1];
+                                    magnitudes.push((re * re + im * im).sqrt());
+                                }
+                                Ok(Vector::new(magnitudes))
+                            }
+                        }
+                        _ => Err(JsValue::from_str("FFT_MAG requires vector or FFT matrix"))
+                    }
                 }
-
-                let data = &mat.data;
-                let n = mat.rows;
-                let mut magnitudes = Vec::with_capacity(n);
-
-                for i in 0..n {
-                    let re = data[i * 2];
-                    let im = data[i * 2 + 1];
-                    magnitudes.push((re * re + im * im).sqrt());
-                }
-
-                Ok(Vector::new(magnitudes))
+                None => Err(JsValue::from_str("Invalid handle"))
             }
-            _ => Err(JsValue::from_str("FFT_MAG requires vector or FFT matrix"))
-        }
-    })?;
+        }?;
 
-    // Now create the handle (borrow is dropped)
-    HANDLES.with(|h| Ok(h.borrow_mut().create(Value::Vector(result))))
+        Ok(h.borrow_mut().create(Value::Vector(result)))
+    })
 }
 
 #[wasm_bindgen]
-pub fn linspace_fast(start: f64, end: f64, n: usize) -> Result<Handle, JsValue> {
+pub fn linspace(start: f64, end: f64, n: usize) -> Result<Handle, JsValue> {
     if n < 2 {
         return Err(JsValue::from_str("linspace requires n >= 2"));
     }
@@ -378,6 +355,339 @@ pub fn linspace_fast(start: f64, end: f64, n: usize) -> Result<Handle, JsValue> 
 
     let vector = Vector::new(result);
     Ok(HANDLES.with(|h| h.borrow_mut().create(Value::Vector(vector))))
+}
+
+/// Inverse Fast Fourier Transform
+#[wasm_bindgen]
+pub fn ifft(handle: Handle) -> Result<Handle, JsValue> {
+    use achronyme_types::complex::Complex;
+
+    HANDLES.with(|h| {
+        // NO ? inside borrow scope
+        let result = {
+            let handles = h.borrow();
+            match handles.get(handle) {
+                Some(value) => {
+                    match value {
+                        Value::Matrix(mat) => {
+                            if mat.cols != 2 {
+                                Err(JsValue::from_str("IFFT requires matrix with 2 columns (real, imag)"))
+                            } else {
+                                let n = mat.rows;
+                                let mut spectrum = Vec::with_capacity(n);
+                                for i in 0..n {
+                                    let re = mat.data[i * 2];
+                                    let im = mat.data[i * 2 + 1];
+                                    spectrum.push(Complex::new(re, im));
+                                }
+                                let signal = achronyme_dsp::ifft_real(&spectrum);
+                                Ok(signal)
+                            }
+                        }
+                        _ => Err(JsValue::from_str("IFFT requires matrix"))
+                    }
+                }
+                None => Err(JsValue::from_str("Invalid handle"))
+            }
+        }?;
+
+        Ok(h.borrow_mut().create(Value::Vector(result)))
+    })
+}
+
+// ============================================================================
+// Vector Operations (Optimized WASM implementations)
+// ============================================================================
+
+/// Binary operation helper for two vectors
+fn apply_binary_op<F>(handle1: Handle, handle2: Handle, f: F) -> Result<Handle, JsValue>
+where
+    F: Fn(&Vector, &Vector) -> Result<Vector, String>,
+{
+    HANDLES.with(|h| {
+        let mut handles = h.borrow_mut();
+        let v1 = handles
+            .get(handle1)
+            .cloned()
+            .ok_or_else(|| JsValue::from_str("Invalid handle 1"))?;
+        let v2 = handles
+            .get(handle2)
+            .cloned()
+            .ok_or_else(|| JsValue::from_str("Invalid handle 2"))?;
+
+        let result_vec = match (v1, v2) {
+            (Value::Vector(vec1), Value::Vector(vec2)) => {
+                f(&vec1, &vec2).map_err(|e| JsValue::from_str(&e))?
+            }
+            _ => return Err(JsValue::from_str("Binary operation requires two vectors")),
+        };
+
+        Ok(handles.create(Value::Vector(result_vec)))
+    })
+}
+
+/// Vector addition: v1 + v2
+#[wasm_bindgen]
+pub fn vadd(handle1: Handle, handle2: Handle) -> Result<Handle, JsValue> {
+    apply_binary_op(handle1, handle2, |v1, v2| {
+        if v1.len() != v2.len() {
+            return Err(format!("Vector length mismatch: {} vs {}", v1.len(), v2.len()));
+        }
+
+        let result: Vec<f64> = v1.data().iter()
+            .zip(v2.data().iter())
+            .map(|(a, b)| a + b)
+            .collect();
+
+        Ok(Vector::new(result))
+    })
+}
+
+/// Vector subtraction: v1 - v2
+#[wasm_bindgen]
+pub fn vsub(handle1: Handle, handle2: Handle) -> Result<Handle, JsValue> {
+    apply_binary_op(handle1, handle2, |v1, v2| {
+        if v1.len() != v2.len() {
+            return Err(format!("Vector length mismatch: {} vs {}", v1.len(), v2.len()));
+        }
+
+        let result: Vec<f64> = v1.data().iter()
+            .zip(v2.data().iter())
+            .map(|(a, b)| a - b)
+            .collect();
+
+        Ok(Vector::new(result))
+    })
+}
+
+/// Element-wise vector multiplication: v1 .* v2
+#[wasm_bindgen]
+pub fn vmul(handle1: Handle, handle2: Handle) -> Result<Handle, JsValue> {
+    apply_binary_op(handle1, handle2, |v1, v2| {
+        if v1.len() != v2.len() {
+            return Err(format!("Vector length mismatch: {} vs {}", v1.len(), v2.len()));
+        }
+
+        let result: Vec<f64> = v1.data().iter()
+            .zip(v2.data().iter())
+            .map(|(a, b)| a * b)
+            .collect();
+
+        Ok(Vector::new(result))
+    })
+}
+
+/// Element-wise vector division: v1 ./ v2
+#[wasm_bindgen]
+pub fn vdiv(handle1: Handle, handle2: Handle) -> Result<Handle, JsValue> {
+    apply_binary_op(handle1, handle2, |v1, v2| {
+        if v1.len() != v2.len() {
+            return Err(format!("Vector length mismatch: {} vs {}", v1.len(), v2.len()));
+        }
+
+        let result: Vec<f64> = v1.data().iter()
+            .zip(v2.data().iter())
+            .map(|(a, b)| a / b)
+            .collect();
+
+        Ok(Vector::new(result))
+    })
+}
+
+/// Dot product: v1 · v2
+#[wasm_bindgen]
+pub fn dot(handle1: Handle, handle2: Handle) -> Result<f64, JsValue> {
+    HANDLES.with(|h| {
+        let handles = h.borrow();
+        let v1 = handles.get(handle1)
+            .ok_or_else(|| JsValue::from_str("Invalid handle 1"))?;
+        let v2 = handles.get(handle2)
+            .ok_or_else(|| JsValue::from_str("Invalid handle 2"))?;
+
+        match (v1, v2) {
+            (Value::Vector(vec1), Value::Vector(vec2)) => {
+                if vec1.len() != vec2.len() {
+                    return Err(JsValue::from_str(&format!(
+                        "Vector length mismatch: {} vs {}", vec1.len(), vec2.len()
+                    )));
+                }
+
+                let result: f64 = vec1.data().iter()
+                    .zip(vec2.data().iter())
+                    .map(|(a, b)| a * b)
+                    .sum();
+
+                Ok(result)
+            }
+            _ => Err(JsValue::from_str("Dot product requires two vectors"))
+        }
+    })
+}
+
+/// Vector L2 norm (Euclidean): ||v||₂
+#[wasm_bindgen]
+pub fn norm(handle: Handle) -> Result<f64, JsValue> {
+    HANDLES.with(|h| {
+        let handles = h.borrow();
+        let value = handles.get(handle)
+            .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
+
+        match value {
+            Value::Vector(vec) => {
+                let sum_squares: f64 = vec.data().iter()
+                    .map(|x| x * x)
+                    .sum();
+                Ok(sum_squares.sqrt())
+            }
+            _ => Err(JsValue::from_str("Norm requires vector"))
+        }
+    })
+}
+
+/// Vector L1 norm: ||v||₁
+#[wasm_bindgen]
+pub fn norm_l1(handle: Handle) -> Result<f64, JsValue> {
+    HANDLES.with(|h| {
+        let handles = h.borrow();
+        let value = handles.get(handle)
+            .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
+
+        match value {
+            Value::Vector(vec) => {
+                let sum: f64 = vec.data().iter()
+                    .map(|x| x.abs())
+                    .sum();
+                Ok(sum)
+            }
+            _ => Err(JsValue::from_str("Norm L1 requires vector"))
+        }
+    })
+}
+
+// ============================================================================
+// Statistics Operations (Optimized WASM implementations)
+// ============================================================================
+
+/// Sum of vector elements
+#[wasm_bindgen]
+pub fn sum(handle: Handle) -> Result<f64, JsValue> {
+    HANDLES.with(|h| {
+        let handles = h.borrow();
+        let value = handles.get(handle)
+            .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
+
+        match value {
+            Value::Vector(vec) => {
+                let result: f64 = vec.data().iter().sum();
+                Ok(result)
+            }
+            _ => Err(JsValue::from_str("Sum requires vector"))
+        }
+    })
+}
+
+/// Mean (average) of vector elements
+#[wasm_bindgen]
+pub fn mean(handle: Handle) -> Result<f64, JsValue> {
+    HANDLES.with(|h| {
+        let handles = h.borrow();
+        let value = handles.get(handle)
+            .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
+
+        match value {
+            Value::Vector(vec) => {
+                if vec.len() == 0 {
+                    return Err(JsValue::from_str("Cannot compute mean of empty vector"));
+                }
+
+                let sum: f64 = vec.data().iter().sum();
+                Ok(sum / vec.len() as f64)
+            }
+            _ => Err(JsValue::from_str("Mean requires vector"))
+        }
+    })
+}
+
+/// Standard deviation of vector elements
+#[wasm_bindgen]
+pub fn std(handle: Handle) -> Result<f64, JsValue> {
+    HANDLES.with(|h| {
+        let handles = h.borrow();
+        let value = handles.get(handle)
+            .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
+
+        match value {
+            Value::Vector(vec) => {
+                if vec.len() == 0 {
+                    return Err(JsValue::from_str("Cannot compute std of empty vector"));
+                }
+
+                // Compute mean
+                let data = vec.data();
+                let n = data.len() as f64;
+                let mean: f64 = data.iter().sum::<f64>() / n;
+
+                // Compute variance
+                let variance: f64 = data.iter()
+                    .map(|x| {
+                        let diff = x - mean;
+                        diff * diff
+                    })
+                    .sum::<f64>() / n;
+
+                Ok(variance.sqrt())
+            }
+            _ => Err(JsValue::from_str("Std requires vector"))
+        }
+    })
+}
+
+/// Minimum value in vector
+#[wasm_bindgen]
+pub fn min(handle: Handle) -> Result<f64, JsValue> {
+    HANDLES.with(|h| {
+        let handles = h.borrow();
+        let value = handles.get(handle)
+            .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
+
+        match value {
+            Value::Vector(vec) => {
+                vec.data().iter()
+                    .fold(None, |min, &x| {
+                        Some(match min {
+                            None => x,
+                            Some(m) => if x < m { x } else { m }
+                        })
+                    })
+                    .ok_or_else(|| JsValue::from_str("Cannot compute min of empty vector"))
+            }
+            _ => Err(JsValue::from_str("Min requires vector"))
+        }
+    })
+}
+
+/// Maximum value in vector
+#[wasm_bindgen]
+pub fn max(handle: Handle) -> Result<f64, JsValue> {
+    HANDLES.with(|h| {
+        let handles = h.borrow();
+        let value = handles.get(handle)
+            .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
+
+        match value {
+            Value::Vector(vec) => {
+                vec.data().iter()
+                    .fold(None, |max, &x| {
+                        Some(match max {
+                            None => x,
+                            Some(m) => if x > m { x } else { m }
+                        })
+                    })
+                    .ok_or_else(|| JsValue::from_str("Cannot compute max of empty vector"))
+            }
+            _ => Err(JsValue::from_str("Max requires vector"))
+        }
+    })
 }
 
 // ============================================================================
@@ -397,33 +707,39 @@ pub struct LUResult {
 #[wasm_bindgen]
 pub fn lu_decomposition_js(handle: Handle) -> Result<LUResult, JsValue> {
     HANDLES.with(|h| {
-        let handles = h.borrow();
-        let value = handles.get(handle)
-            .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
+        // First, borrow immutably to read and compute
+        let (l, u, p_matrix) = {
+            let handles = h.borrow();
+            let value = handles.get(handle)
+                .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
 
-        match value {
-            Value::Matrix(m) => {
-                let (l, u, p) = achronyme_linalg::lu_decomposition(m)
-                    .map_err(|e| JsValue::from_str(&e))?;
+            match value {
+                Value::Matrix(m) => {
+                    let (l, u, p) = achronyme_linalg::lu_decomposition(m)
+                        .map_err(|e| JsValue::from_str(&e))?;
 
-                let mut handles_mut = h.borrow_mut();
-                let L = handles_mut.create(Value::Matrix(l));
-                let U = handles_mut.create(Value::Matrix(u));
+                    // Convert permutation vector to permutation matrix
+                    let n = p.len();
+                    let mut p_data = vec![0.0; n * n];
+                    for (i, &pi) in p.iter().enumerate() {
+                        p_data[i * n + pi] = 1.0;
+                    }
+                    let p_matrix = Matrix::new(n, n, p_data)
+                        .map_err(|e| JsValue::from_str(&e.to_string()))?;
 
-                // Convert permutation vector to permutation matrix
-                let n = p.len();
-                let mut p_data = vec![0.0; n * n];
-                for (i, &pi) in p.iter().enumerate() {
-                    p_data[i * n + pi] = 1.0;
+                    Ok((l, u, p_matrix))
                 }
-                let p_matrix = Matrix::new(n, n, p_data)
-                    .map_err(|e| JsValue::from_str(&e.to_string()))?;
-                let P = handles_mut.create(Value::Matrix(p_matrix));
-
-                Ok(LUResult { L, U, P })
+                _ => Err(JsValue::from_str("LU decomposition requires matrix"))
             }
-            _ => Err(JsValue::from_str("LU decomposition requires matrix"))
-        }
+        }?; // Immutable borrow is dropped here
+
+        // Now borrow mutably to create handles
+        let mut handles_mut = h.borrow_mut();
+        let L = handles_mut.create(Value::Matrix(l));
+        let U = handles_mut.create(Value::Matrix(u));
+        let P = handles_mut.create(Value::Matrix(p_matrix));
+
+        Ok(LUResult { L, U, P })
     })
 }
 
@@ -473,23 +789,27 @@ pub struct QRResult {
 #[wasm_bindgen]
 pub fn qr_decomposition_js(handle: Handle) -> Result<QRResult, JsValue> {
     HANDLES.with(|h| {
-        let handles = h.borrow();
-        let value = handles.get(handle)
-            .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
+        // First, borrow immutably to read and compute
+        let (q, r) = {
+            let handles = h.borrow();
+            let value = handles.get(handle)
+                .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
 
-        match value {
-            Value::Matrix(m) => {
-                let (q, r) = achronyme_linalg::qr_decomposition(m)
-                    .map_err(|e| JsValue::from_str(&e))?;
-
-                let mut handles_mut = h.borrow_mut();
-                let Q = handles_mut.create(Value::Matrix(q));
-                let R = handles_mut.create(Value::Matrix(r));
-
-                Ok(QRResult { Q, R })
+            match value {
+                Value::Matrix(m) => {
+                    achronyme_linalg::qr_decomposition(m)
+                        .map_err(|e| JsValue::from_str(&e))
+                }
+                _ => Err(JsValue::from_str("QR decomposition requires matrix"))
             }
-            _ => Err(JsValue::from_str("QR decomposition requires matrix"))
-        }
+        }?; // Immutable borrow is dropped here
+
+        // Now borrow mutably to create handles
+        let mut handles_mut = h.borrow_mut();
+        let Q = handles_mut.create(Value::Matrix(q));
+        let R = handles_mut.create(Value::Matrix(r));
+
+        Ok(QRResult { Q, R })
     })
 }
 
@@ -500,19 +820,23 @@ pub fn qr_decomposition_js(handle: Handle) -> Result<QRResult, JsValue> {
 #[wasm_bindgen]
 pub fn cholesky_decomposition_js(handle: Handle) -> Result<Handle, JsValue> {
     HANDLES.with(|h| {
-        let handles = h.borrow();
-        let value = handles.get(handle)
-            .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
+        // First, borrow immutably to read and compute
+        let l = {
+            let handles = h.borrow();
+            let value = handles.get(handle)
+                .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
 
-        match value {
-            Value::Matrix(m) => {
-                let l = achronyme_linalg::cholesky_decomposition(m)
-                    .map_err(|e| JsValue::from_str(&e))?;
-
-                Ok(h.borrow_mut().create(Value::Matrix(l)))
+            match value {
+                Value::Matrix(m) => {
+                    achronyme_linalg::cholesky_decomposition(m)
+                        .map_err(|e| JsValue::from_str(&e))
+                }
+                _ => Err(JsValue::from_str("Cholesky decomposition requires matrix"))
             }
-            _ => Err(JsValue::from_str("Cholesky decomposition requires matrix"))
-        }
+        }?; // Immutable borrow is dropped here
+
+        // Now borrow mutably to create handle
+        Ok(h.borrow_mut().create(Value::Matrix(l)))
     })
 }
 
@@ -533,24 +857,28 @@ pub struct SVDResult {
 #[wasm_bindgen]
 pub fn svd_decomposition_js(handle: Handle) -> Result<SVDResult, JsValue> {
     HANDLES.with(|h| {
-        let handles = h.borrow();
-        let value = handles.get(handle)
-            .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
+        // First, borrow immutably to read and compute
+        let (u, s_vec, v) = {
+            let handles = h.borrow();
+            let value = handles.get(handle)
+                .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
 
-        match value {
-            Value::Matrix(m) => {
-                let (u, s_vec, v) = achronyme_linalg::svd_decomposition(m)
-                    .map_err(|e| JsValue::from_str(&format!("{}", e)))?;
-
-                let mut handles_mut = h.borrow_mut();
-                let U = handles_mut.create(Value::Matrix(u));
-                let S = handles_mut.create(Value::Vector(Vector::new(s_vec)));
-                let V = handles_mut.create(Value::Matrix(v));
-
-                Ok(SVDResult { U, S, V })
+            match value {
+                Value::Matrix(m) => {
+                    achronyme_linalg::svd_decomposition(m)
+                        .map_err(|e| JsValue::from_str(&format!("{}", e)))
+                }
+                _ => Err(JsValue::from_str("SVD requires matrix"))
             }
-            _ => Err(JsValue::from_str("SVD requires matrix"))
-        }
+        }?; // Immutable borrow is dropped here
+
+        // Now borrow mutably to create handles
+        let mut handles_mut = h.borrow_mut();
+        let U = handles_mut.create(Value::Matrix(u));
+        let S = handles_mut.create(Value::Vector(Vector::new(s_vec)));
+        let V = handles_mut.create(Value::Matrix(v));
+
+        Ok(SVDResult { U, S, V })
     })
 }
 
@@ -573,24 +901,28 @@ pub fn power_iteration_js(
     tolerance: f64
 ) -> Result<PowerIterationResult, JsValue> {
     HANDLES.with(|h| {
-        let handles = h.borrow();
-        let value = handles.get(handle)
-            .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
+        // First, borrow immutably to read and compute
+        let (eigenvalue, eigenvector_matrix) = {
+            let handles = h.borrow();
+            let value = handles.get(handle)
+                .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
 
-        match value {
-            Value::Matrix(m) => {
-                let (eigenvalue, eigenvector_matrix) = achronyme_linalg::power_iteration(m, max_iterations, tolerance)
-                    .map_err(|e| JsValue::from_str(&format!("{}", e)))?;
-
-                let eigenvector_handle = h.borrow_mut().create(Value::Matrix(eigenvector_matrix));
-
-                Ok(PowerIterationResult {
-                    eigenvalue,
-                    eigenvector: eigenvector_handle,
-                })
+            match value {
+                Value::Matrix(m) => {
+                    achronyme_linalg::power_iteration(m, max_iterations, tolerance)
+                        .map_err(|e| JsValue::from_str(&format!("{}", e)))
+                }
+                _ => Err(JsValue::from_str("Power iteration requires matrix"))
             }
-            _ => Err(JsValue::from_str("Power iteration requires matrix"))
-        }
+        }?; // Immutable borrow is dropped here
+
+        // Now borrow mutably to create handle
+        let eigenvector_handle = h.borrow_mut().create(Value::Matrix(eigenvector_matrix));
+
+        Ok(PowerIterationResult {
+            eigenvalue,
+            eigenvector: eigenvector_handle,
+        })
     })
 }
 
@@ -601,19 +933,23 @@ pub fn qr_eigenvalues_js(
     tolerance: f64
 ) -> Result<Handle, JsValue> {
     HANDLES.with(|h| {
-        let handles = h.borrow();
-        let value = handles.get(handle)
-            .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
+        // First, borrow immutably to read and compute
+        let eigenvalues_vec = {
+            let handles = h.borrow();
+            let value = handles.get(handle)
+                .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
 
-        match value {
-            Value::Matrix(m) => {
-                let eigenvalues_vec = achronyme_linalg::qr_eigenvalues(m, max_iterations, tolerance)
-                    .map_err(|e| JsValue::from_str(&format!("{}", e)))?;
-
-                Ok(h.borrow_mut().create(Value::Vector(Vector::new(eigenvalues_vec))))
+            match value {
+                Value::Matrix(m) => {
+                    achronyme_linalg::qr_eigenvalues(m, max_iterations, tolerance)
+                        .map_err(|e| JsValue::from_str(&format!("{}", e)))
+                }
+                _ => Err(JsValue::from_str("QR eigenvalues requires matrix"))
             }
-            _ => Err(JsValue::from_str("QR eigenvalues requires matrix"))
-        }
+        }?; // Immutable borrow is dropped here
+
+        // Now borrow mutably to create handle
+        Ok(h.borrow_mut().create(Value::Vector(Vector::new(eigenvalues_vec))))
     })
 }
 
@@ -632,26 +968,30 @@ pub fn eigen_symmetric_js(
     tolerance: f64
 ) -> Result<EigenResult, JsValue> {
     HANDLES.with(|h| {
-        let handles = h.borrow();
-        let value = handles.get(handle)
-            .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
+        // First, borrow immutably to read and compute
+        let (eigenvalues_vec, eigenvectors) = {
+            let handles = h.borrow();
+            let value = handles.get(handle)
+                .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
 
-        match value {
-            Value::Matrix(m) => {
-                let (eigenvalues_vec, eigenvectors) = achronyme_linalg::eigen_symmetric(m, max_iterations, tolerance)
-                    .map_err(|e| JsValue::from_str(&format!("{}", e)))?;
-
-                let mut handles_mut = h.borrow_mut();
-                let eigenvalues_handle = handles_mut.create(Value::Vector(Vector::new(eigenvalues_vec)));
-                let eigenvectors_handle = handles_mut.create(Value::Matrix(eigenvectors));
-
-                Ok(EigenResult {
-                    eigenvalues: eigenvalues_handle,
-                    eigenvectors: eigenvectors_handle,
-                })
+            match value {
+                Value::Matrix(m) => {
+                    achronyme_linalg::eigen_symmetric(m, max_iterations, tolerance)
+                        .map_err(|e| JsValue::from_str(&format!("{}", e)))
+                }
+                _ => Err(JsValue::from_str("Eigen symmetric requires matrix"))
             }
-            _ => Err(JsValue::from_str("Eigen symmetric requires matrix"))
-        }
+        }?; // Immutable borrow is dropped here
+
+        // Now borrow mutably to create handles
+        let mut handles_mut = h.borrow_mut();
+        let eigenvalues_handle = handles_mut.create(Value::Vector(Vector::new(eigenvalues_vec)));
+        let eigenvectors_handle = handles_mut.create(Value::Matrix(eigenvectors));
+
+        Ok(EigenResult {
+            eigenvalues: eigenvalues_handle,
+            eigenvectors: eigenvectors_handle,
+        })
     })
 }
 

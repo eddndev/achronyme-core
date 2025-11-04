@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Minimal Debug Test</title>
+</head>
+<body>
+    <h1>Minimal Debug Test</h1>
+    <button onclick="test()">Run Minimal Test</button>
+    <pre id="output"></pre>
+
+    <script type="module">
+        import init, * as wasm from '../dist/achronyme_wasm.js';
+
+        window.test = async function() {
+            const output = document.getElementById('output');
+            output.textContent = '';
+
+            try {
+                await init();
+                output.textContent += '✅ Step 1: WASM initialized\n';
+
+                // Test createVector (single borrow_mut)
+                const h1 = wasm.createVector([1, 2, 3]);
+                output.textContent += `✅ Step 2: createVector succeeded, handle=${h1}\n`;
+
+                // Test getVector (single borrow)
+                const data1 = wasm.getVector(h1);
+                output.textContent += `✅ Step 3: getVector succeeded: [${data1}]\n`;
+
+                // CRITICAL TEST: sin() with new implementation
+                output.textContent += '\n🔍 CRITICAL TEST: Calling sin()...\n';
+                const h2 = wasm.sin(h1);
+                output.textContent += `✅ Step 4: sin() SUCCEEDED! handle=${h2}\n`;
+
+                // Verify result
+                const data2 = wasm.getVector(h2);
+                output.textContent += `✅ Step 5: sin result: [${data2.map(x => x.toFixed(4))}]\n`;
+
+                output.textContent += '\n🎉 ALL TESTS PASSED!\n';
+
+            } catch (error) {
+                output.textContent += `\n❌ FAILED at current step\n`;
+                output.textContent += `Error: ${error.message}\n`;
+                output.textContent += `\nFull stack:\n${error.stack}\n`;
+                console.error('Detailed error:', error);
+            }
+        };
+    </script>
+</body>
+</html>

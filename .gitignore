@@ -1,8 +1,5 @@
-# Build artifacts
+# Build artifacts (Rust WASM only)
 /dist/
-/wasm/build/
-/wasm/dist/
-*.wasm
 *.wasm.map
 *.wasm.br
 *.js.mem
@@ -31,36 +28,13 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Emscripten cache
-.emscripten_cache/
-
 # Test coverage
 coverage/
-*.gcov
-*.gcda
-*.gcno
-
-# CMake
-CMakeCache.txt
-CMakeFiles/
-cmake_install.cmake
-Makefile
-compile_commands.json
-
-# Compiled Object files
-*.o
-*.obj
-*.so
-*.dylib
-*.dll
-*.a
-*.lib
 
 # Temporary files
 *.tmp
 *.temp
 .cache/
-ACHRONYME-PLOT-BLUEPRINT.md
 
 # TypeScript
 *.tsbuildinfo
@@ -77,17 +51,4 @@ test-npm-install/
 **/*.rlib
 **/*.d
 **/*.rmeta
-# WASM artifacts (already present, but ensuring coverage)
-# *.wasm
-# *.wasm.map
-# *.js
-# *.ts
-# *.d.ts
-# *.js.map
-# *.wasm.br
-# *.wasm.gz
-# *.wasm.zip
-# *.wasm.bz2
-# *.wasm.lz4
-# *.wasm.zst
-# *.wasm.xz
+Cargo.lock
