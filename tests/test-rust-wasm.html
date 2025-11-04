@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Achronyme Rust WASM - Test HOF</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 30px;
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+
+        .status.loading {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .status.success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status.error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .test-section {
+            margin-bottom: 30px;
+        }
+
+        .test-section h2 {
+            color: #4c51bf;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+            border-bottom: 2px solid #e0e7ff;
+            padding-bottom: 10px;
+        }
+
+        .test-item {
+            background: #f9fafb;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            border-left: 4px solid #d1d5db;
+        }
+
+        .test-item.pass {
+            border-left-color: #10b981;
+            background: #f0fdf4;
+        }
+
+        .test-item.fail {
+            border-left-color: #ef4444;
+            background: #fef2f2;
+        }
+
+        .test-name {
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #1f2937;
+        }
+
+        .test-expression {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #4b5563;
+            margin-bottom: 5px;
+        }
+
+        .test-result {
+            color: #059669;
+            font-weight: 500;
+        }
+
+        .test-error {
+            color: #dc2626;
+            font-weight: 500;
+        }
+
+        .summary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 30px;
+        }
+
+        .summary h2 {
+            color: white;
+            margin-bottom: 15px;
+        }
+
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+        }
+
+        .stat {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Achronyme Rust WASM</h1>
+        <p class="subtitle">Higher-Order Functions Test Suite</p>
+
+        <div id="status" class="status loading">
+            ⏳ Cargando módulo WASM de Rust...
+        </div>
+
+        <div id="results"></div>
+
+        <div id="summary" style="display: none;"></div>
+    </div>
+
+    <script type="module">
+        import init, { _eval, reset } from '../dist-rust-web/achronyme_wasm.js';
+
+        const statusEl = document.getElementById('status');
+        const resultsEl = document.getElementById('results');
+        const summaryEl = document.getElementById('summary');
+
+        let passed = 0;
+        let failed = 0;
+
+        function addTestSection(title) {
+            const section = document.createElement('div');
+            section.className = 'test-section';
+            section.innerHTML = `<h2>${title}</h2>`;
+            resultsEl.appendChild(section);
+            return section;
+        }
+
+        function addTestResult(section, name, expression, success, result, expected = null) {
+            const div = document.createElement('div');
+            div.className = `test-item ${success ? 'pass' : 'fail'}`;
+
+            let content = `
+                <div class="test-name">${success ? '✅' : '❌'} ${name}</div>
+                <div class="test-expression">Expression: ${expression}</div>
+            `;
+
+            if (success) {
+                content += `<div class="test-result">Result: ${result}</div>`;
+                passed++;
+            } else {
+                content += `<div class="test-error">Error: ${result}</div>`;
+                if (expected !== null) {
+                    content += `<div class="test-error">Expected: ${expected}</div>`;
+                }
+                failed++;
+            }
+
+            div.innerHTML = content;
+            section.appendChild(div);
+        }
+
+        function test(section, name, expression, expected) {
+            try {
+                console.log(`Testing: ${name} - ${expression}`);
+                const result = _eval(expression);
+                console.log(`Result: ${result}`);
+
+                const numResult = typeof result === 'string' ? parseFloat(result) : result;
+                const match = Math.abs(numResult - expected) < 1e-10;
+
+                if (match) {
+                    addTestResult(section, name, expression, true, result);
+                } else {
+                    addTestResult(section, name, expression, false, `Got ${result}`, expected);
+                }
+            } catch (error) {
+                console.error(`Error in test ${name}:`, error);
+                addTestResult(section, name, expression, false, error.message || 'Unknown error');
+            }
+        }
+
+        function testVector(section, name, expression, expectedLength) {
+            try {
+                console.log(`Testing: ${name} - ${expression}`);
+                const result = _eval(expression);
+                console.log(`Result: ${result}`);
+
+                const vectorMatch = result.match(/\[([^\]]+)\]/);
+
+                if (vectorMatch) {
+                    const values = vectorMatch[1].split(',').map(v => parseFloat(v.trim()));
+                    if (values.length === expectedLength) {
+                        addTestResult(section, name, expression, true, `[${values.join(', ')}]`);
+                    } else {
+                        addTestResult(section, name, expression, false,
+                            `Vector length ${values.length}`, `Expected length ${expectedLength}`);
+                    }
+                } else {
+                    addTestResult(section, name, expression, false, `Not a vector: ${result}`);
+                }
+            } catch (error) {
+                console.error(`Error in test ${name}:`, error);
+                addTestResult(section, name, expression, false, error.message || 'Unknown error');
+            }
+        }
+
+        function showSummary() {
+            const total = passed + failed;
+            const successRate = ((passed / total) * 100).toFixed(1);
+
+            summaryEl.style.display = 'block';
+            summaryEl.className = 'summary';
+            summaryEl.innerHTML = `
+                <h2>📊 Resumen de Tests</h2>
+                <div class="summary-stats">
+                    <div class="stat">
+                        <div class="stat-value">✅ ${passed}</div>
+                        <div class="stat-label">Pasados</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">❌ ${failed}</div>
+                        <div class="stat-label">Fallidos</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">${total}</div>
+                        <div class="stat-label">Total</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">${successRate}%</div>
+                        <div class="stat-label">Éxito</div>
+                    </div>
+                </div>
+            `;
+
+            if (failed === 0) {
+                statusEl.className = 'status success';
+                statusEl.textContent = '🎉 ¡Todos los tests pasaron! Rust WASM tiene soporte completo para HOF.';
+            } else {
+                statusEl.className = 'status error';
+                statusEl.textContent = `⚠️ ${failed} test(s) fallaron. Revisar implementación.`;
+            }
+        }
+
+        async function runTests() {
+            try {
+                // Inicializar WASM - el target web auto-detecta el path del .wasm
+                console.log('Inicializando WASM...');
+                await init();
+                console.log('WASM inicializado correctamente');
+
+                // Probar que _eval funciona
+                console.log('Probando _eval con expresión simple: 2+2');
+                const testResult = _eval('2+2');
+                console.log('Resultado de 2+2:', testResult);
+
+                statusEl.className = 'status success';
+                statusEl.textContent = '✅ Módulo WASM cargado correctamente. Ejecutando tests...';
+
+                // MAP TESTS
+                let section = addTestSection('📦 Map Tests');
+                testVector(section, 'map() - square each element',
+                    'map(x => x ^ 2,[2,3,4])', 3);
+                testVector(section, 'map() - add pairs',
+                    'map((x,y) => x + y,[1,2,3],[4,5,6])', 3);
+                testVector(section, 'map() - truncates to shortest',
+                    'map((x,y) => x * y,[1,2],[10,20,30])', 2);
+
+                // FILTER TESTS
+                section = addTestSection('📦 Filter Tests');
+                testVector(section, 'filter() - even numbers',
+                    'filter(x => (x % 2) == 0,[1,2,3,4,5,6])', 3);
+                testVector(section, 'filter() - values >= 3',
+                    'filter(x => x >= 3,[1,2,3,4])', 2);
+                testVector(section, 'filter() - values > 2',
+                    'filter(x => x > 2,[1,2,3,4,5])', 3);
+
+                // REDUCE TESTS
+                section = addTestSection('📦 Reduce Tests');
+                test(section, 'reduce() - sum all elements',
+                    'reduce((acc,x) => acc + x,0,[1,2,3,4])', 10);
+                test(section, 'reduce() - product of elements',
+                    'reduce((acc,x) => acc * x,1,[2,3,4])', 24);
+                test(section, 'reduce() - find maximum',
+                    'reduce((acc,x) => max(acc,x),0,[3,1,4,1,5,9])', 9);
+                test(section, 'reduce() - count elements',
+                    'reduce((acc,x) => acc + 1,0,[10,20,30,40,50])', 5);
+
+                // PIPE TESTS
+                section = addTestSection('📦 Pipe Tests');
+                test(section, 'pipe() - simple pipeline',
+                    'pipe(5,x => x * 2,x => x + 1)', 11);
+                test(section, 'pipe() - multi-step pipeline',
+                    'pipe(2,x => x + 1,x => x * 2,x => x ^ 2)', 36);
+                test(section, 'pipe() - with sqrt wrapper',
+                    'pipe(16,x => sqrt(x),x => x / 2)', 2);
+
+                showSummary();
+
+            } catch (error) {
+                statusEl.className = 'status error';
+                statusEl.textContent = `❌ Error al cargar WASM: ${error.message}`;
+                console.error(error);
+            }
+        }
+
+        runTests();
+    </script>
+</body>
+</html>

@@ -70,3 +70,24 @@ ACHRONYME-PLOT-BLUEPRINT.md
 
 # Test/demo directories
 test-npm-install/
+
+# Rust
+/target/
+**/*.rs.bk
+**/*.rlib
+**/*.d
+**/*.rmeta
+# WASM artifacts (already present, but ensuring coverage)
+# *.wasm
+# *.wasm.map
+# *.js
+# *.ts
+# *.d.ts
+# *.js.map
+# *.wasm.br
+# *.wasm.gz
+# *.wasm.zip
+# *.wasm.bz2
+# *.wasm.lz4
+# *.wasm.zst
+# *.wasm.xz

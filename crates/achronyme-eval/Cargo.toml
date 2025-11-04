@@ -1,0 +1,10 @@
+[package]
+name = "achronyme-eval"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+achronyme-types = { path = "../achronyme-types" }
+achronyme-parser = { path = "../achronyme-parser" }
+achronyme-dsp = { path = "../achronyme-dsp" }
+achronyme-linalg = { path = "../achronyme-linalg" }
