@@ -1,426 +1,208 @@
-# Especificación del Lenguaje Achronyme (SOC)
+# Achronyme/SOC Language Specification
 
-**SOC** - Superior Order Calculator
+This document specifies the syntax and features of the Achronyme/SOC (String-Oriented Calculation) language, which is processed by the `ach.eval()` method. This language provides a powerful way to perform complex mathematical operations in a single, efficient call to the Rust-based core engine.
 
-Achronyme implementa un lenguaje de expresiones matemáticas completo y extensible, diseñado para competir con motores de cálculo como Wolfram Mathematica en el ámbito open-source.
+## Table of Contents
+
+- [Introduction](#introduction)
+- [Syntax](#syntax)
+  - [Data Types & Literals](#data-types--literals)
+  - [Operators](#operators)
+  - [Variables](#variables)
+  - [Functions (Lambdas)](#functions-lambdas)
+- [Built-in Functions](#built-in-functions)
+  - [Core Functions](#core-functions)
+  - [Mathematical Functions](#mathematical-functions)
+  - [Linear Algebra](#linear-algebra)
+  - [Digital Signal Processing (DSP)](#digital-signal-processing-dsp)
+  - [Statistics](#statistics)
+- [Higher-Order Functions](#higher-order-functions)
+- [Examples](#examples)
 
 ---
 
-## 📋 Tabla de Contenidos
+## Introduction
 
-- [Gramática Formal (BNF)](#gramática-formal-bnf)
-- [Tipos de Datos](#tipos-de-datos)
-- [Operadores y Precedencia](#operadores-y-precedencia)
-- [Sintaxis Completa](#sintaxis-completa)
-- [Sistema de Tipos](#sistema-de-tipos)
-- [Constantes Matemáticas](#constantes-matemáticas)
+The SOC language is a simple, expression-based functional language designed for mathematics. It is dynamically typed and allows for the creation of variables and functions at runtime. Its primary purpose is to define a sequence of operations in a single string, which the Achronyme engine can then parse and execute in one pass, minimizing the communication overhead between JavaScript and WebAssembly.
 
----
+**Example:**
+```typescript
+// Instead of multiple JS calls...
+const v = ach.vector([1, 2, 3]);
+const v2 = ach.math.sin(v);
+const v3 = ach.math.abs(v2);
 
-## 🔤 Gramática Formal (BNF)
-
-```bnf
-# Declaraciones
-statement       → variable_decl | expression
-
-variable_decl   → "let" IDENTIFIER "=" expression
-
-# Expresiones
-expression      → lambda | comparison
-
-lambda          → param_list "=>" expression
-                | IDENTIFIER "=>" expression
-
-param_list      → "(" IDENTIFIER ("," IDENTIFIER)* ")"
-
-comparison      → additive ( (">" | "<" | ">=" | "<=" | "==" | "!=") additive )*
-
-additive        → term ( ("+" | "-") term )*
-
-term            → factor ( ("*" | "/" | "%") factor )*
-
-factor          → exponent ("^" exponent)*       # Right-associative
-
-exponent        → unary
-
-unary           → "-" unary
-                | primary
-
-primary         → NUMBER
-                | COMPLEX_LITERAL               # 3i, (2+3)i
-                | VECTOR_LITERAL                # [1, 2, 3]
-                | MATRIX_LITERAL                # [[1,2], [3,4]]
-                | function_call
-                | IDENTIFIER                    # Variable or constant
-                | "(" expression ")"
-
-function_call   → IDENTIFIER "(" arg_list? ")"
-
-arg_list        → expression ("," expression)*
-
-# Literales complejos
-COMPLEX_LITERAL → [NUMBER] "i"
-                | expression "i"
-
-# Vectores
-VECTOR_LITERAL  → "[" arg_list? "]"
-
-# Matrices
-MATRIX_LITERAL  → "[" matrix_rows "]"
-matrix_rows     → "[" arg_list "]" ("," "[" arg_list "]")*
+// You can do it in one eval call
+const result = ach.eval("abs(sin([1, 2, 3]))");
 ```
 
 ---
 
-## 🎯 Tipos de Datos
+## Syntax
 
-Achronyme soporta 5 tipos de datos fundamentales:
+### Data Types & Literals
 
-| Tipo | Descripción | Literales | Ejemplos |
-|------|-------------|-----------|----------|
-| **Number** | Números de punto flotante (64-bit) | `123`, `3.14`, `.5`, `2e-3` | `42`, `-3.14159`, `1.23e-10` |
-| **Complex** | Números complejos (real + imaginary) | `3i`, `2+3i` | `(1+2i) * (3+4i)` → `-5+10i` |
-| **Vector** | Vectores de números reales | `[1, 2, 3]` | `[1, 2, 3] + [4, 5, 6]` → `[5, 7, 9]` |
-| **Matrix** | Matrices 2D | `[[1,2], [3,4]]` | `det([[1,2],[3,4]])` → `-2` |
-| **Function** | Funciones lambda | `x => x^2` | `map(x => x*2, [1,2,3])` → `[2,4,6]` |
+The language supports the following primitive types:
 
-### Number - Números Reales
+- **Scalar**: A single number.
+  ```
+  42
+  -3.14159
+  1.2e3
+  ```
+- **Vector**: A 1D array of numbers.
+  ```
+  [1, 2, 3, 4, 5]
+  ```
+- **Matrix**: A 2D array of numbers.
+  ```
+  [[1, 2], [3, 4]]
+  ```
+- **Function**: A user-defined or built-in function.
 
-```javascript
-// Enteros
-42
--17
-0
+### Operators
 
-// Decimales
-3.14159
--2.718
-.5              // Equivalente a 0.5
+Operators follow standard mathematical precedence.
 
-// Notación científica
-1e6             // 1,000,000
-2.5e-3          // 0.0025
--3.14e2         // -314.0
-```
-
-### Complex - Números Complejos
-
-```javascript
-// Imaginario puro
-3i              // 0 + 3i
--2i             // 0 - 2i
-
-// Complejo completo (suma de real + imaginario)
-2 + 3i          // 2 + 3i
-5 - 4i          // 5 - 4i
-
-// Operaciones con complejos
-(1+2i) + (3+4i)     // → 4+6i
-(2+3i) * (1-i)      // → 5+i
-abs(3+4i)           // → 5 (magnitud)
-arg(1+i)            // → 0.785... (π/4 radianes)
-conj(2+3i)          // → 2-3i (conjugado)
-```
-
-### Vector - Vectores
-
-```javascript
-// Literales de vector
-[1, 2, 3]
-[sin(0), cos(0), tan(0)]
-[1+2i, 3+4i, 5+6i]      // Vector de complejos
-
-// Operaciones vectoriales
-[1,2,3] + [4,5,6]       // → [5, 7, 9] (element-wise)
-[2,4,6] * [1,2,3]       // → [2, 8, 18] (element-wise)
-[1,2,3] ^ 2             // → [1, 4, 9] (broadcast)
-
-// Funciones vectoriales
-dot([1,2,3], [4,5,6])   // → 32 (producto punto)
-norm([3,4])             // → 5 (norma euclidiana)
-cross([1,0,0], [0,1,0]) // → [0,0,1] (producto cruz, solo 3D)
-```
-
-### Matrix - Matrices
-
-```javascript
-// Literales de matriz
-[[1, 2], [3, 4]]
-[[1, 0, 0], [0, 1, 0], [0, 0, 1]]   // Identidad 3x3
-
-// Operaciones matriciales
-[[1,2],[3,4]] + [[5,6],[7,8]]       // Suma element-wise
-[[1,2],[3,4]] * [[5,6],[7,8]]       // Multiplicación matricial
-
-// Funciones matriciales
-transpose([[1,2],[3,4]])            // → [[1,3],[2,4]]
-det([[1,2],[3,4]])                  // → -2 (determinante)
-inverse([[1,2],[3,4]])              // → [[-2,1],[1.5,-0.5]]
-```
-
-### Function - Lambdas
-
-```javascript
-// Lambda de un parámetro
-x => x^2
-n => sin(n * PI)
-
-// Lambda de múltiples parámetros
-(x, y) => x + y
-(a, b, c) => sqrt(a^2 + b^2 + c^2)
-
-// Lambdas como argumentos
-map(x => x*2, [1, 2, 3])            // → [2, 4, 6]
-filter(n => n > 5, [1,5,10,15])     // → [10, 15]
-reduce((a,b) => a+b, 0, [1,2,3,4])  // → 10
-```
-
----
-
-## ⚙️ Operadores y Precedencia
-
-Ordenados de **mayor a menor precedencia** (como en matemáticas estándar):
-
-| Precedencia | Operador | Tipo | Asociatividad | Ejemplo |
-|-------------|----------|------|---------------|---------|
-| 1 (mayor) | `()` | Agrupación | - | `(2 + 3) * 4` |
-| 2 | `f()` | Llamada a función | Izquierda | `sin(PI/2)` |
-| 3 | `-` (unario) | Negación | Derecha | `-5`, `-(2+3)` |
-| 4 | `^` | Potencia | **Derecha** ⚠️ | `2^3^2 = 512` |
-| 5 | `*`, `/`, `%` | Multiplicación, División, Módulo | Izquierda | `6 / 2 * 3` |
-| 6 | `+`, `-` | Suma, Resta | Izquierda | `2 + 3 - 1` |
-| 7 | `>`, `<`, `>=`, `<=` | Comparación | Izquierda | `x > 5` |
-| 8 | `==`, `!=` | Igualdad | Izquierda | `x == 10` |
-| 9 | `=>` | Lambda | Derecha | `x => x^2` |
-| 10 (menor) | `=` | Asignación | Derecha | `let x = 5` |
-
-### ⚠️ Nota Importante: Potencia es Asociativa a la Derecha
-
-```javascript
-2^3^2       // = 2^(3^2) = 2^9 = 512 (correcto)
-            // NO es (2^3)^2 = 8^2 = 64
-
-// Para forzar asociatividad izquierda, usar paréntesis:
-(2^3)^2     // = 64
-```
-
----
-
-## 📖 Sintaxis Completa
+| Operator | Description | Example |
+| :--- | :--- | :--- |
+| `+`, `-` | Addition, Subtraction | `5 + 3` |
+| `*`, `/` | Multiplication, Division | `10 * 2` |
+| `^` | Power / Exponentiation | `2 ^ 10` |
+| `%` | Modulo | `10 % 3` |
+| `==`, `!=` | Equality, Inequality | `x == 5` |
+| `>`, `<`, `>=`, `<=` | Comparison | `x > 0` |
 
 ### Variables
 
-```javascript
-// Declaración
-let x = 10
-let result = sin(PI/2)
-let vec = [1, 2, 3, 4]
-let matrix = [[1,2],[3,4]]
+You can declare variables using the `let` keyword. The scope of these variables is the lifetime of the `Achronyme` instance or until `ach.resetEvaluator()` is called.
 
-// Uso
-x + 5               // → 15
-result * 2          // → 2
-vec + [1,1,1,1]     // → [2, 3, 4, 5]
+```
+let pi = 3.14159
+let v = [1, 2, 3]
+let f = x => x * pi
+f(10) // 31.4159
 ```
 
-### Funciones Matemáticas Básicas
+### Functions (Lambdas)
 
-```javascript
-// Trigonométricas
-sin(PI/2)           // → 1
-cos(0)              // → 1
-tan(PI/4)           // → 1
-asin(1)             // → π/2
-atan2(1, 1)         // → π/4
+Custom functions can be defined using lambda syntax.
 
-// Hiperbólicas
-sinh(0)             // → 0
-cosh(0)             // → 1
-tanh(1)             // → 0.762
-
-// Exponenciales y logaritmos
-exp(1)              // → e = 2.718...
-ln(E)               // → 1
-log10(100)          // → 2
-log2(8)             // → 3
-
-// Raíces y potencias
-sqrt(16)            // → 4
-cbrt(27)            // → 3
-pow(2, 10)          // → 1024
-
-// Redondeo
-floor(3.7)          // → 3
-ceil(3.2)           // → 4
-round(3.5)          // → 4
-
-// Utilidades
-abs(-5)             // → 5
-sign(-3)            // → -1
-min(1, 5, 3)        // → 1
-max(1, 5, 3)        // → 5
 ```
+// Single parameter
+let square = x => x ^ 2
 
-### Higher-Order Functions
+// Multiple parameters
+let add = (a, b) => a + b
 
-```javascript
-// map: Aplicar función a cada elemento
-map(x => x^2, [1, 2, 3, 4])
-// → [1, 4, 9, 16]
-
-map((x,y) => x+y, [1,2,3], [4,5,6])
-// → [5, 7, 9]
-
-// filter: Filtrar elementos por predicado
-filter(x => x > 5, [1, 5, 10, 15])
-// → [10, 15]
-
-filter(n => n % 2 == 0, [1,2,3,4,5,6])
-// → [2, 4, 6]
-
-// reduce: Reducir a un solo valor
-reduce((a,b) => a+b, 0, [1,2,3,4])
-// → 10
-
-reduce((acc,x) => acc*x, 1, [2,3,4])
-// → 24
-
-// pipe: Composición de funciones (pipeline)
-pipe(
-  [1, 2, 3, 4],
-  v => map(x => x^2, v),
-  v => filter(x => x > 5, v),
-  v => reduce((a,b) => a+b, 0, v)
-)
-// [1,2,3,4] → [1,4,9,16] → [9,16] → 25
-```
-
-### DSP - Procesamiento de Señales
-
-```javascript
-// FFT (requiere potencia de 2)
-fft([1, 2, 3, 4, 5, 6, 7, 8])
-// → Spectrum complejo
-
-fft_mag([1, 2, 3, 4, 5, 6, 7, 8])
-// → [20, 9.65, 5.83, 4.83, ...] (magnitudes)
-
-// DFT (acepta cualquier tamaño)
-dft([1, 2, 3, 4, 5])
-dft_mag([1, 2, 3, 4, 5])
-
-// FFT inversa
-let signal = [1, 2, 3, 4, 5, 6, 7, 8]
-let spectrum = fft(signal)
-let reconstructed = ifft(spectrum)
-// reconstructed ≈ signal (reconstrucción perfecta)
-
-// Ventanas (windowing)
-hanning(8)      // → [0, 0.188, 0.612, 0.950, 0.950, 0.612, 0.188, 0]
-hamming(8)      // → Ventana de Hamming
-blackman(8)     // → Ventana de Blackman
-
-// Aplicar ventana a señal
-let windowed = map((s,w) => s*w, signal, hanning(8))
-
-// Convolución (filtrado FIR)
-conv([1,2,3,4,5], [0.333, 0.333, 0.333])
-// → Filtro de promedio móvil
-
-conv_fft([1,2,3,4,5,6,7,8], [1,2,1])
-// → Convolución rápida con FFT
-```
-
-### Pipelines Completos
-
-```javascript
-// Pipeline de análisis espectral
-let analyze = sig => pipe(
-  sig,
-  s => map((val,w) => val*w, s, hanning(8)),
-  s => fft_mag(s),
-  s => map(m => m^2, s),
-  s => reduce((a,b) => a+b, 0, s)
-)
-
-analyze([1,2,3,4,5,6,7,8])
-// → Potencia espectral total
-
-// Pipeline de filtrado
-let lowpass = sig => pipe(
-  sig,
-  s => conv(s, [0.25, 0.5, 0.25]),
-  s => map(x => round(x*100)/100, s)
-)
-
-lowpass([1,5,2,8,3,9])
-// → Señal filtrada y redondeada
+// Using the functions
+square(5) // 25
+add(10, 20) // 30
 ```
 
 ---
 
-## 🔍 Sistema de Tipos
+## Built-in Functions
 
-Achronyme implementa **inferencia de tipos dinámica** con **promoción automática**:
+The language includes a rich standard library of functions. Function names are case-insensitive.
 
-### Promoción Automática
+### Core Functions
 
-```javascript
-// Promoción Number → Complex
-2 + 3i              // 2 es promovido a 2+0i
-                    // → 2+3i
+- `let(name, value)`: Declares a variable.
+- `if(condition, then_expr, else_expr)`: Conditional expression.
+- `print(value)`: Prints a value to the console.
 
-// Promoción Number → Vector (broadcasting)
-[1,2,3] + 5         // 5 es broadcast a todos los elementos
-                    // → [6, 7, 8]
+### Mathematical Functions
 
-[2,4,6] * 3         // → [6, 12, 18]
+- **Trigonometric**: `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `atan2`
+- **Hyperbolic**: `sinh`, `cosh`, `tanh`
+- **Exponential/Logarithmic**: `exp`, `ln`, `log` (natural log), `log10`, `log2`
+- **Power**: `sqrt`, `cbrt`, `pow(base, exp)`
+- **Rounding/Misc**: `abs`, `sign`, `floor`, `ceil`, `round`, `trunc`
 
-// Tipo común en operaciones
-let x = 2           // Number
-let y = 3i          // Complex
-x + y               // x promovido a Complex → 2+3i
-```
+### Linear Algebra
 
-### Polimorfismo en Lambdas
+- **Vector**: `dot(v1, v2)`, `cross(v1, v2)`, `norm(v)`
+- **Matrix**: `det(m)`, `transpose(m)`, `inverse(m)`
+- **Constructors**: `linspace(start, stop, num)`, `zeros(n)`, `ones(n)`, `identity(n)`
 
-```javascript
-// Detección de tipos en lambdas
-let f = x => x^2    // f acepta cualquier tipo
-f(5)                // → 25 (Number)
-f(2+3i)             // → -5+12i (Complex)
-f([1,2,3])          // → [1,4,9] (Vector)
-```
+### Digital Signal Processing (DSP)
 
----
+- **FFT**: `fft(signal)`, `ifft(spectrum)`, `fft_mag(signal)`, `fft_phase(signal)`
+- **Convolution**: `conv(signal1, signal2)`
+- **Windowing**: `hanning(n)`, `hamming(n)`, `blackman(n)`
+- **Utilities**: `fftshift(spectrum)`, `ifftshift(spectrum)`
 
-## 📐 Constantes Matemáticas
+### Statistics
 
-| Constante | Valor | Descripción |
-|-----------|-------|-------------|
-| `PI` | 3.14159265358979... | Número π (relación circunferencia/diámetro) |
-| `E` | 2.71828182845905... | Número e (base de logaritmos naturales) |
-| `PHI` | 1.61803398874989... | Razón áurea φ = (1+√5)/2 |
-| `TAU` | 6.28318530717959... | τ = 2π (constante del círculo) |
-
-```javascript
-// Uso de constantes
-sin(PI/2)           // → 1
-exp(1) == E         // → true (1 == 1)
-log(E)              // → 1
-TAU / 2 == PI       // → true (1 == 1)
-```
+- `sum(v)`, `mean(v)`, `std(v)`
+- `min(v)`, `max(v)`
+- `median(v)`, `percentile(v, p)`
 
 ---
 
-## 📚 Referencias
+## Higher-Order Functions
 
-- [Guía del SDK TypeScript](./sdk-guide.md)
-- [Roadmap del Proyecto](./roadmap.md)
-- [Comparación con Wolfram](./wolfram-comparison.md)
-- [README Principal](../README.md)
+These functions take other functions as arguments.
+
+- `map(func, vector)`: Applies a function to each element of a vector, returning a new vector.
+  ```
+  map(x => x * 2, [1, 2, 3]) // [2, 4, 6]
+  ```
+- `filter(predicate, vector)`: Returns a new vector containing only elements that satisfy the predicate function.
+  ```
+  filter(x => x > 3, [1, 5, 2, 4]) // [5, 4]
+  ```
+- `reduce(func, initial, vector)`: Reduces a vector to a single value.
+  ```
+  reduce((acc, x) => acc + x, 0, [1, 2, 3, 4]) // 10
+  ```
+- `pipe(f1, f2, ..., initial_value)`: Passes the initial value through a pipeline of functions from left to right.
+  ```
+  let double = x => x * 2
+  let add_one = x => x + 1
+  pipe(double, add_one, 5) // add_one(double(5)) => 11
+  ```
 
 ---
 
-**Versión**: 0.3.0
-**Última actualización**: 2025
+## Examples
+
+### Simple Arithmetic
+
+```
+eval> 2 + 3 * (4 - 1)
+"11"
+```
+
+### Vector Operations
+
+```
+eval> let v = [1, 2, 3, 4]
+eval> map(x => x^2, v)
+"[1, 4, 9, 16]"
+```
+
+### Defining and Using a Function
+
+```
+eval> let hypot = (a, b) => sqrt(a^2 + b^2)
+eval> hypot(3, 4)
+"5"
+```
+
+### DSP Signal Processing Chain
+
+```
+// 1. Create a time vector
+eval> let t = linspace(0, 1, 1024)
+
+// 2. Create a signal
+eval> let signal = map(x => sin(2 * PI * 50 * x), t)
+
+// 3. Apply a window
+eval> let windowed = signal * hanning(1024)
+
+// 4. Get the FFT magnitude
+eval> let spectrum = fft_mag(windowed)
+```
