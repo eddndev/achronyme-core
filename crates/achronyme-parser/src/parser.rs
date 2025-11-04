@@ -258,7 +258,7 @@ impl Parser {
 
             // Try to parse as lambda parameters
             let mut params = Vec::new();
-            let mut is_lambda = false;
+            let is_lambda = false;
 
             if let Token::Identifier(name) = self.peek().clone() {
                 params.push(name);
@@ -279,7 +279,6 @@ impl Parser {
 
                 // Must have RPAREN followed by ARROW
                 if self.match_token(&Token::RParen) && self.check(&Token::Arrow) {
-                    is_lambda = true;
                     self.advance(); // consume =>
                     let body = self.expression()?;
                     return Ok(AstNode::Lambda {

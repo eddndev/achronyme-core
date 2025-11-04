@@ -88,9 +88,10 @@ export class HandleManager {
     }
 
     /**
-     * Release all handles (emergency cleanup)
+     * Garbage collect all handles tracked by this manager.
+     * This is the primary mechanism for session-based cleanup.
      */
-    releaseAll(): void {
+    gc(): void {
         const handles = Array.from(this.handles.keys());
         for (const handle of handles) {
             this.release(handle);

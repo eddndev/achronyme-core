@@ -10,21 +10,6 @@ fn matrix_to_faer(matrix: &Matrix) -> Mat<f64> {
     Mat::from_fn(rows, cols, |i, j| matrix.data[i * cols + j])
 }
 
-/// Convert faer Mat to Achronyme Matrix
-fn faer_to_matrix(mat: Mat<f64>) -> Result<Matrix, String> {
-    let rows = mat.nrows();
-    let cols = mat.ncols();
-    let mut data = Vec::with_capacity(rows * cols);
-
-    for i in 0..rows {
-        for j in 0..cols {
-            data.push(mat.read(i, j));
-        }
-    }
-
-    Matrix::new(rows, cols, data).map_err(|e| e.to_string())
-}
-
 /// Compute eigenvalues of a square matrix
 ///
 /// Returns the eigenvalues (potentially complex) of the matrix.

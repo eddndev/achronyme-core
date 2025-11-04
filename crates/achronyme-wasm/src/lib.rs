@@ -107,8 +107,8 @@ pub fn reset() {
 // Handle-Based API (Fast Path - Same as C++)
 // ============================================================================
 
-#[wasm_bindgen]
-pub fn createVectorFromBuffer(data_ptr: *const f64, len: usize) -> Handle {
+#[wasm_bindgen(js_name = createVectorFromBuffer)]
+pub fn create_vector_from_buffer(data_ptr: *const f64, len: usize) -> Handle {
     unsafe {
         let data = std::slice::from_raw_parts(data_ptr, len).to_vec();
         let vector = Vector::new(data);
@@ -117,15 +117,15 @@ pub fn createVectorFromBuffer(data_ptr: *const f64, len: usize) -> Handle {
 }
 
 /// Create vector from JavaScript array (easier for testing)
-#[wasm_bindgen]
-pub fn createVector(data: Vec<f64>) -> Handle {
+#[wasm_bindgen(js_name = createVector)]
+pub fn create_vector(data: Vec<f64>) -> Handle {
     let vector = Vector::new(data);
     HANDLES.with(|h| h.borrow_mut().create(Value::Vector(vector)))
 }
 
 /// Get vector data from handle (for verification/extraction)
-#[wasm_bindgen]
-pub fn getVector(handle: Handle) -> Result<Vec<f64>, JsValue> {
+#[wasm_bindgen(js_name = getVector)]
+pub fn get_vector(handle: Handle) -> Result<Vec<f64>, JsValue> {
     HANDLES.with(|handles| {
         let h = handles.borrow();
         match h.get(handle) {
@@ -136,8 +136,8 @@ pub fn getVector(handle: Handle) -> Result<Vec<f64>, JsValue> {
     })
 }
 
-#[wasm_bindgen]
-pub fn createMatrixFromBuffer(data_ptr: *const f64, rows: usize, cols: usize) -> Result<Handle, JsValue> {
+#[wasm_bindgen(js_name = createMatrixFromBuffer)]
+pub fn create_matrix_from_buffer(data_ptr: *const f64, rows: usize, cols: usize) -> Result<Handle, JsValue> {
     unsafe {
         let len = rows * cols;
         let data = std::slice::from_raw_parts(data_ptr, len).to_vec();
@@ -147,8 +147,8 @@ pub fn createMatrixFromBuffer(data_ptr: *const f64, rows: usize, cols: usize) ->
     }
 }
 
-#[wasm_bindgen]
-pub fn bindVariableToHandle(name: &str, handle: Handle) -> Result<(), JsValue> {
+#[wasm_bindgen(js_name = bindVariableToHandle)]
+pub fn bind_variable_to_handle(name: &str, handle: Handle) -> Result<(), JsValue> {
     // First, get value from HANDLES
     let value = HANDLES.with(|h| {
         let handles = h.borrow();
@@ -164,8 +164,8 @@ pub fn bindVariableToHandle(name: &str, handle: Handle) -> Result<(), JsValue> {
     })
 }
 
-#[wasm_bindgen]
-pub fn releaseHandle(handle: Handle) {
+#[wasm_bindgen(js_name = releaseHandle)]
+pub fn release_handle(handle: Handle) {
     // Direct release - no auto-cleanup, only manual via dispose() or session.use()
     HANDLES.with(|h| {
         h.borrow_mut().release(handle);
@@ -181,164 +181,147 @@ pub fn releaseHandle(handle: Handle) {
 // Fast Path Math Operations (Same API as C++)
 // ============================================================================
 
-fn apply_unary_op<F>(handle: Handle, f: F) -> Result<Handle, JsValue>
+/// Generic helper for safe unary operations on handles.
+fn apply_unary_op<F>(handle: Handle, op_name: &str, f: F) -> Result<Handle, JsValue>
 where
-    F: Fn(&Vector) -> Vector,
+    F: Fn(f64) -> f64,
 {
-    HANDLES.with(|h| {
-        let mut handles = h.borrow_mut();
-        // Clone the value to release the borrow on the HashMap's internal data
-        let value = handles
-            .get(handle)
-            .cloned()
-            .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
+    // Step 1: Read and copy the data out. This is an immutable borrow.
+    let data_copy = HANDLES.with(|h| {
+        let handles = h.borrow();
+        match handles.get(handle) {
+            Some(Value::Vector(v)) => Ok(v.data().to_vec()),
+            Some(Value::Number(n)) => Ok(vec![*n]),
+            Some(_) => Err(JsValue::from_str(&format!("{} requires a vector or number handle", op_name))),
+            None => Err(JsValue::from_str(&format!("Invalid handle for {}", op_name))),
+        }
+    })?;
 
-        let result_vec = match value {
-            Value::Vector(vec) => f(&vec),
-            Value::Number(n) => {
-                let vec = Vector::new(vec![n]);
-                f(&vec)
-            }
-            _ => return Err(JsValue::from_str("Operation requires vector or number")),
+    // Step 2: Perform calculation. No borrows are held.
+    let result_data: Vec<f64> = data_copy.iter().map(|&x| f(x)).collect();
+    let result_vector = Vector::new(result_data);
+
+    // Step 3: Create a new handle. This is a mutable borrow.
+    Ok(HANDLES.with(|h| {
+        h.borrow_mut().create(Value::Vector(result_vector))
+    }))
+}
+
+fn apply_binary_op<F>(handle1: Handle, handle2: Handle, f: F) -> Result<Handle, JsValue>
+where
+    F: Fn(&Vector, &Vector) -> Result<Vector, String>,
+{
+    // Step 1: Read and copy data for both handles
+    let (data1, data2) = HANDLES.with(|h| {
+        let handles = h.borrow();
+        let v1 = match handles.get(handle1) {
+            Some(Value::Vector(v)) => Ok(v.data().to_vec()),
+            _ => Err(JsValue::from_str("Handle 1 is not a vector")),
         };
+        let v2 = match handles.get(handle2) {
+            Some(Value::Vector(v)) => Ok(v.data().to_vec()),
+            _ => Err(JsValue::from_str("Handle 2 is not a vector")),
+        };
+        v1.and_then(|d1| v2.map(|d2| (d1, d2)))
+    })?;
 
-        Ok(handles.create(Value::Vector(result_vec)))
-    })
+    // Step 2: Perform computation with no borrows held
+    let vec1 = Vector::new(data1);
+    let vec2 = Vector::new(data2);
+    let result_vec = f(&vec1, &vec2).map_err(|e| JsValue::from_str(&e))?;
+
+    // Step 3: Write result with a new mutable borrow
+    Ok(HANDLES.with(|h| {
+        h.borrow_mut().create(Value::Vector(result_vec))
+    }))
+}
+#[wasm_bindgen(js_name = "mathSin")]
+pub fn math_sin(handle: Handle) -> Result<Handle, JsValue> {
+    apply_unary_op(handle, "mathSin", |x| x.sin())
 }
 
-// Renamed from *_fast - all handle-based operations are fast path by definition
-#[wasm_bindgen]
-pub fn sin(handle: Handle) -> Result<Handle, JsValue> {
-    apply_unary_op(handle, |v: &Vector| {
-        let result: Vec<f64> = v.data().iter().map(|x| x.sin()).collect();
-        Vector::new(result)
-    })
+#[wasm_bindgen(js_name = "mathCos")]
+pub fn math_cos(handle: Handle) -> Result<Handle, JsValue> {
+    apply_unary_op(handle, "mathCos", |x| x.cos())
 }
 
-#[wasm_bindgen]
-pub fn cos(handle: Handle) -> Result<Handle, JsValue> {
-    apply_unary_op(handle, |v: &Vector| {
-        let result: Vec<f64> = v.data().iter().map(|x| x.cos()).collect();
-        Vector::new(result)
-    })
+#[wasm_bindgen(js_name = "mathTan")]
+pub fn math_tan(handle: Handle) -> Result<Handle, JsValue> {
+    apply_unary_op(handle, "mathTan", |x| x.tan())
 }
 
-#[wasm_bindgen]
-pub fn tan(handle: Handle) -> Result<Handle, JsValue> {
-    apply_unary_op(handle, |v: &Vector| {
-        let result: Vec<f64> = v.data().iter().map(|x| x.tan()).collect();
-        Vector::new(result)
-    })
+#[wasm_bindgen(js_name = "mathExp")]
+pub fn math_exp(handle: Handle) -> Result<Handle, JsValue> {
+    apply_unary_op(handle, "mathExp", |x| x.exp())
 }
 
-#[wasm_bindgen]
-pub fn sqrt(handle: Handle) -> Result<Handle, JsValue> {
-    apply_unary_op(handle, |v: &Vector| {
-        let result: Vec<f64> = v.data().iter().map(|x| x.sqrt()).collect();
-        Vector::new(result)
-    })
+#[wasm_bindgen(js_name = "mathLn")]
+pub fn math_ln(handle: Handle) -> Result<Handle, JsValue> {
+    apply_unary_op(handle, "mathLn", |x| x.ln())
 }
 
-#[wasm_bindgen]
-pub fn exp(handle: Handle) -> Result<Handle, JsValue> {
-    apply_unary_op(handle, |v: &Vector| {
-        let result: Vec<f64> = v.data().iter().map(|x| x.exp()).collect();
-        Vector::new(result)
-    })
+#[wasm_bindgen(js_name = "mathAbs")]
+pub fn math_abs(handle: Handle) -> Result<Handle, JsValue> {
+    apply_unary_op(handle, "mathAbs", |x| x.abs())
 }
 
-#[wasm_bindgen]
-pub fn abs(handle: Handle) -> Result<Handle, JsValue> {
-    apply_unary_op(handle, |v: &Vector| {
-        let result: Vec<f64> = v.data().iter().map(|x| x.abs()).collect();
-        Vector::new(result)
-    })
+#[wasm_bindgen(js_name = "mathSqrt")]
+pub fn math_sqrt(handle: Handle) -> Result<Handle, JsValue> {
+    apply_unary_op(handle, "mathSqrt", |x| x.sqrt())
 }
 
-#[wasm_bindgen]
-pub fn ln(handle: Handle) -> Result<Handle, JsValue> {
-    apply_unary_op(handle, |v: &Vector| {
-        let result: Vec<f64> = v.data().iter().map(|x| x.ln()).collect();
-        Vector::new(result)
-    })
-}
+#[wasm_bindgen(js_name = "dspFft")]
+pub fn dsp_fft(handle: Handle) -> Result<Handle, JsValue> {
+    use achronyme_types::complex::Complex;
 
-// ============================================================================
-// DSP Operations
-// ============================================================================
-
-#[wasm_bindgen]
-pub fn fft(handle: Handle) -> Result<Handle, JsValue> {
     HANDLES.with(|h| {
-        // NO ? inside borrow scope
-        let matrix = {
+        let result_matrix = {
             let handles = h.borrow();
-            match handles.get(handle) {
-                Some(value) => {
-                    match value {
-                        Value::Vector(vec) => {
-                            let spectrum = achronyme_dsp::fft_real(vec);
-                            let n = spectrum.len();
-                            let mut data = Vec::with_capacity(n * 2);
-                            for c in spectrum {
-                                data.push(c.re);
-                                data.push(c.im);
-                            }
-                            Matrix::new(n, 2, data)
-                                .map_err(|e| JsValue::from_str(&e.to_string()))
-                        }
-                        _ => Err(JsValue::from_str("FFT requires vector"))
+            let value = handles.get(handle)
+                .ok_or_else(|| JsValue::from_str("Invalid handle for dspFft"))?;
+
+            match value {
+                Value::Vector(v) => {
+                    let spectrum = achronyme_dsp::fft_real(v);
+                    let n = spectrum.len();
+                    let mut data = Vec::with_capacity(n * 2);
+                    for c in spectrum {
+                        data.push(c.re);
+                        data.push(c.im);
                     }
+                    Matrix::new(n, 2, data).map_err(|e| JsValue::from_str(&e.to_string()))
                 }
-                None => Err(JsValue::from_str("Invalid handle"))
+                _ => Err(JsValue::from_str("dspFft requires a vector handle")),
             }
         }?;
 
-        Ok(h.borrow_mut().create(Value::Matrix(matrix)))
+        Ok(h.borrow_mut().create(Value::Matrix(result_matrix)))
     })
 }
 
-#[wasm_bindgen]
-pub fn fft_mag(handle: Handle) -> Result<Handle, JsValue> {
+#[wasm_bindgen(js_name = "dspFftMag")]
+pub fn dsp_fft_mag(handle: Handle) -> Result<Handle, JsValue> {
     HANDLES.with(|h| {
-        // NO ? inside borrow scope
-        let result = {
+        let result_vector = {
             let handles = h.borrow();
-            match handles.get(handle) {
-                Some(value) => {
-                    match value {
-                        Value::Vector(vec) => {
-                            let spectrum = achronyme_dsp::fft_real(vec);
-                            let magnitudes: Vec<f64> = spectrum.iter()
-                                .map(|c| (c.re * c.re + c.im * c.im).sqrt())
-                                .collect();
-                            Ok(Vector::new(magnitudes))
-                        }
-                        Value::Matrix(mat) => {
-                            if mat.cols != 2 {
-                                Err(JsValue::from_str("FFT matrix must have 2 columns (real, imag)"))
-                            } else {
-                                let data = &mat.data;
-                                let n = mat.rows;
-                                let mut magnitudes = Vec::with_capacity(n);
-                                for i in 0..n {
-                                    let re = data[i * 2];
-                                    let im = data[i * 2 + 1];
-                                    magnitudes.push((re * re + im * im).sqrt());
-                                }
-                                Ok(Vector::new(magnitudes))
-                            }
-                        }
-                        _ => Err(JsValue::from_str("FFT_MAG requires vector or FFT matrix"))
-                    }
+            let value = handles.get(handle)
+                .ok_or_else(|| JsValue::from_str("Invalid handle for dspFftMag"))?;
+
+            match value {
+                Value::Vector(v) => {
+                    let spectrum = achronyme_dsp::fft_real(v);
+                    let magnitudes: Vec<f64> = spectrum.iter().map(|c| c.magnitude()).collect();
+                    Ok(Vector::new(magnitudes))
                 }
-                None => Err(JsValue::from_str("Invalid handle"))
+                _ => Err(JsValue::from_str("dspFftMag requires a vector handle")),
             }
         }?;
 
-        Ok(h.borrow_mut().create(Value::Vector(result)))
+        Ok(h.borrow_mut().create(Value::Vector(result_vector)))
     })
 }
+
+
 
 #[wasm_bindgen]
 pub fn linspace(start: f64, end: f64, n: usize) -> Result<Handle, JsValue> {
@@ -346,14 +329,15 @@ pub fn linspace(start: f64, end: f64, n: usize) -> Result<Handle, JsValue> {
         return Err(JsValue::from_str("linspace requires n >= 2"));
     }
 
+    // Step 1: Perform calculation. No borrows are held. This allocates memory.
     let step = (end - start) / (n as f64 - 1.0);
     let mut result = Vec::with_capacity(n);
-
     for i in 0..n {
         result.push(start + step * i as f64);
     }
-
     let vector = Vector::new(result);
+
+    // Step 2: Create a new handle. This is a mutable borrow.
     Ok(HANDLES.with(|h| h.borrow_mut().create(Value::Vector(vector))))
 }
 
@@ -398,33 +382,6 @@ pub fn ifft(handle: Handle) -> Result<Handle, JsValue> {
 // ============================================================================
 // Vector Operations (Optimized WASM implementations)
 // ============================================================================
-
-/// Binary operation helper for two vectors
-fn apply_binary_op<F>(handle1: Handle, handle2: Handle, f: F) -> Result<Handle, JsValue>
-where
-    F: Fn(&Vector, &Vector) -> Result<Vector, String>,
-{
-    HANDLES.with(|h| {
-        let mut handles = h.borrow_mut();
-        let v1 = handles
-            .get(handle1)
-            .cloned()
-            .ok_or_else(|| JsValue::from_str("Invalid handle 1"))?;
-        let v2 = handles
-            .get(handle2)
-            .cloned()
-            .ok_or_else(|| JsValue::from_str("Invalid handle 2"))?;
-
-        let result_vec = match (v1, v2) {
-            (Value::Vector(vec1), Value::Vector(vec2)) => {
-                f(&vec1, &vec2).map_err(|e| JsValue::from_str(&e))?
-            }
-            _ => return Err(JsValue::from_str("Binary operation requires two vectors")),
-        };
-
-        Ok(handles.create(Value::Vector(result_vec)))
-    })
-}
 
 /// Vector addition: v1 + v2
 #[wasm_bindgen]
@@ -495,220 +452,414 @@ pub fn vdiv(handle1: Handle, handle2: Handle) -> Result<Handle, JsValue> {
 }
 
 /// Dot product: v1 · v2
+
 #[wasm_bindgen]
+
 pub fn dot(handle1: Handle, handle2: Handle) -> Result<f64, JsValue> {
+
     HANDLES.with(|h| {
+
         let handles = h.borrow();
+
         let v1 = handles.get(handle1)
+
             .ok_or_else(|| JsValue::from_str("Invalid handle 1"))?;
+
         let v2 = handles.get(handle2)
+
             .ok_or_else(|| JsValue::from_str("Invalid handle 2"))?;
 
+
+
         match (v1, v2) {
+
             (Value::Vector(vec1), Value::Vector(vec2)) => {
+
                 if vec1.len() != vec2.len() {
+
                     return Err(JsValue::from_str(&format!(
+
                         "Vector length mismatch: {} vs {}", vec1.len(), vec2.len()
+
                     )));
+
                 }
+
+
 
                 let result: f64 = vec1.data().iter()
+
                     .zip(vec2.data().iter())
+
                     .map(|(a, b)| a * b)
+
                     .sum();
 
+
+
                 Ok(result)
+
             }
+
             _ => Err(JsValue::from_str("Dot product requires two vectors"))
+
         }
+
     })
+
 }
+
+
 
 /// Vector L2 norm (Euclidean): ||v||₂
+
 #[wasm_bindgen]
+
 pub fn norm(handle: Handle) -> Result<f64, JsValue> {
+
     HANDLES.with(|h| {
+
         let handles = h.borrow();
+
         let value = handles.get(handle)
+
             .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
 
+
+
         match value {
+
             Value::Vector(vec) => {
+
                 let sum_squares: f64 = vec.data().iter()
+
                     .map(|x| x * x)
+
                     .sum();
+
                 Ok(sum_squares.sqrt())
+
             }
+
             _ => Err(JsValue::from_str("Norm requires vector"))
+
         }
+
     })
+
 }
+
+
 
 /// Vector L1 norm: ||v||₁
+
 #[wasm_bindgen]
+
 pub fn norm_l1(handle: Handle) -> Result<f64, JsValue> {
+
     HANDLES.with(|h| {
+
         let handles = h.borrow();
+
         let value = handles.get(handle)
+
             .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
 
+
+
         match value {
+
             Value::Vector(vec) => {
+
                 let sum: f64 = vec.data().iter()
+
                     .map(|x| x.abs())
+
                     .sum();
+
                 Ok(sum)
+
             }
+
             _ => Err(JsValue::from_str("Norm L1 requires vector"))
+
         }
+
     })
+
 }
 
+
+
 // ============================================================================
+
 // Statistics Operations (Optimized WASM implementations)
+
 // ============================================================================
+
+
 
 /// Sum of vector elements
+
 #[wasm_bindgen]
+
 pub fn sum(handle: Handle) -> Result<f64, JsValue> {
+
     HANDLES.with(|h| {
+
         let handles = h.borrow();
+
         let value = handles.get(handle)
+
             .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
 
+
+
         match value {
+
             Value::Vector(vec) => {
+
                 let result: f64 = vec.data().iter().sum();
+
                 Ok(result)
+
             }
+
             _ => Err(JsValue::from_str("Sum requires vector"))
+
         }
+
     })
+
 }
+
+
 
 /// Mean (average) of vector elements
+
 #[wasm_bindgen]
+
 pub fn mean(handle: Handle) -> Result<f64, JsValue> {
+
     HANDLES.with(|h| {
+
         let handles = h.borrow();
+
         let value = handles.get(handle)
+
             .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
 
+
+
         match value {
+
             Value::Vector(vec) => {
+
                 if vec.len() == 0 {
+
                     return Err(JsValue::from_str("Cannot compute mean of empty vector"));
+
                 }
+
+
 
                 let sum: f64 = vec.data().iter().sum();
+
                 Ok(sum / vec.len() as f64)
+
             }
+
             _ => Err(JsValue::from_str("Mean requires vector"))
+
         }
+
     })
+
 }
+
+
 
 /// Standard deviation of vector elements
+
 #[wasm_bindgen]
+
 pub fn std(handle: Handle) -> Result<f64, JsValue> {
+
     HANDLES.with(|h| {
+
         let handles = h.borrow();
+
         let value = handles.get(handle)
+
             .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
 
+
+
         match value {
+
             Value::Vector(vec) => {
+
                 if vec.len() == 0 {
+
                     return Err(JsValue::from_str("Cannot compute std of empty vector"));
+
                 }
 
+
+
                 // Compute mean
+
                 let data = vec.data();
+
                 let n = data.len() as f64;
+
                 let mean: f64 = data.iter().sum::<f64>() / n;
 
+
+
                 // Compute variance
+
                 let variance: f64 = data.iter()
+
                     .map(|x| {
+
                         let diff = x - mean;
+
                         diff * diff
+
                     })
+
                     .sum::<f64>() / n;
 
+
+
                 Ok(variance.sqrt())
+
             }
+
             _ => Err(JsValue::from_str("Std requires vector"))
+
         }
+
     })
+
 }
+
+
 
 /// Minimum value in vector
+
 #[wasm_bindgen]
+
 pub fn min(handle: Handle) -> Result<f64, JsValue> {
+
     HANDLES.with(|h| {
+
         let handles = h.borrow();
+
         let value = handles.get(handle)
+
             .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
 
+
+
         match value {
+
             Value::Vector(vec) => {
+
                 vec.data().iter()
+
                     .fold(None, |min, &x| {
+
                         Some(match min {
+
                             None => x,
+
                             Some(m) => if x < m { x } else { m }
+
                         })
+
                     })
+
                     .ok_or_else(|| JsValue::from_str("Cannot compute min of empty vector"))
+
             }
+
             _ => Err(JsValue::from_str("Min requires vector"))
+
         }
+
     })
+
 }
 
+
+
 /// Maximum value in vector
+
 #[wasm_bindgen]
+
 pub fn max(handle: Handle) -> Result<f64, JsValue> {
+
     HANDLES.with(|h| {
+
         let handles = h.borrow();
+
         let value = handles.get(handle)
+
             .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
 
+
+
         match value {
+
             Value::Vector(vec) => {
+
                 vec.data().iter()
+
                     .fold(None, |max, &x| {
+
                         Some(match max {
+
                             None => x,
+
                             Some(m) => if x > m { x } else { m }
+
                         })
+
                     })
+
                     .ok_or_else(|| JsValue::from_str("Cannot compute max of empty vector"))
+
             }
+
             _ => Err(JsValue::from_str("Max requires vector"))
+
         }
+
     })
+
 }
 
 // ============================================================================
 // Linear Algebra Bindings (Compatible with C++ SDK)
 // ============================================================================
 
-#[wasm_bindgen]
-pub struct LUResult {
-    #[wasm_bindgen(readonly)]
-    pub L: Handle,
-    #[wasm_bindgen(readonly)]
-    pub U: Handle,
-    #[wasm_bindgen(readonly)]
-    pub P: Handle,
+#[wasm_bindgen(js_name = LUResult)]
+pub struct LuResult {
+    #[wasm_bindgen(readonly, js_name = L)]
+    pub l: Handle,
+    #[wasm_bindgen(readonly, js_name = U)]
+    pub u: Handle,
+    #[wasm_bindgen(readonly, js_name = P)]
+    pub p: Handle,
 }
 
-#[wasm_bindgen]
-pub fn lu_decomposition_js(handle: Handle) -> Result<LUResult, JsValue> {
+#[wasm_bindgen(js_name = lu)]
+pub fn lu_decomposition(handle: Handle) -> Result<LuResult, JsValue> {
     HANDLES.with(|h| {
         // First, borrow immutably to read and compute
-        let (l, u, p_matrix) = {
+        let (l_mat, u_mat, p_matrix) = {
             let handles = h.borrow();
             let value = handles.get(handle)
                 .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
@@ -735,11 +886,11 @@ pub fn lu_decomposition_js(handle: Handle) -> Result<LUResult, JsValue> {
 
         // Now borrow mutably to create handles
         let mut handles_mut = h.borrow_mut();
-        let L = handles_mut.create(Value::Matrix(l));
-        let U = handles_mut.create(Value::Matrix(u));
-        let P = handles_mut.create(Value::Matrix(p_matrix));
+        let l_handle = handles_mut.create(Value::Matrix(l_mat));
+        let u_handle = handles_mut.create(Value::Matrix(u_mat));
+        let p_handle = handles_mut.create(Value::Matrix(p_matrix));
 
-        Ok(LUResult { L, U, P })
+        Ok(LuResult { l: l_handle, u: u_handle, p: p_handle })
     })
 }
 
@@ -778,19 +929,19 @@ fn format_value(value: &Value) -> String {
 // QR Decomposition
 // ============================================================================
 
-#[wasm_bindgen]
-pub struct QRResult {
-    #[wasm_bindgen(readonly)]
-    pub Q: Handle,
-    #[wasm_bindgen(readonly)]
-    pub R: Handle,
+#[wasm_bindgen(js_name = QRResult)]
+pub struct QrResult {
+    #[wasm_bindgen(readonly, js_name = Q)]
+    pub q: Handle,
+    #[wasm_bindgen(readonly, js_name = R)]
+    pub r: Handle,
 }
 
-#[wasm_bindgen]
-pub fn qr_decomposition_js(handle: Handle) -> Result<QRResult, JsValue> {
+#[wasm_bindgen(js_name = qr)]
+pub fn qr_decomposition(handle: Handle) -> Result<QrResult, JsValue> {
     HANDLES.with(|h| {
         // First, borrow immutably to read and compute
-        let (q, r) = {
+        let (q_mat, r_mat) = {
             let handles = h.borrow();
             let value = handles.get(handle)
                 .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
@@ -806,10 +957,10 @@ pub fn qr_decomposition_js(handle: Handle) -> Result<QRResult, JsValue> {
 
         // Now borrow mutably to create handles
         let mut handles_mut = h.borrow_mut();
-        let Q = handles_mut.create(Value::Matrix(q));
-        let R = handles_mut.create(Value::Matrix(r));
+        let q_handle = handles_mut.create(Value::Matrix(q_mat));
+        let r_handle = handles_mut.create(Value::Matrix(r_mat));
 
-        Ok(QRResult { Q, R })
+        Ok(QrResult { q: q_handle, r: r_handle })
     })
 }
 
@@ -817,8 +968,8 @@ pub fn qr_decomposition_js(handle: Handle) -> Result<QRResult, JsValue> {
 // Cholesky Decomposition
 // ============================================================================
 
-#[wasm_bindgen]
-pub fn cholesky_decomposition_js(handle: Handle) -> Result<Handle, JsValue> {
+#[wasm_bindgen(js_name = cholesky)]
+pub fn cholesky_decomposition(handle: Handle) -> Result<Handle, JsValue> {
     HANDLES.with(|h| {
         // First, borrow immutably to read and compute
         let l = {
@@ -844,21 +995,21 @@ pub fn cholesky_decomposition_js(handle: Handle) -> Result<Handle, JsValue> {
 // SVD Decomposition
 // ============================================================================
 
-#[wasm_bindgen]
-pub struct SVDResult {
-    #[wasm_bindgen(readonly)]
-    pub U: Handle,
-    #[wasm_bindgen(readonly)]
-    pub S: Handle,
-    #[wasm_bindgen(readonly)]
-    pub V: Handle,
+#[wasm_bindgen(js_name = SVDResult)]
+pub struct SvdResult {
+    #[wasm_bindgen(readonly, js_name = U)]
+    pub u: Handle,
+    #[wasm_bindgen(readonly, js_name = S)]
+    pub s: Handle,
+    #[wasm_bindgen(readonly, js_name = V)]
+    pub v: Handle,
 }
 
-#[wasm_bindgen]
-pub fn svd_decomposition_js(handle: Handle) -> Result<SVDResult, JsValue> {
+#[wasm_bindgen(js_name = svd)]
+pub fn svd_decomposition(handle: Handle) -> Result<SvdResult, JsValue> {
     HANDLES.with(|h| {
         // First, borrow immutably to read and compute
-        let (u, s_vec, v) = {
+        let (u_mat, s_vec, v_mat) = {
             let handles = h.borrow();
             let value = handles.get(handle)
                 .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
@@ -874,11 +1025,11 @@ pub fn svd_decomposition_js(handle: Handle) -> Result<SVDResult, JsValue> {
 
         // Now borrow mutably to create handles
         let mut handles_mut = h.borrow_mut();
-        let U = handles_mut.create(Value::Matrix(u));
-        let S = handles_mut.create(Value::Vector(Vector::new(s_vec)));
-        let V = handles_mut.create(Value::Matrix(v));
+        let u_handle = handles_mut.create(Value::Matrix(u_mat));
+        let s_handle = handles_mut.create(Value::Vector(Vector::new(s_vec)));
+        let v_handle = handles_mut.create(Value::Matrix(v_mat));
 
-        Ok(SVDResult { U, S, V })
+        Ok(SvdResult { u: u_handle, s: s_handle, v: v_handle })
     })
 }
 
@@ -886,7 +1037,7 @@ pub fn svd_decomposition_js(handle: Handle) -> Result<SVDResult, JsValue> {
 // Eigenvalue Solvers
 // ============================================================================
 
-#[wasm_bindgen]
+#[wasm_bindgen(js_name = PowerIterationResult)]
 pub struct PowerIterationResult {
     #[wasm_bindgen(readonly)]
     pub eigenvalue: f64,
@@ -894,8 +1045,8 @@ pub struct PowerIterationResult {
     pub eigenvector: Handle,
 }
 
-#[wasm_bindgen]
-pub fn power_iteration_js(
+#[wasm_bindgen(js_name = powerIteration)]
+pub fn power_iteration(
     handle: Handle,
     max_iterations: usize,
     tolerance: f64
@@ -926,8 +1077,8 @@ pub fn power_iteration_js(
     })
 }
 
-#[wasm_bindgen]
-pub fn qr_eigenvalues_js(
+#[wasm_bindgen(js_name = qrEigenvalues)]
+pub fn qr_eigenvalues(
     handle: Handle,
     max_iterations: usize,
     tolerance: f64
@@ -953,7 +1104,7 @@ pub fn qr_eigenvalues_js(
     })
 }
 
-#[wasm_bindgen]
+#[wasm_bindgen(js_name = EigenResult)]
 pub struct EigenResult {
     #[wasm_bindgen(readonly)]
     pub eigenvalues: Handle,
@@ -961,15 +1112,15 @@ pub struct EigenResult {
     pub eigenvectors: Handle,
 }
 
-#[wasm_bindgen]
-pub fn eigen_symmetric_js(
+#[wasm_bindgen(js_name = eigenSymmetric)]
+pub fn eigen_symmetric(
     handle: Handle,
     max_iterations: usize,
     tolerance: f64
 ) -> Result<EigenResult, JsValue> {
     HANDLES.with(|h| {
         // First, borrow immutably to read and compute
-        let (eigenvalues_vec, eigenvectors) = {
+        let (eigenvalues_vec, eigenvectors_mat) = {
             let handles = h.borrow();
             let value = handles.get(handle)
                 .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
@@ -986,7 +1137,7 @@ pub fn eigen_symmetric_js(
         // Now borrow mutably to create handles
         let mut handles_mut = h.borrow_mut();
         let eigenvalues_handle = handles_mut.create(Value::Vector(Vector::new(eigenvalues_vec)));
-        let eigenvectors_handle = handles_mut.create(Value::Matrix(eigenvectors));
+        let eigenvectors_handle = handles_mut.create(Value::Matrix(eigenvectors_mat));
 
         Ok(EigenResult {
             eigenvalues: eigenvalues_handle,
@@ -999,8 +1150,8 @@ pub fn eigen_symmetric_js(
 // Matrix Utilities
 // ============================================================================
 
-#[wasm_bindgen]
-pub fn is_symmetric_js(handle: Handle, tolerance: f64) -> Result<bool, JsValue> {
+#[wasm_bindgen(js_name = isSymmetric)]
+pub fn is_symmetric(handle: Handle, tolerance: f64) -> Result<bool, JsValue> {
     HANDLES.with(|h| {
         let handles = h.borrow();
         let value = handles.get(handle)
@@ -1015,8 +1166,8 @@ pub fn is_symmetric_js(handle: Handle, tolerance: f64) -> Result<bool, JsValue> 
     })
 }
 
-#[wasm_bindgen]
-pub fn is_positive_definite_js(handle: Handle) -> Result<bool, JsValue> {
+#[wasm_bindgen(js_name = isPositiveDefinite)]
+pub fn is_positive_definite(handle: Handle) -> Result<bool, JsValue> {
     HANDLES.with(|h| {
         let handles = h.borrow();
         let value = handles.get(handle)
@@ -1031,8 +1182,8 @@ pub fn is_positive_definite_js(handle: Handle) -> Result<bool, JsValue> {
     })
 }
 
-#[wasm_bindgen]
-pub fn identity_js(n: usize) -> Result<Handle, JsValue> {
+#[wasm_bindgen(js_name = identity)]
+pub fn identity(n: usize) -> Result<Handle, JsValue> {
     let mut data = vec![0.0; n * n];
     for i in 0..n {
         data[i * n + i] = 1.0;

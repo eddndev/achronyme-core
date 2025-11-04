@@ -17,6 +17,11 @@
             output.textContent = '';
 
             try {
+                // Debug: List all exported functions
+                output.textContent += '📋 Available functions:\n';
+                const funcs = Object.keys(wasm).filter(k => typeof wasm[k] === 'function');
+                output.textContent += funcs.join(', ') + '\n\n';
+
                 await init();
                 output.textContent += '✅ Step 1: WASM initialized\n';
 
@@ -28,16 +33,30 @@
                 const data1 = wasm.getVector(h1);
                 output.textContent += `✅ Step 3: getVector succeeded: [${data1}]\n`;
 
-                // CRITICAL TEST: sin() with new implementation
-                output.textContent += '\n🔍 CRITICAL TEST: Calling sin()...\n';
-                const h2 = wasm.sin(h1);
-                output.textContent += `✅ Step 4: sin() SUCCEEDED! handle=${h2}\n`;
+                // CRITICAL TEST 1: mathSin()
+                output.textContent += '\n🔍 TEST 1: Calling mathSin()...\n';
+                try {
+                    // Call the corrected, renamed function
+                    const h2 = wasm.mathSin(h1); 
+                    output.textContent += `✅ mathSin() SUCCEEDED! handle=${h2}\n`;
+                    const data2 = wasm.getVector(h2);
+                    output.textContent += `   Result: [${data2.map(x => x.toFixed(4))}]\n`;
+                } catch (error) {
+                    output.textContent += `❌ mathSin() FAILED: ${error.message}\n`;
+                }
 
-                // Verify result
-                const data2 = wasm.getVector(h2);
-                output.textContent += `✅ Step 5: sin result: [${data2.map(x => x.toFixed(4))}]\n`;
+                // CRITICAL TEST 2: linspace()
+                output.textContent += '\n🔍 TEST 2: Calling linspace()...\n';
+                try {
+                    const h4 = wasm.linspace(0, 10, 5);
+                    output.textContent += `✅ linspace() SUCCEEDED! handle=${h4}\n`;
+                    const data4 = wasm.getVector(h4);
+                    output.textContent += `   Result: [${data4.map(x => x.toFixed(2))}]\n`;
+                } catch (error) {
+                    output.textContent += `❌ linspace() FAILED: ${error.message}\n`;
+                }
 
-                output.textContent += '\n🎉 ALL TESTS PASSED!\n';
+                output.textContent += '\n🎉 TEST COMPLETE!\n';
 
             } catch (error) {
                 output.textContent += `\n❌ FAILED at current step\n`;

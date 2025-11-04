@@ -121,7 +121,7 @@ export class RustWASM {
     sin(handle: Handle): Handle {
         const mod = this.ensureInit();
         try {
-            return mod.sin(handle);
+            return mod.mathSin(handle);
         } catch (error) {
             throw new Error(`sin failed: ${error}`);
         }
@@ -130,7 +130,7 @@ export class RustWASM {
     cos(handle: Handle): Handle {
         const mod = this.ensureInit();
         try {
-            return mod.cos(handle);
+            return mod.mathCos(handle);
         } catch (error) {
             throw new Error(`cos failed: ${error}`);
         }
@@ -139,7 +139,7 @@ export class RustWASM {
     tan(handle: Handle): Handle {
         const mod = this.ensureInit();
         try {
-            return mod.tan(handle);
+            return mod.mathTan(handle);
         } catch (error) {
             throw new Error(`tan failed: ${error}`);
         }
@@ -148,7 +148,7 @@ export class RustWASM {
     exp(handle: Handle): Handle {
         const mod = this.ensureInit();
         try {
-            return mod.exp(handle);
+            return mod.mathExp(handle);
         } catch (error) {
             throw new Error(`exp failed: ${error}`);
         }
@@ -157,7 +157,7 @@ export class RustWASM {
     ln(handle: Handle): Handle {
         const mod = this.ensureInit();
         try {
-            return mod.ln(handle);
+            return mod.mathLn(handle);
         } catch (error) {
             throw new Error(`ln failed: ${error}`);
         }
@@ -166,7 +166,7 @@ export class RustWASM {
     abs(handle: Handle): Handle {
         const mod = this.ensureInit();
         try {
-            return mod.abs(handle);
+            return mod.mathAbs(handle);
         } catch (error) {
             throw new Error(`abs failed: ${error}`);
         }
@@ -175,7 +175,7 @@ export class RustWASM {
     sqrt(handle: Handle): Handle {
         const mod = this.ensureInit();
         try {
-            return mod.sqrt(handle);
+            return mod.mathSqrt(handle);
         } catch (error) {
             throw new Error(`sqrt failed: ${error}`);
         }
@@ -188,7 +188,7 @@ export class RustWASM {
     fft(handle: Handle): Handle {
         const mod = this.ensureInit();
         try {
-            return mod.fft(handle);
+            return mod.dspFft(handle);
         } catch (error) {
             throw new Error(`fft failed: ${error}`);
         }
@@ -197,7 +197,7 @@ export class RustWASM {
     fft_mag(handle: Handle): Handle {
         const mod = this.ensureInit();
         try {
-            return mod.fft_mag(handle);
+            return mod.dspFftMag(handle);
         } catch (error) {
             throw new Error(`fft_mag failed: ${error}`);
         }
