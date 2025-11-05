@@ -90,12 +90,16 @@ export class HandleManager {
     /**
      * Garbage collect all handles tracked by this manager.
      * This is the primary mechanism for session-based cleanup.
+     *
+     * @returns Number of handles freed
      */
-    gc(): void {
+    gc(): number {
         const handles = Array.from(this.handles.keys());
+        const count = handles.length;
         for (const handle of handles) {
             this.release(handle);
         }
+        return count;
     }
 
     /**

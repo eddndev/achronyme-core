@@ -36,4 +36,3 @@ export { createAchronymeModule as createModule };
 
 // Re-export main classes for convenience
 export { Achronyme } from './sdk/Achronyme.js';
-export { AchronymeValue } from './sdk/AchronymeValue.js';

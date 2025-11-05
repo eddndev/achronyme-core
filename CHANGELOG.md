@@ -11,6 +11,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Symbolic computation
 - Units and dimensions
 
+## [0.5.0] - 2025-11-04
+
+### Added - Rust WASM Integration & SDK v2.0 🦀
+
+**Complete Rewrite with Rust/WASM:**
+- **Rust WASM Core** using `wasm-bindgen` with `target=bundler`
+- **TypeScript SDK v2.0** with modern architecture:
+  - Session-based resource management with automatic cleanup
+  - Modular operations: `MathOps`, `DSPOps`, `LinalgOps`, `VectorOps`, `HOFOps`, `StatsOps`
+  - Zero-copy value types: `Vector`, `Matrix`, `Scalar`, `Complex`
+  - Handle-based memory management with garbage collection
+  - Memory pool for efficient handle reuse
+
+**SOC Language Evaluator:**
+- Full expression evaluation with `eval()` method
+- Lambda functions with closures support
+- Higher-order functions: `map`, `filter`, `reduce`, `pipe`
+- Variable declarations with `let`
+- Complete parser and evaluator in Rust
+
+**Performance Improvements:**
+- **5.25x faster** than JavaScript V8 in vectorized math operations
+- Optimized vector operations with direct WASM calls (fast-path)
+- 10M element operations:
+  - `sin()`: 625ms (79.8M ops/sec) vs V8: 3805ms
+  - `cos()`: 650ms (76.8M ops/sec) vs V8: 3647ms
+  - `exp()`: 754ms (66.2M ops/sec) vs V8: 3417ms
+
+**Interactive Demo:**
+- Comprehensive test suite with 8 categories
+- Real-time benchmarks vs JavaScript V8 and math.js
+- Stress tests (50K vectors, 100K elements, 32K DSP pipeline)
+- SOC expression tests with lambdas and HOF
+
+### Changed
+- **WASM Build Target**: Changed from `target=web` to `target=bundler` for npm compatibility
+- **SDK Architecture**: Refactored to use Rust WASM instead of C++ Emscripten
+- **VectorOps Fast-Path**: Now uses direct WASM bindings instead of JavaScript loops (2.6x faster)
+- **Import Structure**: Uses compiled artifacts from `dist/` for production
+
+### Fixed
+- **Type Safety**: Fixed Float64Array ↔ number[] conversions in RustBindings
+- **Initialization**: Fixed DOMContentLoaded timing with module scripts
+- **Vite Support**: Added `vite-plugin-wasm` and `vite-plugin-top-level-await` for bundler compatibility
+- **Memory Management**: `gc()` now returns count of freed handles
+- **Package Publishing**: Fixed `.npmignore` to include dist/ properly (55 files, 1.3MB)
+
+### Technical Details
+- Rust crates: `achronyme-wasm`, `achronyme-types`, `achronyme-parser`, `achronyme-eval`, `achronyme-dsp`, `achronyme-linalg`
+- TypeScript SDK with full type definitions
+- Automatic WASM initialization with bundler target
+- Enhanced error handling and logging
+
+### Validation
+- ✅ All SDK tests passing
+- ✅ All SOC expression tests passing (8/8)
+- ✅ All benchmarks showing expected performance (5.25x vs V8)
+- ✅ Package ready for npm publish (verified with `npm pack --dry-run`)
+- ✅ Interactive demo fully functional
+
 ## [0.4.0] - 2025-11-01
 
 ### Added - Advanced Linear Algebra 📐

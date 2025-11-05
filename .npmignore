@@ -38,10 +38,10 @@ CHANGELOG.md
 CMakeLists.txt
 CONTRIBUTING.md
 inspect-wasm.mjs
-LICENSE
-README.md
 REFACTOR.md
 SESSION-SUMMARY.md
+SESSION.md
+.claude/
 test-hof.ach
 tsconfig.json
 tsconfig.sdk.json

@@ -14,7 +14,7 @@ fi
 echo "🔧 Compiling Rust → WASM..."
 cd crates/achronyme-wasm
 wasm-pack build \
-  --target web \
+  --target bundler \
   --out-dir ../../dist \
   --release
 

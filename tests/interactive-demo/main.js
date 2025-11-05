@@ -1,13 +1,19 @@
-import { Achronyme } from '../../src/sdk/index.ts';
+console.log('🚀 main.js loading...');
+
+import { Achronyme } from '../../dist/sdk/index.js';
 import * as math from 'mathjs';
+
+console.log('✅ Imports successful');
 
 // Global SDK instance
 let ach = null;
 
 // DOM Elements
+console.log('🔍 Getting DOM elements...');
 const sdkStatusText = document.getElementById('sdk-status-text');
 const memoryStatusText = document.getElementById('memory-status-text');
 const resultsOutput = document.getElementById('results-output');
+console.log('✅ DOM elements retrieved:', { sdkStatusText, memoryStatusText, resultsOutput });
 
 // Test category buttons
 const categoryButtons = document.querySelectorAll('.test-category');
@@ -25,11 +31,15 @@ const testButtons = document.querySelectorAll('.test-btn');
 // Initialize SDK
 async function initSDK() {
   try {
+    console.log('🔄 Starting SDK initialization...');
     sdkStatusText.textContent = 'Initializing...';
     sdkStatusText.style.color = 'var(--warning)';
 
     ach = new Achronyme();
+    console.log('✅ Achronyme instance created');
+
     await ach.init();
+    console.log('✅ SDK initialized successfully');
 
     sdkStatusText.textContent = 'Ready';
     sdkStatusText.style.color = 'var(--success)';
@@ -37,9 +47,10 @@ async function initSDK() {
     addResult('SDK Initialized', 'SDK is ready for testing', 'success');
     updateMemoryStatus();
   } catch (error) {
+    console.error('❌ SDK initialization failed:', error);
     sdkStatusText.textContent = 'Error';
     sdkStatusText.style.color = 'var(--error)';
-    addResult('SDK Initialization Failed', error.message, 'error');
+    addResult('SDK Initialization Failed', error.message + '\n\nCheck browser console for details', 'error');
   }
 }
 
@@ -898,6 +909,20 @@ runAllBtn.addEventListener('click', async () => {
 });
 
 // Initialize on load
-window.addEventListener('DOMContentLoaded', () => {
+console.log('📝 Setting up initialization...');
+console.log('Document ready state:', document.readyState);
+
+if (document.readyState === 'loading') {
+  // DOM not ready yet
+  console.log('⏳ DOM still loading, adding listener...');
+  window.addEventListener('DOMContentLoaded', () => {
+    console.log('🎯 DOMContentLoaded fired!');
+    initSDK();
+  });
+} else {
+  // DOM already ready (happens with type="module")
+  console.log('✅ DOM already ready, initializing immediately...');
   initSDK();
-});
+}
+
+console.log('✅ Initialization setup complete');
