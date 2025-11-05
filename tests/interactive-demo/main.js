@@ -1,6 +1,6 @@
 console.log('🚀 main.js loading...');
 
-import { Achronyme } from '../../dist/sdk/index.js';
+import { Achronyme } from '@achronyme/core';
 import * as math from 'mathjs';
 
 console.log('✅ Imports successful');

@@ -5,7 +5,7 @@
 [![npm version](https://img.shields.io/npm/v/@achronyme/core)](https://www.npmjs.com/package/@achronyme/core)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Achronyme Core es un motor de computación matemática compilado a WebAssembly que combina rendimiento de C++ con la accesibilidad de JavaScript/TypeScript.
+Achronyme Core es un motor de computación matemática compilado a WebAssembly que combina rendimiento de C++ con la accesibilidad de JavaScript/TypeScript. Presenta un **SDK TypeScript v2.0** moderno y un potente **lenguaje de expresiones SOC** para cálculos eficientes.
 
 ```typescript
 import { Achronyme } from '@achronyme/core';
@@ -13,13 +13,16 @@ import { Achronyme } from '@achronyme/core';
 const ach = new Achronyme();
 await ach.init();
 
-// DSP en tiempo real
-const signal = ach.vector(Array.from({length: 1024}, (_, i) =>
-  Math.sin(2 * Math.PI * 50 * i / 1000)
-));
-const spectrum = ach.fft_mag(signal);
+// DSP en tiempo real con gestión de memoria automática
+await ach.use(async () => {
+  const signal = ach.vector(Array.from({length: 1024}, (_, i) =>
+    Math.sin(2 * Math.PI * 50 * i / 1000)
+  ));
+  const spectrum = ach.dsp.fftMag(signal);
 
-console.log('Dominant frequency:', await spectrum.toVector());
+  console.log('Dominant frequency (first 5 values):', spectrum.data.slice(0, 5));
+  // signal y spectrum se limpian automáticamente al salir de ach.use()
+});
 ```
 
 ---
@@ -36,20 +39,22 @@ console.log('Dominant frequency:', await spectrum.toVector());
 
 *Nota: Achronyme usa WASM compilado con -O3 y sistema de handles zero-copy. math.js es JavaScript puro. Benchmarks ejecutados en Chrome V8.*
 
-**Fast Path Usage**: 99.9% de operaciones usan path optimizado (sin parsing)
+**Fast Path Usage**: El SDK v2.0 maximiza el uso de rutas optimizadas en WASM, incluyendo **vistas zero-copy** para acceso instantáneo a los datos.
 
 ---
 
 ## ✨ Características
 
-- **🚀 Alto rendimiento**: **1.39x más rápido que math.js** en operaciones vectorizadas, **78x en FFT**
-- **🔢 Tipos avanzados**: Number, Complex, Vector, Matrix, Function
-- **📡 DSP nativo**: FFT Cooley-Tukey, convolución, ventanas, filtros
-- **λ Programación funcional**: Lambdas, closures, map/filter/reduce
+- **🚀 Alto rendimiento**: **4.45x más rápido que JS Nativo** en operaciones matemáticas vectorizadas, **202.01x en FFT**.
+- **🧠 Gestión de Memoria por Sesiones**: El patrón `ach.use()` garantiza la limpieza automática de recursos WASM, previniendo fugas de memoria.
+- **💾 Vistas Zero-Copy**: Acceso instantáneo a los datos en memoria WASM (`Float64Array`) sin costosas copias.
+- **🔢 Tipos avanzados**: Number, Complex, Vector, Matrix, Function.
+- **📡 DSP nativo**: FFT Cooley-Tukey, convolución, ventanas, filtros.
+- **λ Programación funcional**: Lambdas, closures, map/filter/reduce.
 - **📐 Álgebra lineal**: Operaciones matriciales, determinante, inversa, y descomposiciones avanzadas (LU, QR, SVD, Cholesky, Eigenvalues).
-- **💾 Zero-copy**: Sistema de handles evita serialización JS ↔ WASM
-- **TypeScript SDK**: API tipo-segura con gestión de memoria explícita
-- **🌐 Universal**: Web, Node.js, y compilable a binarios nativos
+- **📝 Lenguaje de Expresiones SOC**: Un potente lenguaje string-based para ejecutar pipelines complejos en una sola llamada a WASM.
+- **TypeScript SDK v2.0**: API tipo-segura y modular.
+- **🌐 Universal**: Web, Node.js, y compilable a binarios nativos.
 
 ---
 
@@ -63,7 +68,9 @@ npm install @achronyme/core
 
 ## 🚀 Inicio Rápido
 
-### Uso Básico con SDK TypeScript
+### Uso Básico con SDK TypeScript (v2.0)
+
+El patrón recomendado es usar `ach.use()` para la gestión automática de memoria.
 
 ```typescript
 import { Achronyme } from '@achronyme/core';
@@ -71,61 +78,70 @@ import { Achronyme } from '@achronyme/core';
 const ach = new Achronyme();
 await ach.init();
 
-// Operaciones matemáticas
-const result = ach.number(5).mul(2).add(10).div(4);
-console.log(await result.toNumber()); // → 5
+await ach.use(async () => {
+  // Operaciones matemáticas
+  const x = ach.scalar(5);
+  const result = ach.math.add(ach.math.mul(x, 2), 10); // (5 * 2) + 10 = 20
+  console.log('Resultado:', x.value); // 20
 
-// Vectores y estadísticas
-const data = ach.vector([1, 2, 3, 4, 5]);
-const mean = ach.mean(data);
-const std = ach.std(data);
+  // Vectores y estadísticas
+  const data = ach.vector([1, 2, 3, 4, 5]);
+  const mean = ach.stats.mean(data);
+  const std = ach.stats.std(data);
 
-console.log('Mean:', await mean.toNumber());
-console.log('Std:', await std.toNumber());
+  console.log('Mean:', mean);
+  console.log('Std:', std);
 
-// Limpieza de memoria
-result.dispose();
-data.dispose();
-mean.dispose();
-std.dispose();
+  // x, result, data, mean, std se limpian automáticamente al salir de ach.use()
+});
 ```
 
 ### Procesamiento de Señales (DSP)
 
 ```typescript
-// Generar señal con ruido
-const signalData = Array.from({length: 1024}, (_, i) =>
-  Math.sin(2 * Math.PI * 50 * i / 1000) +
-  0.5 * Math.sin(2 * Math.PI * 120 * i / 1000)
-);
+import { Achronyme } from '@achronyme/core';
 
-const signal = ach.vector(signalData);
-const window = ach.hanning(1024);
-const windowed = ach.vmul(signal, window);
-const spectrum = ach.fft_mag(windowed);
+const ach = new Achronyme();
+await ach.init();
 
-console.log('Spectrum:', await spectrum.toVector());
+await ach.use(async () => {
+  // Generar señal con ruido
+  const signalData = Array.from({length: 1024}, (_, i) =>
+    Math.sin(2 * Math.PI * 50 * i / 1000) +
+    0.5 * Math.sin(2 * Math.PI * 120 * i / 1000)
+  );
 
-// Cleanup
-signal.dispose();
-window.dispose();
-windowed.dispose();
-spectrum.dispose();
+  const signal = ach.vector(signalData);
+  const window = ach.dsp.hanning(1024);
+  const windowed = ach.vecOps.vmul(signal, window); // Multiplicación elemento a elemento
+  const spectrum = ach.dsp.fftMag(windowed);
+
+  console.log('Spectrum (first 10 values):', spectrum.data.slice(0, 10));
+
+  // signal, window, windowed, spectrum se limpian automáticamente
+});
 ```
 
-### Programación Funcional
+### Programación Funcional con el Lenguaje SOC
 
 ```typescript
-const numbers = ach.vector([1, 2, 3, 4, 5, 6]);
+import { Achronyme } from '@achronyme/core';
 
-// Map, filter, reduce
-const squared = ach.map('x => x^2', numbers);
-const evens = ach.filter('x => x % 2 == 0', numbers);
-const sum = ach.reduce('(a,b) => a+b', numbers, ach.number(0));
+const ach = new Achronyme();
+await ach.init();
 
-console.log(await squared.toVector()); // → [1, 4, 9, 16, 25, 36]
-console.log(await evens.toVector());   // → [2, 4, 6]
-console.log(await sum.toNumber());     // → 21
+await ach.use(async () => {
+  const numbers = ach.vector([1, 2, 3, 4, 5, 6]);
+
+  // Map, filter, reduce usando el lenguaje SOC
+  const squared = ach.eval("map(x => x^2, [1,2,3,4,5,6])");
+  const evens = ach.eval("filter(x => x % 2 == 0, [1,2,3,4,5,6])");
+  const sum = ach.eval("reduce((a,b) => a+b, 0, [1,2,3,4,5,6])");
+
+  console.log('Squared:', squared); // → "[1, 4, 9, 16, 25, 36]"
+  console.log('Evens:', evens);     // → "[2, 4, 6]"
+  console.log('Sum:', sum);         // → "21" 
+});
 ```
 
 ---
@@ -135,23 +151,20 @@ console.log(await sum.toNumber());     // → 21
 **Benchmarks de producción** - Ejecutados en Chrome V8 con datasets reales:
 
 ### Operaciones Matemáticas Vectorizadas
-*(100K elementos, 100 iteraciones, 6 operaciones: exp, ln, sqrt, abs, sin, cos)*
+*(10.000.000 elementos × 5 iteraciones, 3 operaciones: sin, cos, exp)*
 
-| Librería | Tiempo Total | Throughput | Resultado |
-|----------|--------------|------------|-----------|
-| **Achronyme (WASM)** | 447ms | 33.5M ops/sec | 🏆 **Ganador** |
-| math.js | 622ms | 24.1M ops/sec | 1.39x más lento |
-| JS nativo | 390ms | 38.5M ops/sec | Referencia teórica* |
-
-*JS nativo es el límite teórico de V8 JIT para `Array.map()` - en producción se usan librerías como math.js*
+| Librería | Tiempo Total | Speedup vs JS Native | Resultado |
+|----------|--------------|----------------------|-----------|
+| **Achronyme (WASM)** | 2239.20ms | **4.45x más rápido** | 🏆 **Ganador** |
+| JS Nativo (V8) | 9971.90ms | 1.00x (baseline) | Referencia |
 
 ### DSP y Operaciones Complejas
 
 | Operación | Achronyme | math.js | Speedup |
 |-----------|-----------|---------|---------|
-| **FFT (4K samples)** | 26ms | 2032ms | **🚀 78x más rápido** |
-| **Vector operations (100K)** | 3.7ms | 9.7ms | **2.6x más rápido** |
-| **Pipeline DSP (32K)** | 131ms | 705ms | **5.4x más rápido** |
+| **FFT (8K samples)** | 7.40ms | 1494.90ms | **🚀 202.01x más rápido** |
+| **Operaciones Vectoriales (200K)** | 550.10ms | 1649.30ms | **3.00x más rápido** |
+| **Pipeline DSP Completo (16K)** | 5.10ms | 313.90ms | **61.55x más rápido** |
 
 ### Fast Path Efficiency
 - **99.9%** de operaciones usan path optimizado (zero-copy)
@@ -164,16 +177,10 @@ console.log(await sum.toNumber());     // → 21
 - ✅ Mantiene datos en memoria WASM durante pipelines
 
 **Por qué Achronyme compite con JS nativo:**
-- ⚡ Overhead JS-WASM minimalizado (solo 15% vs V8 JIT puro)
-- ⚡ Operaciones vectorizadas sin abstracciones
-- ⚡ Sin overhead de librerías (math.js tiene múltiples capas)
-
-**Cuándo usar Achronyme:**
-- ✅ DSP, análisis espectral, procesamiento de señales
-- ✅ Operaciones matemáticas complejas (FFT, convolución)
-- ✅ Pipelines con múltiples operaciones encadenadas
-- ✅ Aplicaciones que actualmente usan math.js (39% de mejora)
-- ✅ Datasets medianos a grandes (1K+ elementos)
+- ⚡ Overhead JS-WASM minimalizado, especialmente en operaciones complejas.
+- ⚡ Operaciones vectorizadas sin abstracciones.
+- ⚡ Sin overhead de librerías (math.js tiene múltiples capas).
+- **Nota**: Para operaciones vectoriales muy simples, JavaScript nativo (V8) puede ser marginalmente más rápido, pero Achronyme supera a JS nativo en operaciones matemáticas complejas y pipelines DSP.
 
 ---
 
@@ -181,10 +188,15 @@ console.log(await sum.toNumber());     // → 21
 
 ### Guías Completas
 
-- **[Especificación del Lenguaje SOC](./docs/language-spec.md)** - Gramática, tipos, operadores, sintaxis
-- **[Guía del SDK TypeScript](./docs/sdk-guide.md)** - API completa, gestión de memoria, ejemplos
-- **[Roadmap del Proyecto](./docs/roadmap.md)** - Futuro de Achronyme y ecosistema
-- **[Comparación con Wolfram](./docs/wolfram-comparison.md)** - Análisis competitivo realista
+- **[Guía del SDK TypeScript v2.0](./docs/sdk/README.md)** - Visión general del SDK, características clave y ejemplos.
+- **[Referencia de API del SDK](./docs/sdk/api-reference.md)** - Documentación detallada de todas las clases, métodos y funciones del SDK.
+- **[Gestión de Memoria del SDK](./docs/sdk/memory-management.md)** - Patrones y mejores prácticas para el manejo de memoria en el SDK.
+- **[Ejemplos del SDK](./docs/sdk/examples.md)** - Casos de uso prácticos y código de ejemplo para el SDK.
+- **[Tipos de Datos del SDK](./docs/sdk/types.md)** - Definiciones de tipos TypeScript y estructuras de datos del SDK.
+- **[Especificación del Lenguaje SOC](./docs/language-spec.md)** - Gramática, tipos, operadores y funciones del lenguaje de expresiones SOC.
+- **[Guía de Rendimiento](./docs/sdk/optimization-functions.md)** - Estrategias para optimizar el rendimiento y minimizar el overhead JS-WASM.
+- **[Roadmap del Proyecto](./docs/roadmap.md)** - Futuro de Achronyme y ecosistema.
+- **[Comparación con Wolfram](./docs/wolfram-comparison.md)** - Análisis competitivo realista.
 
 ### Ejemplos
 
@@ -253,6 +265,8 @@ npm run build
 ---
 
 ## 🎯 Características del Lenguaje SOC
+
+El lenguaje SOC permite ejecutar expresiones matemáticas complejas directamente en el motor WASM.
 
 ### Tipos de Datos
 
@@ -325,8 +339,8 @@ Achronyme es open-source y buscamos colaboradores en:
 - **DSP engineers**: Optimización de FFT, filtros
 - **Documentation**: Tutoriales, traducciones
 
-**Repositorio**: https://github.com/eddndev/achronyme-core
-**Discusiones**: https://github.com/eddndev/achronyme-core/discussions
+**Repositorio**: https://github.com/achronyme/achronyme-core
+**Discusiones**: https://github.com/achronyme/achronyme-core/discussions
 
 ---
 
@@ -342,9 +356,9 @@ Ver [LICENSE](./LICENSE) para detalles completos.
 
 - **[Documentación](./docs/)** - Guías completas
 - **[Ejemplos](./examples/)** - Código de ejemplo
-- **[GitHub](https://github.com/eddndev/achronyme-core)** - Repositorio
+- **[GitHub](https://github.com/achronyme/achronyme-core)** - Repositorio
 - **[npm](https://www.npmjs.com/package/@achronyme/core)** - Paquete
-- **[Website](https://achronyme.com)** - Sitio oficial
+Website: https://achrony.me
 
 ---
 

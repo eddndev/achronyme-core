@@ -14,6 +14,7 @@ export default defineConfig({
     }
   },
   optimizeDeps: {
-    exclude: ['@achronyme/core']
+    // Remove exclusion to let Vite bundle from node_modules
+    // exclude: ['@achronyme/core']
   }
 });
