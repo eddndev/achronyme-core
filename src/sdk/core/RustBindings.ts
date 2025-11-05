@@ -472,6 +472,102 @@ export class RustWASM {
             throw new Error(`_eval failed: ${error}`);
         }
     }
+
+    // ========================================================================
+    // Numerical Calculus
+    // ========================================================================
+
+    /**
+     * Numerical first derivative
+     */
+    numDiff(funcHandle: Handle, x: number, h: number): number {
+        const mod = this.ensureInit();
+        return mod.numDiff(funcHandle, x, h);
+    }
+
+    /**
+     * Numerical second derivative
+     */
+    numDiff2(funcHandle: Handle, x: number, h: number): number {
+        const mod = this.ensureInit();
+        return mod.numDiff2(funcHandle, x, h);
+    }
+
+    /**
+     * Numerical third derivative
+     */
+    numDiff3(funcHandle: Handle, x: number, h: number): number {
+        const mod = this.ensureInit();
+        return mod.numDiff3(funcHandle, x, h);
+    }
+
+    /**
+     * Numerical integration (trapezoidal rule)
+     */
+    numIntegral(funcHandle: Handle, a: number, b: number, n: number): number {
+        const mod = this.ensureInit();
+        return mod.numIntegral(funcHandle, a, b, n);
+    }
+
+    /**
+     * Numerical integration (Simpson's rule)
+     */
+    numSimpson(funcHandle: Handle, a: number, b: number, n: number): number {
+        const mod = this.ensureInit();
+        return mod.numSimpson(funcHandle, a, b, n);
+    }
+
+    /**
+     * Romberg integration
+     */
+    numRomberg(funcHandle: Handle, a: number, b: number, tol: number): number {
+        const mod = this.ensureInit();
+        return mod.numRomberg(funcHandle, a, b, tol);
+    }
+
+    /**
+     * Adaptive quadrature
+     */
+    numQuad(funcHandle: Handle, a: number, b: number): number {
+        const mod = this.ensureInit();
+        return mod.numQuad(funcHandle, a, b);
+    }
+
+    /**
+     * Root finding (bisection method)
+     */
+    numSolve(funcHandle: Handle, a: number, b: number, tol: number): number {
+        const mod = this.ensureInit();
+        return mod.numSolve(funcHandle, a, b, tol);
+    }
+
+    /**
+     * Root finding (Newton's method)
+     */
+    numNewton(
+        funcHandle: Handle,
+        dfuncHandle: Handle,
+        x0: number,
+        tol: number,
+        maxIter: number
+    ): number {
+        const mod = this.ensureInit();
+        return mod.numNewton(funcHandle, dfuncHandle, x0, tol, maxIter);
+    }
+
+    /**
+     * Root finding (Secant method)
+     */
+    numSecant(
+        funcHandle: Handle,
+        x0: number,
+        x1: number,
+        tol: number,
+        maxIter: number
+    ): number {
+        const mod = this.ensureInit();
+        return mod.numSecant(funcHandle, x0, x1, tol, maxIter);
+    }
 }
 
 /**

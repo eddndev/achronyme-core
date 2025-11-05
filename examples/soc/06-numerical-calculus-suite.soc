@@ -1,0 +1,36 @@
+// --- Complete Numerical Calculus Test Suite ---
+
+// Test 1: First derivative (expected: 4.0)
+let test1 = diff(x => x^2, 2, 1e-5)
+
+// Test 2: Second derivative (expected: 12.0)
+let test2 = diff2(x => x^3, 2, 1e-3)
+
+// Test 3: Third derivative (expected: 48.0)
+let test3 = diff3(x => x^4, 2, 1e-2)
+
+// Test 4: Trapezoidal integration (expected: 0.5)
+let test4 = integral(x => x, 0, 1, 1000)
+
+// Test 5: Simpson's rule (expected: 0.333...)
+let test5 = simpson(x => x^2, 0, 1, 100)
+
+// Test 6: Romberg integration sin(x) from 0 to π (expected: 2.0)
+let test6 = romberg(x => sin(x), 0, 3.14159265359, 1e-10)
+
+// Test 7: Adaptive quadrature e^x from 0 to 1 (expected: 1.718...)
+let test7 = quad(x => exp(x), 0, 1)
+
+// Test 8: Bisection root finding (expected: 2.0)
+let test8 = solve(x => x^2 - 4, 0, 5, 1e-6)
+
+// Test 9: Newton's method (expected: 2.0)
+let f_newton = x => x^2 - 4
+let df_newton = x => 2*x
+let test9 = newton(f_newton, df_newton, 1, 1e-10, 100)
+
+// Test 10: Secant method (expected: 1.521...)
+let test10 = secant(x => x^3 - x - 2, 1, 2, 1e-10, 100)
+
+// Return a vector with all results
+[test1, test2, test3, test4, test5, test6, test7, test8, test9, test10]
