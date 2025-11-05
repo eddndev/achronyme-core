@@ -23,4 +23,4 @@ achronyme-numerical = { path = "../achronyme-numerical" }
 
 # Profile-specific metadata for wasm-pack
 [package.metadata.wasm-pack.profile.release]
-wasm-opt = false # Disable wasm-opt to avoid bulk memory validation errors
+wasm-opt = true # Disable wasm-opt to avoid bulk memory validation errors

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Achronyme Interactive Demo - WASM SDK Testbed</title>
-  <script type="module" crossorigin src="/assets/index-hTYEMxgZ.js"></script>
+  <script type="module" crossorigin src="/assets/index-DN2iNSqw.js"></script>
   <link rel="stylesheet" crossorigin href="/assets/index-CVNYRwVl.css">
 </head>
 <body>
@@ -36,6 +36,7 @@
           <button class="test-category" data-category="dsp">DSP Functions</button>
           <button class="test-category" data-category="hof">Higher-Order Functions</button>
           <button class="test-category" data-category="matrix">Matrix Operations</button>
+          <button class="test-category" data-category="numerical">Numerical Calculus</button>
           <button class="test-category" data-category="soc">SOC Expressions & Lambdas</button>
           <button class="test-category" data-category="stress">Stress Test</button>
           <button class="test-category" data-category="benchmark">Benchmarks</button>
@@ -115,6 +116,23 @@
             <button class="test-btn" data-test="matrix-determinant">Determinant</button>
             <button class="test-btn" data-test="matrix-inverse">Inverse</button>
             <button class="test-btn" data-test="matrix-decomposition">Decompositions (LU, QR, SVD)</button>
+          </div>
+        </div>
+
+        <div class="test-section hidden" id="section-numerical">
+          <h2>Numerical Calculus</h2>
+          <div class="test-grid">
+            <button class="test-btn" data-test="numerical-diff">First Derivative (diff)</button>
+            <button class="test-btn" data-test="numerical-diff2">Second Derivative (diff2)</button>
+            <button class="test-btn" data-test="numerical-diff3">Third Derivative (diff3)</button>
+            <button class="test-btn" data-test="numerical-integral">Trapezoidal Integration</button>
+            <button class="test-btn" data-test="numerical-simpson">Simpson Integration</button>
+            <button class="test-btn" data-test="numerical-romberg">Romberg Integration</button>
+            <button class="test-btn" data-test="numerical-quad">Adaptive Quadrature</button>
+            <button class="test-btn" data-test="numerical-solve">Bisection Method</button>
+            <button class="test-btn" data-test="numerical-newton">Newton's Method</button>
+            <button class="test-btn" data-test="numerical-secant">Secant Method</button>
+            <button class="test-btn" data-test="numerical-all">Run All Numerical Tests</button>
           </div>
         </div>
 

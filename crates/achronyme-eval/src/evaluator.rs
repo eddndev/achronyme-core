@@ -1065,6 +1065,22 @@ impl LambdaEvaluator for Evaluator {
             _ => Err("Lambda function must return a number".to_string()),
         }
     }
+
+    fn eval_at_nd(&mut self, func: &Function, args: &[f64]) -> Result<f64, String> {
+        // Convert each f64 to a Value::Number
+        let value_args: Vec<Value> = args.iter()
+            .map(|&x| Value::Number(x))
+            .collect();
+
+        // Apply the lambda with multiple arguments
+        let result = self.apply_lambda(func, value_args)?;
+
+        // Extract the numeric result
+        match result {
+            Value::Number(n) => Ok(n),
+            _ => Err("Lambda function must return a number".to_string()),
+        }
+    }
 }
 
 impl Default for Evaluator {

@@ -69,7 +69,7 @@ export class Achronyme {
         this.vecOps = new VectorOps(this.session);  // Renamed to avoid conflict
         this.hof = new HOFOps(this.session);
         this.stats = new StatsOps(this.session);
-        this.numerical = new NumericalOps(this.session.wasm);
+        this.numerical = new NumericalOps(this.session.wasm, this.session);
     }
 
     // ========================================================================

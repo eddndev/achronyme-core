@@ -99,6 +99,34 @@ pub fn reset() {
     });
 }
 
+/// Evalúa una expresión y retorna un handle al resultado
+/// Útil para crear funciones lambda que luego se pasan a funciones numéricas
+#[wasm_bindgen(js_name = evalToHandle)]
+pub fn eval_to_handle(expression: &str) -> Result<Handle, JsValue> {
+    EVALUATOR.with(|evaluator| {
+        let mut eval = evaluator.borrow_mut();
+
+        // Parse
+        let mut lexer = Lexer::new(expression);
+        let tokens = lexer.tokenize()
+            .map_err(|e| JsValue::from_str(&e))?;
+
+        let mut parser = Parser::new(tokens);
+        let ast = parser.parse()
+            .map_err(|e| JsValue::from_str(&e))?;
+
+        // Evaluate
+        let result = eval.evaluate(&ast)
+            .map_err(|e| JsValue::from_str(&e))?;
+
+        // Store in handle manager and return the handle
+        HANDLES.with(|handles| {
+            let mut h = handles.borrow_mut();
+            Ok(h.create(result))
+        })
+    })
+}
+
 // ============================================================================
 // Memory Management (Emscripten-compatible interface)
 // ============================================================================
@@ -1292,7 +1320,6 @@ pub fn identity(n: usize) -> Result<Handle, JsValue> {
 /// diff(f, x, h) - computes f'(x) ≈ (f(x+h) - f(x-h)) / (2h)
 #[wasm_bindgen(js_name = numDiff)]
 pub fn num_diff(func_handle: Handle, x: f64, h: f64) -> Result<f64, JsValue> {
-    use achronyme_types::LambdaEvaluator;
 
     HANDLES.with(|handles| {
         let func = {
@@ -1317,7 +1344,6 @@ pub fn num_diff(func_handle: Handle, x: f64, h: f64) -> Result<f64, JsValue> {
 /// diff2(f, x, h) - computes f''(x)
 #[wasm_bindgen(js_name = numDiff2)]
 pub fn num_diff2(func_handle: Handle, x: f64, h: f64) -> Result<f64, JsValue> {
-    use achronyme_types::LambdaEvaluator;
 
     HANDLES.with(|handles| {
         let func = {
@@ -1342,7 +1368,6 @@ pub fn num_diff2(func_handle: Handle, x: f64, h: f64) -> Result<f64, JsValue> {
 /// diff3(f, x, h) - computes f'''(x)
 #[wasm_bindgen(js_name = numDiff3)]
 pub fn num_diff3(func_handle: Handle, x: f64, h: f64) -> Result<f64, JsValue> {
-    use achronyme_types::LambdaEvaluator;
 
     HANDLES.with(|handles| {
         let func = {
@@ -1367,7 +1392,6 @@ pub fn num_diff3(func_handle: Handle, x: f64, h: f64) -> Result<f64, JsValue> {
 /// integral(f, a, b, n) - computes ∫f(x)dx from a to b using n subdivisions
 #[wasm_bindgen(js_name = numIntegral)]
 pub fn num_integral(func_handle: Handle, a: f64, b: f64, n: usize) -> Result<f64, JsValue> {
-    use achronyme_types::LambdaEvaluator;
 
     HANDLES.with(|handles| {
         let func = {
@@ -1392,7 +1416,6 @@ pub fn num_integral(func_handle: Handle, a: f64, b: f64, n: usize) -> Result<f64
 /// simpson(f, a, b, n) - more accurate than trapezoidal
 #[wasm_bindgen(js_name = numSimpson)]
 pub fn num_simpson(func_handle: Handle, a: f64, b: f64, n: usize) -> Result<f64, JsValue> {
-    use achronyme_types::LambdaEvaluator;
 
     HANDLES.with(|handles| {
         let func = {
@@ -1417,7 +1440,6 @@ pub fn num_simpson(func_handle: Handle, a: f64, b: f64, n: usize) -> Result<f64,
 /// romberg(f, a, b, tol) - uses Richardson extrapolation
 #[wasm_bindgen(js_name = numRomberg)]
 pub fn num_romberg(func_handle: Handle, a: f64, b: f64, tol: f64) -> Result<f64, JsValue> {
-    use achronyme_types::LambdaEvaluator;
 
     HANDLES.with(|handles| {
         let func = {
@@ -1442,7 +1464,6 @@ pub fn num_romberg(func_handle: Handle, a: f64, b: f64, tol: f64) -> Result<f64,
 /// quad(f, a, b) - automatically adapts to achieve high accuracy
 #[wasm_bindgen(js_name = numQuad)]
 pub fn num_quad(func_handle: Handle, a: f64, b: f64) -> Result<f64, JsValue> {
-    use achronyme_types::LambdaEvaluator;
 
     HANDLES.with(|handles| {
         let func = {
@@ -1467,7 +1488,6 @@ pub fn num_quad(func_handle: Handle, a: f64, b: f64) -> Result<f64, JsValue> {
 /// solve(f, a, b, tol) - finds x where f(x) = 0 in interval [a,b]
 #[wasm_bindgen(js_name = numSolve)]
 pub fn num_solve(func_handle: Handle, a: f64, b: f64, tol: f64) -> Result<f64, JsValue> {
-    use achronyme_types::LambdaEvaluator;
 
     HANDLES.with(|handles| {
         let func = {
@@ -1498,7 +1518,6 @@ pub fn num_newton(
     tol: f64,
     max_iter: usize,
 ) -> Result<f64, JsValue> {
-    use achronyme_types::LambdaEvaluator;
 
     HANDLES.with(|handles| {
         let (func, dfunc) = {
@@ -1537,7 +1556,6 @@ pub fn num_secant(
     tol: f64,
     max_iter: usize,
 ) -> Result<f64, JsValue> {
-    use achronyme_types::LambdaEvaluator;
 
     HANDLES.with(|handles| {
         let func = {

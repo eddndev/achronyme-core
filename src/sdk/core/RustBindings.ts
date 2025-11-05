@@ -473,6 +473,19 @@ export class RustWASM {
         }
     }
 
+    /**
+     * Evaluate expression and return a handle to the result
+     * Useful for creating function handles for numerical operations
+     */
+    evalToHandle(expr: string): Handle {
+        const mod = this.ensureInit();
+        try {
+            return mod.evalToHandle(expr);
+        } catch (error) {
+            throw new Error(`evalToHandle failed: ${error}`);
+        }
+    }
+
     // ========================================================================
     // Numerical Calculus
     // ========================================================================

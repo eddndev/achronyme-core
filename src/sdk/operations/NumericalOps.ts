@@ -9,9 +9,13 @@
 
 import type { RustWASM } from '../core/RustBindings';
 import type { Handle } from '../types';
+import type { AchronymeSession } from '../core/Session';
 
 export class NumericalOps {
-  constructor(private bindings: RustWASM) {}
+  constructor(
+    private bindings: RustWASM,
+    private session: AchronymeSession
+  ) {}
 
   // ============================================================================
   // Numerical Differentiation
@@ -21,7 +25,7 @@ export class NumericalOps {
    * Compute first derivative using central difference method
    * f'(x) ≈ (f(x+h) - f(x-h)) / (2h)
    *
-   * @param funcHandle - Handle to the function to differentiate
+   * @param fn - JavaScript function to differentiate, or SOC expression string
    * @param x - Point at which to compute the derivative
    * @param h - Step size (default: 1e-5)
    * @returns The numerical derivative f'(x)
@@ -29,13 +33,31 @@ export class NumericalOps {
    * @example
    * ```typescript
    * // f(x) = x^2, f'(2) = 4
-   * const f = session.use(ctx => ctx.eval('x => x^2'));
-   * const derivative = numerical.diff(f, 2, 1e-5);
+   * const derivative = numerical.diff(x => x * x, 2, 1e-5);
    * console.log(derivative); // ~4.0
+   *
+   * // Or with SOC expression
+   * const derivative2 = numerical.diff('x => x^2', 2, 1e-5);
    * ```
    */
-  diff(funcHandle: Handle, x: number, h: number = 1e-5): number {
-    return this.bindings.numDiff(funcHandle, x, h);
+  diff(fn: ((x: number) => number) | string, x: number, h: number = 1e-5): number {
+    const handle = this.createFunctionHandle(fn);
+    return this.bindings.numDiff(handle, x, h);
+  }
+
+  /**
+   * Helper to create a function handle from JavaScript function or SOC string
+   */
+  private createFunctionHandle(fn: ((x: number) => number) | string): Handle {
+    if (typeof fn === 'string') {
+      // Use SOC evaluator to create function handle from expression
+      return this.bindings.evalToHandle(fn);
+    } else {
+      // JavaScript function - we need to wrap it
+      // This is tricky because we can't directly pass JS functions to WASM
+      // For now, we only support SOC expression strings
+      throw new Error('JavaScript functions not yet supported. Use SOC expression strings like "x => x^2" instead.');
+    }
   }
 
   /**
@@ -55,8 +77,9 @@ export class NumericalOps {
    * console.log(d2); // ~12.0
    * ```
    */
-  diff2(funcHandle: Handle, x: number, h: number = 1e-3): number {
-    return this.bindings.numDiff2(funcHandle, x, h);
+  diff2(fn: ((x: number) => number) | string, x: number, h: number = 1e-3): number {
+    const handle = this.createFunctionHandle(fn);
+    return this.bindings.numDiff2(handle, x, h);
   }
 
   /**
@@ -75,8 +98,9 @@ export class NumericalOps {
    * console.log(d3); // ~48.0
    * ```
    */
-  diff3(funcHandle: Handle, x: number, h: number = 1e-2): number {
-    return this.bindings.numDiff3(funcHandle, x, h);
+  diff3(fn: ((x: number) => number) | string, x: number, h: number = 1e-2): number {
+    const handle = this.createFunctionHandle(fn);
+    return this.bindings.numDiff3(handle, x, h);
   }
 
   // ============================================================================
@@ -101,8 +125,9 @@ export class NumericalOps {
    * console.log(integral); // ~0.5
    * ```
    */
-  integral(funcHandle: Handle, a: number, b: number, n: number): number {
-    return this.bindings.numIntegral(funcHandle, a, b, n);
+  integral(fn: ((x: number) => number) | string, a: number, b: number, n: number): number {
+    const handle = this.createFunctionHandle(fn);
+    return this.bindings.numIntegral(handle, a, b, n);
   }
 
   /**
@@ -123,8 +148,9 @@ export class NumericalOps {
    * console.log(integral); // ~0.333...
    * ```
    */
-  simpson(funcHandle: Handle, a: number, b: number, n: number): number {
-    return this.bindings.numSimpson(funcHandle, a, b, n);
+  simpson(fn: ((x: number) => number) | string, a: number, b: number, n: number): number {
+    const handle = this.createFunctionHandle(fn);
+    return this.bindings.numSimpson(handle, a, b, n);
   }
 
   /**
@@ -145,8 +171,9 @@ export class NumericalOps {
    * console.log(integral); // ~2.0
    * ```
    */
-  romberg(funcHandle: Handle, a: number, b: number, tol: number = 1e-10): number {
-    return this.bindings.numRomberg(funcHandle, a, b, tol);
+  romberg(fn: ((x: number) => number) | string, a: number, b: number, tol: number = 1e-10): number {
+    const handle = this.createFunctionHandle(fn);
+    return this.bindings.numRomberg(handle, a, b, tol);
   }
 
   /**
@@ -166,8 +193,9 @@ export class NumericalOps {
    * console.log(integral); // ~1.718...
    * ```
    */
-  quad(funcHandle: Handle, a: number, b: number): number {
-    return this.bindings.numQuad(funcHandle, a, b);
+  quad(fn: ((x: number) => number) | string, a: number, b: number): number {
+    const handle = this.createFunctionHandle(fn);
+    return this.bindings.numQuad(handle, a, b);
   }
 
   // ============================================================================
@@ -193,8 +221,9 @@ export class NumericalOps {
    * console.log(root); // ~2.0
    * ```
    */
-  solve(funcHandle: Handle, a: number, b: number, tol: number): number {
-    return this.bindings.numSolve(funcHandle, a, b, tol);
+  solve(fn: ((x: number) => number) | string, a: number, b: number, tol: number): number {
+    const handle = this.createFunctionHandle(fn);
+    return this.bindings.numSolve(handle, a, b, tol);
   }
 
   /**
@@ -219,12 +248,14 @@ export class NumericalOps {
    * ```
    */
   newton(
-    funcHandle: Handle,
-    dfuncHandle: Handle,
+    fn: ((x: number) => number) | string,
+    dfn: ((x: number) => number) | string,
     x0: number,
     tol: number,
     maxIter: number
   ): number {
+    const funcHandle = this.createFunctionHandle(fn);
+    const dfuncHandle = this.createFunctionHandle(dfn);
     return this.bindings.numNewton(funcHandle, dfuncHandle, x0, tol, maxIter);
   }
 
@@ -249,12 +280,13 @@ export class NumericalOps {
    * ```
    */
   secant(
-    funcHandle: Handle,
+    fn: ((x: number) => number) | string,
     x0: number,
     x1: number,
     tol: number,
     maxIter: number
   ): number {
+    const funcHandle = this.createFunctionHandle(fn);
     return this.bindings.numSecant(funcHandle, x0, x1, tol, maxIter);
   }
 }

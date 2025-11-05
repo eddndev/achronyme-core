@@ -41,4 +41,24 @@ pub trait LambdaEvaluator {
     /// # Returns
     /// The numeric result of evaluating `func(point)`
     fn eval_vec_at(&mut self, func: &Function, point: &[f64]) -> Result<f64, String>;
+
+    /// Evaluate a lambda function with multiple scalar arguments
+    ///
+    /// This is different from `eval_vec_at` which passes a single Vector argument.
+    /// This method passes multiple Number arguments.
+    ///
+    /// # Arguments
+    /// * `func` - The lambda function to evaluate
+    /// * `args` - The arguments as individual numbers
+    ///
+    /// # Returns
+    /// The numeric result of evaluating `func(args[0], args[1], ...)`
+    ///
+    /// # Example
+    /// ```ignore
+    /// // For a function like: (x, y) => x^2 + y^2
+    /// let result = evaluator.eval_at_nd(&func, &[3.0, 4.0])?;
+    /// // result = 25.0
+    /// ```
+    fn eval_at_nd(&mut self, func: &Function, args: &[f64]) -> Result<f64, String>;
 }
