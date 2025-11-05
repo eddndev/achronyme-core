@@ -8,3 +8,4 @@ achronyme-types = { path = "../achronyme-types" }
 achronyme-parser = { path = "../achronyme-parser" }
 achronyme-dsp = { path = "../achronyme-dsp" }
 achronyme-linalg = { path = "../achronyme-linalg" }
+achronyme-numerical = { path = "../achronyme-numerical" }

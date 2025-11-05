@@ -3,6 +3,8 @@ use achronyme_types::complex::Complex;
 use achronyme_types::matrix::Matrix;
 use achronyme_types::value::Value;
 use achronyme_types::vector::Vector;
+use achronyme_types::function::Function;
+use achronyme_types::LambdaEvaluator;
 
 use crate::constants::ConstantsRegistry;
 use crate::environment::Environment;
@@ -150,6 +152,22 @@ impl Evaluator {
             "filter" => return self.hof_filter(args),
             "reduce" => return self.hof_reduce(args),
             "pipe" => return self.hof_pipe(args),
+            _ => {}
+        }
+
+        // Check for numerical calculus functions (need evaluator access for lambdas)
+        match name {
+            "diff" => return self.num_diff(args),
+            "diff2" => return self.num_diff2(args),
+            "diff3" => return self.num_diff3(args),
+            "gradient" => return self.num_gradient(args),
+            "integral" | "trapz" => return self.num_integral(args),
+            "simpson" => return self.num_simpson(args),
+            "romberg" => return self.num_romberg(args),
+            "quad" => return self.num_quad(args),
+            "solve" | "bisect" => return self.num_solve(args),
+            "newton" => return self.num_newton(args),
+            "secant" => return self.num_secant(args),
             _ => {}
         }
 
@@ -504,6 +522,357 @@ impl Evaluator {
     }
 
     // ========================================================================
+    // Numerical Calculus Functions
+    // ========================================================================
+
+    /// Helper to evaluate a lambda function at a single point
+    fn eval_lambda_at(&mut self, func: &achronyme_types::function::Function, x: f64) -> Result<f64, String> {
+        let result = self.apply_lambda(func, vec![Value::Number(x)])?;
+        match result {
+            Value::Number(n) => Ok(n),
+            _ => Err("Lambda must return a number".to_string()),
+        }
+    }
+
+    /// Numerical first derivative: diff(f, x, h)
+    fn num_diff(&mut self, args: &[AstNode]) -> Result<Value, String> {
+        if args.len() != 3 {
+            return Err("diff() requires 3 arguments: function, x, h".to_string());
+        }
+
+        let func_value = self.evaluate(&args[0])?;
+        let func = match func_value {
+            Value::Function(f) => f,
+            _ => return Err("diff() requires a function as first argument".to_string()),
+        };
+
+        let x = match self.evaluate(&args[1])? {
+            Value::Number(n) => n,
+            _ => return Err("diff() requires a number for x".to_string()),
+        };
+
+        let h = match self.evaluate(&args[2])? {
+            Value::Number(n) => n,
+            _ => return Err("diff() requires a number for h".to_string()),
+        };
+
+        use achronyme_numerical::diff_central;
+        let result = diff_central(self, &func, x, h)?;
+        Ok(Value::Number(result))
+    }
+
+    /// Numerical second derivative: diff2(f, x, h)
+    fn num_diff2(&mut self, args: &[AstNode]) -> Result<Value, String> {
+        if args.len() != 3 {
+            return Err("diff2() requires 3 arguments: function, x, h".to_string());
+        }
+
+        let func_value = self.evaluate(&args[0])?;
+        let func = match func_value {
+            Value::Function(f) => f,
+            _ => return Err("diff2() requires a function as first argument".to_string()),
+        };
+
+        let x = match self.evaluate(&args[1])? {
+            Value::Number(n) => n,
+            _ => return Err("diff2() requires a number for x".to_string()),
+        };
+
+        let h = match self.evaluate(&args[2])? {
+            Value::Number(n) => n,
+            _ => return Err("diff2() requires a number for h".to_string()),
+        };
+
+        use achronyme_numerical::diff2_central;
+        let result = diff2_central(self, &func, x, h)?;
+        Ok(Value::Number(result))
+    }
+
+    /// Numerical third derivative: diff3(f, x, h)
+    fn num_diff3(&mut self, args: &[AstNode]) -> Result<Value, String> {
+        if args.len() != 3 {
+            return Err("diff3() requires 3 arguments: function, x, h".to_string());
+        }
+
+        let func_value = self.evaluate(&args[0])?;
+        let func = match func_value {
+            Value::Function(f) => f,
+            _ => return Err("diff3() requires a function as first argument".to_string()),
+        };
+
+        let x = match self.evaluate(&args[1])? {
+            Value::Number(n) => n,
+            _ => return Err("diff3() requires a number for x".to_string()),
+        };
+
+        let h = match self.evaluate(&args[2])? {
+            Value::Number(n) => n,
+            _ => return Err("diff3() requires a number for h".to_string()),
+        };
+
+        use achronyme_numerical::diff3_central;
+        let result = diff3_central(self, &func, x, h)?;
+        Ok(Value::Number(result))
+    }
+
+    /// Gradient: gradient(f, point, h)
+    fn num_gradient(&mut self, args: &[AstNode]) -> Result<Value, String> {
+        if args.len() != 3 {
+            return Err("gradient() requires 3 arguments: function, point, h".to_string());
+        }
+
+        let func = match self.evaluate(&args[0])? {
+            Value::Function(f) => f,
+            _ => return Err("gradient() requires a function as first argument".to_string()),
+        };
+
+        let point_value = self.evaluate(&args[1])?;
+        let point_vec = match &point_value {
+            Value::Vector(v) => v.data().to_vec(),
+            _ => return Err("gradient() requires a vector for point".to_string()),
+        };
+
+        let h = match self.evaluate(&args[2])? {
+            Value::Number(n) => n,
+            _ => return Err("gradient() requires a number for h".to_string()),
+        };
+
+        use achronyme_numerical::gradient as gradient_calc;
+        let result = gradient_calc(self, &func, &point_vec, h)?;
+        Ok(Value::Vector(Vector::new(result)))
+    }
+
+    /// Numerical integration (trapezoidal): integral(f, a, b, n)
+    fn num_integral(&mut self, args: &[AstNode]) -> Result<Value, String> {
+        if args.len() != 4 {
+            return Err("integral() requires 4 arguments: function, a, b, n".to_string());
+        }
+
+        let func_value = self.evaluate(&args[0])?;
+        let func = match func_value {
+            Value::Function(f) => f,
+            _ => return Err("integral() requires a function as first argument".to_string()),
+        };
+
+        let a = match self.evaluate(&args[1])? {
+            Value::Number(n) => n,
+            _ => return Err("integral() requires a number for a".to_string()),
+        };
+
+        let b = match self.evaluate(&args[2])? {
+            Value::Number(n) => n,
+            _ => return Err("integral() requires a number for b".to_string()),
+        };
+
+        let n = match self.evaluate(&args[3])? {
+            Value::Number(n) => n as usize,
+            _ => return Err("integral() requires a number for n".to_string()),
+        };
+
+        use achronyme_numerical::trapz;
+        let result = trapz(self, &func, a, b, n)?;
+        Ok(Value::Number(result))
+    }
+
+    /// Simpson's rule integration: simpson(f, a, b, n)
+    fn num_simpson(&mut self, args: &[AstNode]) -> Result<Value, String> {
+        if args.len() != 4 {
+            return Err("simpson() requires 4 arguments: function, a, b, n".to_string());
+        }
+
+        let func_value = self.evaluate(&args[0])?;
+        let func = match func_value {
+            Value::Function(f) => f,
+            _ => return Err("simpson() requires a function as first argument".to_string()),
+        };
+
+        let a = match self.evaluate(&args[1])? {
+            Value::Number(n) => n,
+            _ => return Err("simpson() requires a number for a".to_string()),
+        };
+
+        let b = match self.evaluate(&args[2])? {
+            Value::Number(n) => n,
+            _ => return Err("simpson() requires a number for b".to_string()),
+        };
+
+        let n = match self.evaluate(&args[3])? {
+            Value::Number(n) => n as usize,
+            _ => return Err("simpson() requires a number for n".to_string()),
+        };
+
+        use achronyme_numerical::simpson;
+        let result = simpson(self, &func, a, b, n)?;
+        Ok(Value::Number(result))
+    }
+
+    /// Romberg integration: romberg(f, a, b, tol)
+    fn num_romberg(&mut self, args: &[AstNode]) -> Result<Value, String> {
+        if args.len() != 4 {
+            return Err("romberg() requires 4 arguments: function, a, b, tol".to_string());
+        }
+
+        let func_value = self.evaluate(&args[0])?;
+        let func = match func_value {
+            Value::Function(f) => f,
+            _ => return Err("romberg() requires a function as first argument".to_string()),
+        };
+
+        let a = match self.evaluate(&args[1])? {
+            Value::Number(n) => n,
+            _ => return Err("romberg() requires a number for a".to_string()),
+        };
+
+        let b = match self.evaluate(&args[2])? {
+            Value::Number(n) => n,
+            _ => return Err("romberg() requires a number for b".to_string()),
+        };
+
+        let tol = match self.evaluate(&args[3])? {
+            Value::Number(n) => n,
+            _ => return Err("romberg() requires a number for tol".to_string()),
+        };
+
+        use achronyme_numerical::romberg;
+        let result = romberg(self, &func, a, b, tol, 20)?;
+        Ok(Value::Number(result))
+    }
+
+    /// Adaptive quadrature: quad(f, a, b)
+    fn num_quad(&mut self, args: &[AstNode]) -> Result<Value, String> {
+        if args.len() != 3 {
+            return Err("quad() requires 3 arguments: function, a, b".to_string());
+        }
+
+        let func_value = self.evaluate(&args[0])?;
+        let func = match func_value {
+            Value::Function(f) => f,
+            _ => return Err("quad() requires a function as first argument".to_string()),
+        };
+
+        let a = match self.evaluate(&args[1])? {
+            Value::Number(n) => n,
+            _ => return Err("quad() requires a number for a".to_string()),
+        };
+
+        let b = match self.evaluate(&args[2])? {
+            Value::Number(n) => n,
+            _ => return Err("quad() requires a number for b".to_string()),
+        };
+
+        use achronyme_numerical::quad;
+        let result = quad(self, &func, a, b, 1e-10)?;
+        Ok(Value::Number(result))
+    }
+
+    /// Root finding (bisection): solve(f, a, b, tol)
+    fn num_solve(&mut self, args: &[AstNode]) -> Result<Value, String> {
+        if args.len() != 4 {
+            return Err("solve() requires 4 arguments: function, a, b, tol".to_string());
+        }
+
+        let func_value = self.evaluate(&args[0])?;
+        let func = match func_value {
+            Value::Function(f) => f,
+            _ => return Err("solve() requires a function as first argument".to_string()),
+        };
+
+        let a = match self.evaluate(&args[1])? {
+            Value::Number(n) => n,
+            _ => return Err("solve() requires a number for a".to_string()),
+        };
+
+        let b = match self.evaluate(&args[2])? {
+            Value::Number(n) => n,
+            _ => return Err("solve() requires a number for b".to_string()),
+        };
+
+        let tol = match self.evaluate(&args[3])? {
+            Value::Number(n) => n,
+            _ => return Err("solve() requires a number for tol".to_string()),
+        };
+
+        use achronyme_numerical::bisect;
+        let result = bisect(self, &func, a, b, tol)?;
+        Ok(Value::Number(result))
+    }
+
+    /// Newton's method: newton(f, df, x0, tol, max_iter)
+    fn num_newton(&mut self, args: &[AstNode]) -> Result<Value, String> {
+        if args.len() != 5 {
+            return Err("newton() requires 5 arguments: function, derivative, x0, tol, max_iter".to_string());
+        }
+
+        let func_value = self.evaluate(&args[0])?;
+        let func = match func_value {
+            Value::Function(f) => f,
+            _ => return Err("newton() requires a function as first argument".to_string()),
+        };
+
+        let dfunc_value = self.evaluate(&args[1])?;
+        let dfunc = match dfunc_value {
+            Value::Function(f) => f,
+            _ => return Err("newton() requires a function as second argument (derivative)".to_string()),
+        };
+
+        let x0 = match self.evaluate(&args[2])? {
+            Value::Number(n) => n,
+            _ => return Err("newton() requires a number for x0".to_string()),
+        };
+
+        let tol = match self.evaluate(&args[3])? {
+            Value::Number(n) => n,
+            _ => return Err("newton() requires a number for tol".to_string()),
+        };
+
+        let max_iter = match self.evaluate(&args[4])? {
+            Value::Number(n) => n as usize,
+            _ => return Err("newton() requires a number for max_iter".to_string()),
+        };
+
+        use achronyme_numerical::newton;
+        let result = newton(self, &func, &dfunc, x0, tol, max_iter)?;
+        Ok(Value::Number(result))
+    }
+
+    /// Secant method: secant(f, x0, x1, tol, max_iter)
+    fn num_secant(&mut self, args: &[AstNode]) -> Result<Value, String> {
+        if args.len() != 5 {
+            return Err("secant() requires 5 arguments: function, x0, x1, tol, max_iter".to_string());
+        }
+
+        let func_value = self.evaluate(&args[0])?;
+        let func = match func_value {
+            Value::Function(f) => f,
+            _ => return Err("secant() requires a function as first argument".to_string()),
+        };
+
+        let x0 = match self.evaluate(&args[1])? {
+            Value::Number(n) => n,
+            _ => return Err("secant() requires a number for x0".to_string()),
+        };
+
+        let x1 = match self.evaluate(&args[2])? {
+            Value::Number(n) => n,
+            _ => return Err("secant() requires a number for x1".to_string()),
+        };
+
+        let tol = match self.evaluate(&args[3])? {
+            Value::Number(n) => n,
+            _ => return Err("secant() requires a number for tol".to_string()),
+        };
+
+        let max_iter = match self.evaluate(&args[4])? {
+            Value::Number(n) => n as usize,
+            _ => return Err("secant() requires a number for max_iter".to_string()),
+        };
+
+        use achronyme_numerical::secant;
+        let result = secant(self, &func, x0, x1, tol, max_iter)?;
+        Ok(Value::Number(result))
+    }
+
+    // ========================================================================
     // Binary Operation Helpers
     // ========================================================================
 
@@ -671,6 +1040,29 @@ impl Evaluator {
                 Ok(Value::Number(if a != b { 1.0 } else { 0.0 }))
             }
             _ => Err("Comparison operators currently only support numbers".to_string()),
+        }
+    }
+}
+
+// ============================================================================
+// LambdaEvaluator Implementation
+// ============================================================================
+
+impl LambdaEvaluator for Evaluator {
+    fn eval_at(&mut self, func: &Function, x: f64) -> Result<f64, String> {
+        // Use the existing eval_lambda_at method
+        self.eval_lambda_at(func, x)
+    }
+
+    fn eval_vec_at(&mut self, func: &Function, point: &[f64]) -> Result<f64, String> {
+        // Create a vector value and apply the lambda
+        let vec_arg = Value::Vector(Vector::new(point.to_vec()));
+        let result = self.apply_lambda(func, vec![vec_arg])?;
+
+        // Extract the numeric result
+        match result {
+            Value::Number(n) => Ok(n),
+            _ => Err("Lambda function must return a number".to_string()),
         }
     }
 }

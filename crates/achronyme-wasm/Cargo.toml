@@ -19,6 +19,7 @@ achronyme-parser = { path = "../achronyme-parser" }
 achronyme-eval = { path = "../achronyme-eval" }
 achronyme-dsp = { path = "../achronyme-dsp" }
 achronyme-linalg = { path = "../achronyme-linalg" }
+achronyme-numerical = { path = "../achronyme-numerical" }
 
 # Profile-specific metadata for wasm-pack
 [package.metadata.wasm-pack.profile.release]

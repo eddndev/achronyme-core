@@ -135,6 +135,10 @@ impl FunctionRegistry {
         self.register("transpose", transpose, 1);
         self.register("det", det, 1);
         self.register("trace", trace, 1);
+
+        // NOTE: Numerical calculus functions (diff, integral, solve, etc.) are
+        // implemented directly in the evaluator (evaluator.rs) because they need
+        // access to the evaluator to call lambda functions, similar to HOF functions.
     }
 
     /// Register a function

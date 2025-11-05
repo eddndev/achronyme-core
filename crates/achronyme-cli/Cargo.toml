@@ -3,4 +3,11 @@ name = "achronyme-cli"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "achronyme"
+path = "src/main.rs"
+
 [dependencies]
+achronyme-parser = { path = "../achronyme-parser" }
+achronyme-eval = { path = "../achronyme-eval" }
+achronyme-types = { path = "../achronyme-types" }

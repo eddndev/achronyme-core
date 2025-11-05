@@ -5,6 +5,11 @@ version = 4
 [[package]]
 name = "achronyme-cli"
 version = "0.1.0"
+dependencies = [
+ "achronyme-eval",
+ "achronyme-parser",
+ "achronyme-types",
+]
 
 [[package]]
 name = "achronyme-dsp"
@@ -22,6 +27,7 @@ version = "0.1.0"
 dependencies = [
  "achronyme-dsp",
  "achronyme-linalg",
+ "achronyme-numerical",
  "achronyme-parser",
  "achronyme-types",
 ]
@@ -40,6 +46,9 @@ dependencies = [
 [[package]]
 name = "achronyme-numerical"
 version = "0.1.0"
+dependencies = [
+ "achronyme-types",
+]
 
 [[package]]
 name = "achronyme-parser"
@@ -59,6 +68,7 @@ dependencies = [
  "achronyme-dsp",
  "achronyme-eval",
  "achronyme-linalg",
+ "achronyme-numerical",
  "achronyme-parser",
  "achronyme-types",
  "getrandom",
