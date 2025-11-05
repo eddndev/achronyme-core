@@ -10,6 +10,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned Features (Phase 5+)
 - Symbolic computation
 - Units and dimensions
+- Ordinary Differential Equations (ODEs)
+- Optimization algorithms (minimize/maximize)
+
+## [0.5.1] - 2025-01-05
+
+### Added - Numerical Calculus Module 🧮
+
+**Complete Numerical Calculus Suite:**
+- **Numerical Differentiation:**
+  - `diff()` - First derivative using central difference method
+  - `diff2()` - Second derivative
+  - `diff3()` - Third derivative
+  - Configurable step sizes for precision control
+
+- **Numerical Integration:**
+  - `integral()` - Trapezoidal rule integration
+  - `simpson()` - Simpson's 1/3 rule (higher accuracy)
+  - `romberg()` - Romberg integration with Richardson extrapolation
+  - `quad()` - Adaptive quadrature for automatic accuracy
+
+- **Root Finding:**
+  - `solve()` - Bisection method for bracketed roots
+  - `newton()` - Newton's method (requires derivative)
+  - `secant()` - Secant method (no derivative needed)
+
+**Architecture Improvements:**
+- **Dependency Injection Pattern** via `LambdaEvaluator` trait:
+  - Decouples numerical algorithms from expression evaluator
+  - Enables multiple evaluation backends (JIT, GPU, caching, etc.)
+  - Simplifies testing with mock evaluators
+  - Resolves Rust borrow checker conflicts elegantly
+
+- **Multi-Parameter Lambda Support:**
+  - Extended `LambdaEvaluator` with `eval_at_nd()` for N-dimensional functions
+  - Foundation for future ODEs, optimization, and multivariate calculus
+  - Full support for `(x, y) => x^2 + y^2` style lambdas
+
+**WASM Bindings:**
+- New `evalToHandle()` function - evaluates SOC expressions and returns handles
+- 10 new numerical function exports: `numDiff`, `numDiff2`, `numDiff3`, `numIntegral`, `numSimpson`, `numRomberg`, `numQuad`, `numSolve`, `numNewton`, `numSecant`
+
+**TypeScript SDK:**
+- New `NumericalOps` module with complete JSDoc documentation
+- Clean API accepting SOC expression strings: `numerical.diff('x => x^2', 2)`
+- All functions return numbers or throw descriptive errors
+- Example usage in interactive demo with 11 comprehensive tests
+
+**Testing:**
+- SOC script tests for all numerical functions
+- Interactive demo category with visual results
+- Validated against analytical solutions (derivatives, integrals, roots)
+- All tests passing with 6-decimal precision
+
+### Technical Details
+- **Modular Architecture**: New `achronyme-numerical` crate (pure math, no eval dependency)
+- **Zero Breaking Changes**: All existing APIs remain unchanged
+- **Performance**: Numerical functions execute directly in WASM with minimal overhead
 
 ## [0.5.0] - 2025-11-04
 
