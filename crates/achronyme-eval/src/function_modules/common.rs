@@ -3,10 +3,10 @@
 macro_rules! unary_math_fn {
     ($name:expr, $f:expr, $arg:expr) => {
         match $arg {
-            Value::Number(x) => Ok(Value::Number($f(*x))),
-            Value::Vector(v) => {
+            achronyme_types::value::Value::Number(x) => Ok(achronyme_types::value::Value::Number($f(*x))),
+            achronyme_types::value::Value::Vector(v) => {
                 let result: Vec<f64> = v.data().iter().map(|&x| $f(x)).collect();
-                Ok(Value::Vector(Vector::new(result)))
+                Ok(achronyme_types::value::Value::Vector(achronyme_types::vector::Vector::new(result)))
             }
             _ => Err(format!("{}() requires a number or vector", $name)),
         }

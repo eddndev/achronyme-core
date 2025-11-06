@@ -1,7 +1,7 @@
 use achronyme_types::value::Value;
 use achronyme_types::vector::Vector;
 
-use super::super::functions::{BuiltinFunction, FunctionRegistry};
+use super::super::functions::FunctionRegistry;
 
 /// Helper macro for unary functions that work on both scalars and vectors
 macro_rules! unary_math_fn {

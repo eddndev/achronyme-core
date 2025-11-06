@@ -1,4 +1,4 @@
-use crate::functions::{BuiltinFunction, FunctionRegistry};
+use crate::functions::FunctionRegistry;
 use achronyme_types::complex::Complex as AchronymeComplex;
 use achronyme_types::matrix::Matrix;
 use achronyme_types::value::Value;

@@ -316,7 +316,7 @@ fn get_column(mat: &[f64], col: usize, rows: usize, cols: usize) -> Vec<f64> {
 }
 
 /// Extraer solución final
-fn extract_solution(basis: &[usize], x_b: &[f64], n: usize, m: usize) -> Result<Vec<f64>, String> {
+fn extract_solution(basis: &[usize], x_b: &[f64], n: usize, _m: usize) -> Result<Vec<f64>, String> {
     let mut solution = vec![0.0; n];
 
     for (i, &var) in basis.iter().enumerate() {

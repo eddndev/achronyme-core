@@ -1,15 +1,9 @@
-/// Function Registry Module Organization
-///
-/// This module organizes function registration by category
-
 pub mod common;
+pub mod complex;
+pub mod dsp;
+pub mod exponential;
+pub mod matrix;
+pub mod rounding;
+pub mod stats;
 pub mod trig;
-
-// TODO: Add more specialized modules as needed:
-// pub mod exponential;
-// pub mod rounding;
-// pub mod complex_ops;
-// pub mod vector_ops;
-// pub mod matrix_ops;
-// pub mod stats;
-// pub mod dsp;
+pub mod vector;

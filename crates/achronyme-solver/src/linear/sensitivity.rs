@@ -1,5 +1,4 @@
 use achronyme_types::matrix::Matrix;
-use super::simplex;
 
 /// Calcular precios sombra (shadow prices) para un problema LP
 ///
@@ -225,7 +224,7 @@ pub fn sensitivity_b(
     // Extraer la columna correspondiente a la restricción index en B⁻¹
     // (esto requiere invertir la base, simplificamos con un rango conservador)
 
-    let current_rhs = tableau.data[index][rhs_col];
+    let _current_rhs = tableau.data[index][rhs_col];
 
     // Rango conservador: ±50% del valor actual
     let b_min = b[index] - b[index].abs() * 0.5;

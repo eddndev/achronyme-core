@@ -1,6 +1,5 @@
-use crate::functions::{BuiltinFunction, FunctionRegistry};
+use crate::functions::FunctionRegistry;
 use achronyme_types::value::Value;
-use achronyme_types::vector::Vector;
 
 pub fn register_functions(registry: &mut FunctionRegistry) {
     registry.register("sum", sum, 1);

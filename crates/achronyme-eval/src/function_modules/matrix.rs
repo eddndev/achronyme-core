@@ -1,4 +1,4 @@
-use crate::functions::{BuiltinFunction, FunctionRegistry};
+use crate::functions::FunctionRegistry;
 use achronyme_types::value::Value;
 
 pub fn register_functions(registry: &mut FunctionRegistry) {
