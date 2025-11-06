@@ -588,20 +588,69 @@ pub enum UnaryOp {
 
 ---
 
-## Propuesta de Migración: Parser Hand-Written → Pest
+## ✅ Estado de Migración a Pest (Completado v0.5.3)
 
-*Propuesta para modernizar el parser del lenguaje SOC usando Pest (Parser Generator)*
+**MIGRACIÓN COMPLETADA** - El parser de Pest está ahora funcionando como parser principal.
 
-### Motivación
+### ✅ Logros Completados
 
-**Problema:** El parser hand-written actual (`achronyme-parser`) está creciendo en complejidad:
+1. **Parser Pest Implementado**
+   - ✅ Gramática completa en `grammar.pest` (~150 líneas)
+   - ✅ Módulo `pest_parser.rs` con generación de AST
+   - ✅ API `eval_str()` para evaluación directa
+   - ✅ Manejo correcto de precedencia y asociatividad
+   - ✅ Soporte para comentarios y multi-línea
+
+2. **CLI Actualizado**
+   - ✅ Usa `eval_str()` en lugar de Lexer→Parser→Evaluator
+   - ✅ Procesa archivos completos (no línea por línea)
+   - ✅ 13 de 15 ejemplos funcionando correctamente
+
+3. **Tests Validados**
+   - ✅ 8 tests de parser específicos
+   - ✅ 12 tests de evaluador con Pest
+   - ✅ Todos los ejemplos de optimización funcionando
+
+### 🔜 Próximos Pasos (v0.6.0)
+
+**Prioridad Alta:**
+1. ⏳ Implementar condicionales (`if()`) en gramática Pest
+2. ⏳ Implementar funciones por partes (`piecewise()`)
+3. ⏳ Agregar operadores lógicos (`&&`, `||`, `!`)
+4. ⏳ Agregar sintaxis de grafos para algoritmos de redes
+
+**Limpieza del Código:**
+5. 🔜 Remover parser hand-written (lexer.rs, parser.rs)
+6. 🔜 Deprecar exports del parser antiguo
+7. 🔜 Limpiar dependencias no usadas
+8. 🔜 Actualizar toda la documentación
+
+### Archivos a Remover (Deprecados)
+
+```
+crates/achronyme-parser/src/
+├── lexer.rs          ← REMOVER (deprecado)
+├── parser.rs         ← REMOVER (deprecado)
+├── token.rs          ← REMOVER (deprecado)
+└── pest_parser.rs    ← MANTENER (parser principal)
+```
+
+---
+
+## Propuesta Original: Parser Hand-Written → Pest
+
+*Esta sección documenta la propuesta original. Ver arriba para el estado actual.*
+
+### Motivación Original
+
+**Problema:** El parser hand-written actual (`achronyme-parser`) estaba creciendo en complejidad:
 - AST con 10+ variantes de nodos
 - Parsing manual de tokens
 - Difícil agregar nuevas features (condicionales, loops, pattern matching)
 - Propenso a errores de precedencia y asociatividad
 - Difícil de mantener y testear
 
-**Solución:** Migrar a **Pest** - un parser generator basado en PEG (Parsing Expression Grammars).
+**Solución Implementada:** Migración a **Pest** - un parser generator basado en PEG (Parsing Expression Grammars).
 
 ### Beneficios de Pest
 
@@ -706,15 +755,16 @@ program = { SOI ~ statement ~ (statement)* ~ EOI }
 2. Comparar AST generado (Pest vs hand-written)
 3. Benchmarks de performance
 
-**Fase 4: Nuevas Features**
-1. Implementar condicionales (`if`, `piecewise`)
-2. Implementar operadores lógicos (`&&`, `||`, `!`)
-3. Agregar tests para nuevas features
+**Fase 4: Nuevas Features** (Próxima Prioridad)
+1. ⏳ Implementar condicionales (`if`, `piecewise`)
+2. ⏳ Implementar operadores lógicos (`&&`, `||`, `!`)
+3. ⏳ Agregar tests para nuevas features
 
-**Fase 5: Cleanup**
-1. Remover parser hand-written
-2. Actualizar documentación
-3. Release nueva versión
+**Fase 5: Cleanup** (Después de Condicionales)
+1. 🔜 Remover parser hand-written (lexer.rs, parser.rs)
+2. 🔜 Deprecar exports del parser antiguo
+3. 🔜 Actualizar documentación para reflejar solo Pest
+4. 🔜 Release v0.6.0 con condicionales y sin parser legacy
 
 ### Estimación de Esfuerzo
 
