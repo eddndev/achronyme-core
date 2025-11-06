@@ -11,3 +11,4 @@ export { VectorOps } from './VectorOps';
 export { HOFOps } from './HOFOps';
 export { StatsOps } from './StatsOps';
 export { NumericalOps } from './NumericalOps';
+export { OptimizationOps } from './OptimizationOps';

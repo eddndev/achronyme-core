@@ -581,6 +581,82 @@ export class RustWASM {
         const mod = this.ensureInit();
         return mod.numSecant(funcHandle, x0, x1, tol, maxIter);
     }
+
+    // ========================================================================
+    // Linear Programming and Optimization
+    // ========================================================================
+
+    /**
+     * Simplex method for linear programming
+     */
+    simplex(c: Handle, A: Handle, b: Handle, sense: number): Handle {
+        const mod = this.ensureInit();
+        return mod.simplex(c, A, b, sense);
+    }
+
+    /**
+     * Linear programming with auto-selection
+     */
+    linprog(c: Handle, A: Handle, b: Handle, sense: number): Handle {
+        const mod = this.ensureInit();
+        return mod.linprog(c, A, b, sense);
+    }
+
+    /**
+     * Dual simplex method
+     */
+    dualSimplex(c: Handle, A: Handle, b: Handle, sense: number): Handle {
+        const mod = this.ensureInit();
+        return mod.dualSimplex(c, A, b, sense);
+    }
+
+    /**
+     * Two-phase simplex method
+     */
+    twoPhaseSimplex(c: Handle, A: Handle, b: Handle, sense: number): Handle {
+        const mod = this.ensureInit();
+        return mod.twoPhaseSimplex(c, A, b, sense);
+    }
+
+    /**
+     * Revised simplex method (memory efficient)
+     */
+    revisedSimplex(c: Handle, A: Handle, b: Handle, sense: number): Handle {
+        const mod = this.ensureInit();
+        return mod.revisedSimplex(c, A, b, sense);
+    }
+
+    /**
+     * Calculate objective value c·x
+     */
+    objectiveValue(c: Handle, x: Handle): number {
+        const mod = this.ensureInit();
+        return mod.objectiveValue(c, x);
+    }
+
+    /**
+     * Shadow prices (dual variables)
+     */
+    shadowPrice(c: Handle, A: Handle, b: Handle, sense: number): Handle {
+        const mod = this.ensureInit();
+        return mod.shadowPrice(c, A, b, sense);
+    }
+
+    /**
+     * Sensitivity analysis for objective coefficient
+     */
+    sensitivityC(c: Handle, A: Handle, b: Handle, index: number): Handle {
+        const mod = this.ensureInit();
+        return mod.sensitivityC(c, A, b, index);
+    }
+
+    /**
+     * Sensitivity analysis for RHS constraint
+     */
+    sensitivityB(c: Handle, A: Handle, b: Handle, index: number): Handle {
+        const mod = this.ensureInit();
+        return mod.sensitivityB(c, A, b, index);
+    }
 }
 
 /**

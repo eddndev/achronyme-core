@@ -78,6 +78,7 @@ dependencies = [
  "achronyme-linalg",
  "achronyme-numerical",
  "achronyme-parser",
+ "achronyme-solver",
  "achronyme-types",
  "getrandom",
  "js-sys",

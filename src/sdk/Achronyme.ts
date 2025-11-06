@@ -13,6 +13,7 @@ import { VectorOps } from './operations/VectorOps';
 import { HOFOps } from './operations/HOFOps';
 import { StatsOps } from './operations/StatsOps';
 import { NumericalOps } from './operations/NumericalOps';
+import { OptimizationOps } from './operations/OptimizationOps';
 import { Vector } from './values/Vector';
 import { Matrix } from './values/Matrix';
 import { Scalar } from './values/Scalar';
@@ -58,6 +59,7 @@ export class Achronyme {
     readonly hof: HOFOps;
     readonly stats: StatsOps;
     readonly numerical: NumericalOps;
+    readonly optimization: OptimizationOps;
 
     constructor() {
         this.session = new AchronymeSession();
@@ -70,6 +72,7 @@ export class Achronyme {
         this.hof = new HOFOps(this.session);
         this.stats = new StatsOps(this.session);
         this.numerical = new NumericalOps(this.session.wasm, this.session);
+        this.optimization = new OptimizationOps(this.session.wasm, this.session);
     }
 
     // ========================================================================
