@@ -224,3 +224,90 @@ Convertirse en la alternativa open-source líder para cálculo numérico, DSP y 
 
 **Versión**: 0.3.0
 **Última actualización**: 2025
+
+---
+
+## Propuesta de Sintaxis para Grafos (Futuro)
+
+*Esta es una propuesta para una futura implementación de una sintaxis de grafos en el lenguaje SOC, diseñada para ser extensible y soportar múltiples algoritmos (PERT, Dijkstra, etc.).*
+
+### Principio de Diseño
+
+La sintaxis debe separar la **topología** del grafo (su estructura de nodos y aristas) de los **datos** asociados a un problema específico (pesos, tiempos, costos), permitiendo máxima flexibilidad.
+
+### Sintaxis General Propuesta
+
+Se introduce un nuevo literal `network` y un operador de arista `->`.
+
+```soc
+let mi_red = network {
+    // Opcional: Definición de nodos y sus propiedades
+    nodes: {
+        "ID_Nodo_1": { prop1: valor1, ... },
+        "ID_Nodo_2": { prop2: valor2, ... }
+    },
+
+    // Opcional: Lista de aristas y sus propiedades
+    edges: [
+        "ID_Nodo_1" -> "ID_Nodo_2" { prop_arista: valor, ... },
+        ...
+    ]
+}
+```
+
+### Ejemplos de Casos de Uso
+
+#### 1. Grafo Simple (Topología Pura)
+Para algoritmos de conectividad, recorridos (BFS, DFS), etc.
+
+```soc
+let grafo_simple = network {
+    // Los nodos se pueden inferir de las aristas
+    edges: [
+        "A" -> "B",
+        "B" -> "C",
+        "A" -> "C"
+    ]
+}
+```
+
+#### 2. Grafo con Pesos en Aristas (Para Dijkstra, Kruskal)
+Se añaden propiedades a las aristas.
+
+```soc
+let mapa_distancias = network {
+    edges: [
+        "Madrid"   -> "Zaragoza"  { distancia: 325 },
+        "Zaragoza" -> "Barcelona" { distancia: 290 },
+        "Madrid"   -> "Valencia"  { distancia: 360 }
+    ]
+}
+
+// Uso: dijkstra(mapa_distancias, "Madrid", "Barcelona", { weight: "distancia" })
+```
+
+#### 3. Grafo con Propiedades en Nodos (Para PERT)
+Se añaden propiedades a los nodos.
+
+```soc
+let proyecto_pert = network {
+    nodes: {
+        "Diseño":     { to: 3, tm: 5, tp: 10 },
+        "Backend":    { to: 7, tm: 10, tp: 15 },
+        "Frontend":   { to: 6, tm: 8,  tp: 12 }
+    },
+    edges: [
+        "Diseño" -> "Backend",
+        "Diseño" -> "Frontend"
+    ]
+}
+
+// Uso: find_critical_path(proyecto_pert)
+```
+
+### Beneficios de la Propuesta
+
+- **Consistente:** Sigue el estilo declarativo del lenguaje SOC.
+- **Flexible:** Permite definir topología pura, datos en nodos, datos en aristas, o una combinación.
+- **Extensible:** Los nuevos algoritmos pueden simplemente buscar las propiedades que necesitan en los `records` de los nodos o aristas, sin requerir cambios en la sintaxis.
+- **Legible:** La estructura del grafo y sus datos son fáciles de entender de un vistazo.

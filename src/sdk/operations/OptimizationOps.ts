@@ -3,6 +3,7 @@
  *
  * Provides methods for:
  * - Linear Programming (Simplex, Dual Simplex, Revised Simplex, Two-Phase)
+ * - Integer Programming (Branch & Bound for Integer and Binary variables)
  * - Sensitivity Analysis (Shadow Prices, Parameter Ranges)
  * - Objective Value Calculation
  */
@@ -263,5 +264,117 @@ export class OptimizationOps {
    */
   sensitivityB(c: Handle, A: Handle, b: Handle, index: number): Handle {
     return this.bindings.sensitivityB(c, A, b, index);
+  }
+
+  // ============================================================================
+  // Integer Programming
+  // ============================================================================
+
+  /**
+   * Integer Linear Programming using Branch & Bound
+   *
+   * Solves LP problems where specified variables must take integer values.
+   * Uses Branch & Bound algorithm with LP relaxations.
+   *
+   * @param c - Handle to objective coefficients vector
+   * @param A - Handle to constraint matrix
+   * @param b - Handle to RHS vector
+   * @param sense - 1 for maximize, -1 for minimize
+   * @param integerVars - Handle to vector of variable indices that must be integer (0-based)
+   * @returns Handle to integer solution vector x
+   *
+   * @remarks
+   * Algorithm: Branch & Bound
+   * 1. Solve LP relaxation (without integer constraints)
+   * 2. If solution is integer → done!
+   * 3. Otherwise, branch on fractional variable
+   * 4. Bound: prune branches worse than best integer solution found
+   *
+   * @example
+   * ```typescript
+   * // maximize z = 3x₁ + 2x₂
+   * // subject to: x₁ + x₂ ≤ 4, x₁, x₂ ∈ ℤ₊
+   * const c = session.use(ctx => ctx.eval('[3, 2]'));
+   * const A = session.use(ctx => ctx.eval('[[1, 1]]'));
+   * const b = session.use(ctx => ctx.eval('[4]'));
+   * const intVars = session.use(ctx => ctx.eval('[0, 1]')); // Both variables must be integer
+   *
+   * const solution = optimization.intlinprog(c, A, b, 1, intVars);
+   * const z = optimization.objectiveValue(c, solution);
+   * // solution = [4, 0], z* = 12
+   * ```
+   */
+  intlinprog(c: Handle, A: Handle, b: Handle, sense: number, integerVars: Handle): Handle {
+    return this.bindings.intlinprog(c, A, b, sense, integerVars);
+  }
+
+  /**
+   * Binary Linear Programming (0-1 Integer Programming)
+   *
+   * Solves LP problems where specified variables must be binary (0 or 1).
+   * Optimized for binary variables using specialized Branch & Bound.
+   *
+   * @param c - Handle to objective coefficients vector
+   * @param A - Handle to constraint matrix
+   * @param b - Handle to RHS vector
+   * @param sense - 1 for maximize, -1 for minimize
+   * @param binaryVars - Handle to vector of variable indices that must be binary (0-based)
+   * @returns Handle to binary solution vector x (all values are 0 or 1)
+   *
+   * @remarks
+   * Common Applications:
+   * - **0-1 Knapsack**: Select items to maximize value within weight limit
+   * - **Set Covering**: Select minimum sets to cover all elements
+   * - **Set Packing**: Select maximum non-overlapping sets
+   * - **Assignment**: Assign tasks to workers (one-to-one)
+   * - **Facility Location**: Choose which facilities to open
+   * - **Capital Budgeting**: Select projects subject to budget
+   * - **Scheduling**: Binary decisions for time slots
+   *
+   * @example
+   * ```typescript
+   * // 0-1 Knapsack Problem
+   * // maximize z = 60x₁ + 100x₂ + 120x₃
+   * // subject to: 10x₁ + 20x₂ + 30x₃ ≤ 50, xᵢ ∈ {0,1}
+   *
+   * const values = session.use(ctx => ctx.eval('[60, 100, 120]'));
+   * const weights = session.use(ctx => ctx.eval('[[10, 20, 30]]'));
+   * const capacity = session.use(ctx => ctx.eval('[50]'));
+   * const binVars = session.use(ctx => ctx.eval('[0, 1, 2]')); // All variables are binary
+   *
+   * const solution = optimization.binaryLinprog(values, weights, capacity, 1, binVars);
+   * const totalValue = optimization.objectiveValue(values, solution);
+   * // solution = [0, 1, 1] → take items 2 and 3
+   * // totalValue = 220 (weight = 50)
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Assignment Problem: Assign 3 workers to 3 tasks
+   * // Minimize cost while ensuring each worker gets exactly one task
+   *
+   * // Cost matrix (flattened): worker i to task j
+   * const costs = session.use(ctx => ctx.eval('[9, 2, 7, 6, 4, 3, 5, 8, 1]'));
+   *
+   * // Constraints: each worker assigned once, each task assigned once
+   * const A = session.use(ctx => ctx.eval(`[
+   *   [1, 1, 1, 0, 0, 0, 0, 0, 0],  // worker 1
+   *   [0, 0, 0, 1, 1, 1, 0, 0, 0],  // worker 2
+   *   [0, 0, 0, 0, 0, 0, 1, 1, 1],  // worker 3
+   *   [1, 0, 0, 1, 0, 0, 1, 0, 0],  // task 1
+   *   [0, 1, 0, 0, 1, 0, 0, 1, 0],  // task 2
+   *   [0, 0, 1, 0, 0, 1, 0, 0, 1]   // task 3
+   * ]`));
+   * const b = session.use(ctx => ctx.eval('[1, 1, 1, 1, 1, 1]'));
+   * const binVars = session.use(ctx => ctx.eval('[0, 1, 2, 3, 4, 5, 6, 7, 8]'));
+   *
+   * const assignment = optimization.binaryLinprog(costs, A, b, -1, binVars);
+   * // assignment = [0, 1, 0, 1, 0, 0, 0, 0, 1]
+   * // Worker 1 → Task 2 (cost=2), Worker 2 → Task 1 (cost=6), Worker 3 → Task 3 (cost=1)
+   * // Total cost = 9
+   * ```
+   */
+  binaryLinprog(c: Handle, A: Handle, b: Handle, sense: number, binaryVars: Handle): Handle {
+    return this.bindings.binaryLinprog(c, A, b, sense, binaryVars);
   }
 }

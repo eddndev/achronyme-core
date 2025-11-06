@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Nonlinear optimization (gradient descent, conjugate gradient, BFGS)
 - Constrained optimization (SQP, barrier methods)
 
-## [0.5.3] - 2025-11-05
+## [0.5.3] - 2025-11-06
 
 ### Added - Linear Programming & Optimization Module 📊
 
@@ -54,6 +54,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Within range: Shadow price remains valid
     - Change in objective: Δz* = shadow_price[i] × Δb[i]
 
+- **Integer Programming (Branch & Bound):**
+  - **`intlinprog(c, A, b, sense, integer_vars)`** - Solves LP with integer constraints
+    - Uses Branch & Bound algorithm with LP relaxations
+    - Supports mixed-integer problems (some variables integer, others continuous)
+    - Optimal branching variable selection (most fractional heuristic)
+    - Efficient pruning based on LP bounds
+
+  - **`binary_linprog(c, A, b, sense, binary_vars)`** - Solves 0-1 Integer Programming
+    - Specialized for binary variables (xᵢ ∈ {0, 1})
+    - Optimized Branch & Bound for binary decisions
+    - Applications: Knapsack, Set Covering, Assignment, Capital Budgeting
+
+  *Algorithm Features:*
+  - **Fixed Variable Substitution:** Automatically handles variables with equal bounds
+  - **Binary-Aware Branching:** Direct branching on 0/1 for binary variables
+  - **Smart Pruning:** Eliminates suboptimal branches early
+  - **Iteration Limit:** 50,000 iterations (prevents infinite loops)
+
+  *Common Applications:*
+  - **0-1 Knapsack Problem:** Select items to maximize value within weight limit
+  - **Capital Budgeting:** Choose projects to maximize NPV within budget
+  - **Production Planning:** Integer units of products
+  - **Set Covering/Packing:** Minimum cost coverage, maximum non-overlapping sets
+  - **Assignment Problems:** Match workers to tasks optimally
+  - **Facility Location:** Binary decisions on opening facilities
+
 **Architecture Improvements:**
 
 - **Modular Solver Structure:**
@@ -61,15 +87,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   achronyme-solver/
   ├── src/
   │   ├── lib.rs              # Public API and re-exports
-  │   └── linear/
-  │       ├── mod.rs           # Module organization
-  │       ├── tableau.rs       # Core Tableau structure with pivot operations
-  │       ├── simplex.rs       # Primal simplex implementation
-  │       ├── linprog.rs       # Auto-selection logic
-  │       ├── dual_simplex.rs  # Dual simplex algorithm
-  │       ├── two_phase.rs     # Two-phase simplex for difficult problems
-  │       ├── revised_simplex.rs  # Memory-efficient variant
-  │       └── sensitivity.rs   # Sensitivity analysis functions
+  │   ├── linear/
+  │   │   ├── mod.rs           # Module organization
+  │   │   ├── tableau.rs       # Core Tableau structure with pivot operations
+  │   │   ├── simplex.rs       # Primal simplex implementation
+  │   │   ├── linprog.rs       # Auto-selection logic
+  │   │   ├── dual_simplex.rs  # Dual simplex algorithm
+  │   │   ├── two_phase.rs     # Two-phase simplex for difficult problems
+  │   │   ├── revised_simplex.rs  # Memory-efficient variant
+  │   │   └── sensitivity.rs   # Sensitivity analysis functions
+  │   └── integer/
+  │       ├── mod.rs           # Integer programming module
+  │       └── branch_bound.rs  # Branch & Bound implementation (~650 lines)
   ```
 
 - **Handler Architecture Integration:**
@@ -79,19 +108,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **WASM Bindings:**
 
-- 9 new optimization function exports in `achronyme-wasm`:
-  - `simplex`, `linprog`, `dualSimplex`, `twoPhaseSimplex`, `revisedSimplex`
-  - `objectiveValue`, `shadowPrice`, `sensitivityC`, `sensitivityB`
+- **11 optimization function exports** in `achronyme-wasm`:
+  - Linear Programming: `simplex`, `linprog`, `dualSimplex`, `twoPhaseSimplex`, `revisedSimplex`
+  - Sensitivity Analysis: `objectiveValue`, `shadowPrice`, `sensitivityC`, `sensitivityB`
+  - Integer Programming: `intlinprog`, `binaryLinprog` ⭐ **NEW**
 - All functions use handle-based API for efficient memory management
 - Proper error propagation from Rust to JavaScript
+- Compiled WASM binary: 1.06 MB (optimized with wasm-opt)
 
 **TypeScript SDK:**
 
 - **New `OptimizationOps` module** with comprehensive documentation:
-  - Complete JSDoc for all 9 functions
+  - Complete JSDoc for all **11 functions** (9 LP + 2 IP ⭐ **NEW**)
   - Economic interpretation of sensitivity analysis
-  - Real-world production planning examples
+  - Real-world examples: production planning, knapsack, capital budgeting
   - Type-safe handle-based API
+  - Integer Programming examples with 7+ documented applications
 
 - **Integration with Main SDK:**
   - New `ach.optimization` namespace
@@ -101,10 +133,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 **Testing & Validation:**
 
 - **Rust Unit Tests:**
-  - 22 total tests in `achronyme-solver`
-  - 20/22 passing (2 edge cases for dual/two-phase documented)
-  - Tests for: simplex, tableau operations, sensitivity analysis
+  - **30 total tests** in `achronyme-solver` (22 LP + 8 IP ⭐ **NEW**)
+  - **28/30 passing** (2 edge cases for dual/two-phase documented)
+  - Tests for: simplex, tableau operations, sensitivity analysis, integer programming
   - Validated against known optimal solutions
+
+- **Integer Programming Tests (8 tests, 100% passing):**
+  - `test_intlinprog_simple` - Basic integer LP (z* = 12)
+  - `test_binary_linprog_knapsack` - Classic knapsack (z* = 220)
+  - `test_knapsack_small_capacity` - Tight capacity (z* = 5)
+  - `test_knapsack_large_instance` - 5 items (z* = 100)
+  - `test_knapsack_all_items_fit` - All items feasible (z* = 30)
+  - `test_knapsack_one_item_only` - Single item selection (z* = 300)
+  - `test_knapsack_tight_capacity` - Tight constraint (z ≥ 35)
+  - `test_intlinprog_multiple_constraints` - 2 constraints (z* = 17)
 
 - **SOC Script Tests (6 test files):**
   ```
@@ -119,10 +161,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - ✅ All tests passing with correct results
   - ✅ Validates simplex, revised simplex, sensitivity analysis
 
+- **Interactive Demo Tests (15 total):**
+  - **Linear Programming (10 tests):**
+    - Simple LP, Production Planning, All Simplex Methods
+    - Shadow Prices, Sensitivity Analysis (c & b)
+    - Full Analysis with all features
+  - **Integer Programming (5 tests, 100% passing):** ⭐ **NEW**
+    - `opt-integer-simple` - Integer LP (x=[4,0], z*=12, ~0.4ms)
+    - `opt-knapsack-01` - 0-1 Knapsack (items 2,3 selected, z*=220, ~0.3ms)
+    - `opt-knapsack-large` - 5-item knapsack (z*=100, ~0.4ms)
+    - `opt-integer-production` - Integer units (40A+30B=$2500, ~0.2ms)
+    - `opt-capital-budgeting` - Project selection (Projects 2,4, NPV=$400M, ~0.2ms)
+
 - **Package Validation:**
   - ✅ `npm pack --dry-run` successful (428.4 kB compressed)
-  - ✅ OptimizationOps included in distribution (8.8kB .d.ts, 9.5kB .js)
+  - ✅ OptimizationOps included in distribution (enhanced with IP methods)
   - ✅ 59 total files ready for publication
+  - ✅ WASM binary optimized and verified
 
 **Documentation:**
 
@@ -150,14 +205,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Coefficient sensitivity: Conservative ranges (instant)
   - RHS sensitivity: Conservative ranges (instant)
 
+- **Integer Programming (Branch & Bound):** ⭐ **NEW**
+  - Small instances (n=3): ~0.3-0.4ms (WASM)
+  - Medium instances (n=5): ~0.2-0.4ms (WASM)
+  - Binary optimization: 0/1 branching strategy (~30% faster than general integer)
+  - Iteration limit: 50,000 (prevents runaway computation)
+  - Memory efficient: Fixed variable substitution reduces problem size
+
 ### Technical Details
 
-- **Tableau Structure:** Row-major storage with slack variables
-- **Pivot Selection:** Bland's rule to prevent cycling
-- **Numerical Stability:** Tolerance-based comparison (1e-10)
-- **Memory Management:** Shared handle system across all WASM operations
+- **Linear Programming:**
+  - **Tableau Structure:** Row-major storage with slack variables
+  - **Pivot Selection:** Bland's rule to prevent cycling
+  - **Numerical Stability:** Tolerance-based comparison (1e-10)
+  - **Memory Management:** Shared handle system across all WASM operations
+
+- **Integer Programming:** ⭐ **NEW**
+  - **Algorithm:** Branch & Bound with LP relaxations
+  - **Branching Strategy:** Most fractional heuristic (closest to 0.5)
+  - **Binary Optimization:** Direct 0/1 branching (not floor/ceil)
+  - **Fixed Variables:** Automatic substitution when lower == upper
+  - **Pruning:** Bound-based elimination (LP objective vs best integer solution)
+  - **Constraint Handling:** Avoids negative RHS through variable substitution
+  - **Integer Tolerance:** 1e-6 for checking integrality
 
 ### Example Usage
+
+#### Linear Programming
 
 ```typescript
 const ach = new Achronyme();
@@ -184,6 +258,42 @@ await ach.use(async () => {
   // Sensitivity: how much can c[0] vary?
   const range = ach.optimization.sensitivityC(c.handle, A.handle, b.handle, 0);
   // [20, 80] = c[0] can vary between $20-$80 without changing solution structure
+});
+```
+
+#### Integer Programming ⭐ **NEW**
+
+```typescript
+await ach.use(async () => {
+  // 0-1 Knapsack Problem
+  // maximize value within weight limit
+  const values = ach.vector([60, 100, 120]);
+  const weights = ach.matrix([[10, 20, 30]]);
+  const capacity = ach.vector([50]);
+  const binVars = ach.vector([0, 1, 2]); // All variables are binary
+
+  const solution = ach.optimization.binaryLinprog(
+    values.handle, weights.handle, capacity.handle, 1, binVars.handle
+  );
+
+  const totalValue = ach.optimization.objectiveValue(values.handle, solution);
+  // solution = [0, 1, 1] → take items 2 and 3
+  // totalValue = 220 (weight = 50)
+});
+
+await ach.use(async () => {
+  // Capital Budgeting - Select projects within budget
+  const npvs = ach.vector([100, 150, 200, 250]);
+  const costs = ach.matrix([[50, 75, 100, 125]]);
+  const budget = ach.vector([200]);
+  const binVars = ach.vector([0, 1, 2, 3]);
+
+  const solution = ach.optimization.binaryLinprog(
+    npvs.handle, costs.handle, budget.handle, 1, binVars.handle
+  );
+
+  // solution = [0, 1, 0, 1] → Projects 2 and 4
+  // Total NPV = $400M (budget used = $200M)
 });
 ```
 

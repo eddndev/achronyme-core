@@ -657,6 +657,28 @@ export class RustWASM {
         const mod = this.ensureInit();
         return mod.sensitivityB(c, A, b, index);
     }
+
+    // ========================================================================
+    // Integer Programming
+    // ========================================================================
+
+    /**
+     * Integer Linear Programming using Branch & Bound
+     * Solves LP with integer constraints on specified variables
+     */
+    intlinprog(c: Handle, A: Handle, b: Handle, sense: number, integerVars: Handle): Handle {
+        const mod = this.ensureInit();
+        return mod.intlinprog(c, A, b, sense, integerVars);
+    }
+
+    /**
+     * Binary Linear Programming (0-1 Integer Programming)
+     * Solves LP where specified variables must be binary (0 or 1)
+     */
+    binaryLinprog(c: Handle, A: Handle, b: Handle, sense: number, binaryVars: Handle): Handle {
+        const mod = this.ensureInit();
+        return mod.binaryLinprog(c, A, b, sense, binaryVars);
+    }
 }
 
 /**

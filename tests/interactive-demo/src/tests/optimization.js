@@ -172,4 +172,127 @@ Within this range, shadow price remains constant`;
       return output;
     });
   },
+
+  // ============================================================================
+  // Integer Programming Tests
+  // ============================================================================
+
+  'opt-integer-simple': async (ach) => {
+    return ach.use(async () => {
+      // maximize z = 3x₁ + 2x₂ subject to x₁ + x₂ ≤ 4, x₁, x₂ ∈ ℤ₊
+      const c = ach.vector([3, 2]);
+      const A = ach.matrix([[1, 1]]);
+      const b = ach.vector([4]);
+      const intVars = ach.vector([0, 1]); // Both variables must be integer
+
+      const solution = ach.optimization.intlinprog(c.handle, A.handle, b.handle, 1, intVars.handle);
+      const z = ach.optimization.objectiveValue(c.handle, solution);
+      const solData = ach.session.wasm.getVector(solution);
+
+      return `Integer LP Solution:
+  x₁ = ${solData[0].toFixed(0)} (integer)
+  x₂ = ${solData[1].toFixed(0)} (integer)
+  z* = ${z.toFixed(0)}
+
+✓ All variables are integers`;
+    });
+  },
+
+  'opt-knapsack-01': async (ach) => {
+    return ach.use(async () => {
+      // 0-1 Knapsack: maximize value within weight limit
+      // Items: values = [60, 100, 120], weights = [10, 20, 30], capacity = 50
+      const values = ach.vector([60, 100, 120]);
+      const weights = ach.matrix([[10, 20, 30]]);
+      const capacity = ach.vector([50]);
+      const binVars = ach.vector([0, 1, 2]); // All variables are binary
+
+      const solution = ach.optimization.binaryLinprog(values.handle, weights.handle, capacity.handle, 1, binVars.handle);
+      const totalValue = ach.optimization.objectiveValue(values.handle, solution);
+      const solData = ach.session.wasm.getVector(solution);
+
+      const selectedItems = solData.map((x, i) => x > 0.5 ? i + 1 : null).filter(x => x !== null);
+      const totalWeight = solData.reduce((sum, x, i) => sum + x * [10, 20, 30][i], 0);
+
+      return `0-1 Knapsack Solution:
+  Selected items: ${selectedItems.join(', ')}
+  Total value: ${totalValue.toFixed(0)}
+  Total weight: ${totalWeight.toFixed(0)}/50
+
+Solution: x = [${solData.map(x => x.toFixed(0)).join(', ')}]
+✓ Optimal selection found!`;
+    });
+  },
+
+  'opt-knapsack-large': async (ach) => {
+    return ach.use(async () => {
+      // Larger knapsack instance
+      const values = ach.vector([10, 20, 30, 40, 50]);
+      const weights = ach.matrix([[5, 10, 15, 20, 25]]);
+      const capacity = ach.vector([50]);
+      const binVars = ach.vector([0, 1, 2, 3, 4]);
+
+      const start = performance.now();
+      const solution = ach.optimization.binaryLinprog(values.handle, weights.handle, capacity.handle, 1, binVars.handle);
+      const time = performance.now() - start;
+
+      const totalValue = ach.optimization.objectiveValue(values.handle, solution);
+      const solData = ach.session.wasm.getVector(solution);
+      const totalWeight = solData.reduce((sum, x, i) => sum + x * [5, 10, 15, 20, 25][i], 0);
+
+      return `Large Knapsack (5 items):
+  Solution: x = [${solData.map(x => x.toFixed(0)).join(', ')}]
+  Total value: ${totalValue.toFixed(0)}
+  Weight used: ${totalWeight.toFixed(0)}/50
+
+Solved in ${time.toFixed(2)}ms using Branch & Bound`;
+    });
+  },
+
+  'opt-integer-production': async (ach) => {
+    return ach.use(async () => {
+      // Integer production planning: can only produce whole units
+      const profits = ach.vector([40, 30]);
+      const resources = ach.matrix([[1, 0], [0, 1], [1, 1]]);
+      const available = ach.vector([40, 50, 70]);
+      const intVars = ach.vector([0, 1]);
+
+      const solution = ach.optimization.intlinprog(profits.handle, resources.handle, available.handle, 1, intVars.handle);
+      const profit = ach.optimization.objectiveValue(profits.handle, solution);
+      const solData = ach.session.wasm.getVector(solution);
+
+      return `Integer Production Planning:
+  Product A: ${solData[0].toFixed(0)} units
+  Product B: ${solData[1].toFixed(0)} units
+  Total profit: $${profit.toFixed(0)}
+
+Note: Only whole units can be produced
+✓ Integer constraint satisfied`;
+    });
+  },
+
+  'opt-capital-budgeting': async (ach) => {
+    return ach.use(async () => {
+      // Capital budgeting: select projects within budget
+      // Projects: NPVs = [100, 150, 200, 250], costs = [50, 75, 100, 125], budget = 200
+      const npvs = ach.vector([100, 150, 200, 250]);
+      const costs = ach.matrix([[50, 75, 100, 125]]);
+      const budget = ach.vector([200]);
+      const binVars = ach.vector([0, 1, 2, 3]);
+
+      const solution = ach.optimization.binaryLinprog(npvs.handle, costs.handle, budget.handle, 1, binVars.handle);
+      const totalNPV = ach.optimization.objectiveValue(npvs.handle, solution);
+      const solData = ach.session.wasm.getVector(solution);
+
+      const selectedProjects = solData.map((x, i) => x > 0.5 ? `Project ${i + 1}` : null).filter(x => x !== null);
+      const totalCost = solData.reduce((sum, x, i) => sum + x * [50, 75, 100, 125][i], 0);
+
+      return `Capital Budgeting Solution:
+  Selected: ${selectedProjects.join(', ')}
+  Total NPV: $${totalNPV.toFixed(0)}M
+  Budget used: $${totalCost.toFixed(0)}M / $200M
+
+✓ Optimal project portfolio selected`;
+    });
+  },
 };

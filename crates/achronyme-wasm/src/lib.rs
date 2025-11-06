@@ -1942,3 +1942,155 @@ pub fn sensitivity_b(
         Ok(h.borrow_mut().create(Value::Vector(Vector::new(range))))
     })
 }
+
+// ============================================================================
+// Integer Programming
+// ============================================================================
+
+/// Integer Linear Programming using Branch & Bound
+/// intlinprog(c, A, b, sense, integerVars) - solves IP with integer constraints
+///
+/// # Parameters
+/// - c_handle: Handle to objective coefficients vector
+/// - a_handle: Handle to constraint matrix A
+/// - b_handle: Handle to RHS vector b
+/// - sense: 1.0 for maximize, -1.0 for minimize
+/// - integer_vars_handle: Handle to vector of variable indices that must be integer
+///
+/// # Returns
+/// Handle to integer solution vector x
+///
+/// # Algorithm
+/// Uses Branch & Bound with LP relaxations
+///
+/// # Example
+/// ```javascript
+/// // maximize z = 3x₁ + 2x₂
+/// // subject to: x₁ + x₂ ≤ 4, x₁, x₂ ∈ ℤ₊
+/// const c = ach.vector([3, 2]);
+/// const A = ach.matrix([[1, 1]]);
+/// const b = ach.vector([4]);
+/// const intVars = ach.vector([0, 1]); // Both variables must be integer
+/// const solution = ach.optimization.intlinprog(c.handle, A.handle, b.handle, 1, intVars.handle);
+/// ```
+#[wasm_bindgen(js_name = intlinprog)]
+pub fn intlinprog(
+    c_handle: Handle,
+    a_handle: Handle,
+    b_handle: Handle,
+    sense: f64,
+    integer_vars_handle: Handle,
+) -> Result<Handle, JsValue> {
+    HANDLES.with(|h| {
+        let (c_vec, a_mat, b_vec, int_vars) = {
+            let handles = h.borrow();
+
+            let c = match handles.get(c_handle) {
+                Some(Value::Vector(v)) => Ok(v.data().to_vec()),
+                _ => Err(JsValue::from_str("intlinprog: c must be a vector")),
+            }?;
+
+            let a = match handles.get(a_handle) {
+                Some(Value::Matrix(m)) => Ok(m.clone()),
+                _ => Err(JsValue::from_str("intlinprog: A must be a matrix")),
+            }?;
+
+            let b = match handles.get(b_handle) {
+                Some(Value::Vector(v)) => Ok(v.data().to_vec()),
+                _ => Err(JsValue::from_str("intlinprog: b must be a vector")),
+            }?;
+
+            let integer_vars_vec = match handles.get(integer_vars_handle) {
+                Some(Value::Vector(v)) => {
+                    // Convert f64 to usize
+                    Ok(v.data().iter().map(|&x| x as usize).collect::<Vec<usize>>())
+                },
+                _ => Err(JsValue::from_str("intlinprog: integer_vars must be a vector")),
+            }?;
+
+            Ok::<_, JsValue>((c, a, b, integer_vars_vec))
+        }?;
+
+        use achronyme_solver::intlinprog;
+        let solution = intlinprog(&c_vec, &a_mat, &b_vec, sense, &int_vars)
+            .map_err(|e| JsValue::from_str(&e))?;
+
+        Ok(h.borrow_mut().create(Value::Vector(Vector::new(solution))))
+    })
+}
+
+/// Binary Linear Programming (0-1 Integer Programming)
+/// binaryLinprog(c, A, b, sense, binaryVars) - solves binary IP where variables ∈ {0,1}
+///
+/// # Parameters
+/// - c_handle: Handle to objective coefficients vector
+/// - a_handle: Handle to constraint matrix A
+/// - b_handle: Handle to RHS vector b
+/// - sense: 1.0 for maximize, -1.0 for minimize
+/// - binary_vars_handle: Handle to vector of variable indices that must be binary (0 or 1)
+///
+/// # Returns
+/// Handle to binary solution vector x (all values are 0 or 1)
+///
+/// # Use Cases
+/// - 0-1 Knapsack problem
+/// - Set covering/packing problems
+/// - Assignment problems
+/// - Facility location problems
+///
+/// # Example
+/// ```javascript
+/// // Knapsack: maximize z = 60x₁ + 100x₂ + 120x₃
+/// // subject to: 10x₁ + 20x₂ + 30x₃ ≤ 50, xᵢ ∈ {0,1}
+/// const c = ach.vector([60, 100, 120]);
+/// const A = ach.matrix([[10, 20, 30]]);
+/// const b = ach.vector([50]);
+/// const binVars = ach.vector([0, 1, 2]); // All variables are binary
+/// const solution = ach.optimization.binaryLinprog(c.handle, A.handle, b.handle, 1, binVars.handle);
+/// // solution = [0, 1, 1], z* = 220
+/// ```
+#[wasm_bindgen(js_name = binaryLinprog)]
+pub fn binary_linprog(
+    c_handle: Handle,
+    a_handle: Handle,
+    b_handle: Handle,
+    sense: f64,
+    binary_vars_handle: Handle,
+) -> Result<Handle, JsValue> {
+    HANDLES.with(|h| {
+        let (c_vec, a_mat, b_vec, bin_vars) = {
+            let handles = h.borrow();
+
+            let c = match handles.get(c_handle) {
+                Some(Value::Vector(v)) => Ok(v.data().to_vec()),
+                _ => Err(JsValue::from_str("binaryLinprog: c must be a vector")),
+            }?;
+
+            let a = match handles.get(a_handle) {
+                Some(Value::Matrix(m)) => Ok(m.clone()),
+                _ => Err(JsValue::from_str("binaryLinprog: A must be a matrix")),
+            }?;
+
+            let b = match handles.get(b_handle) {
+                Some(Value::Vector(v)) => Ok(v.data().to_vec()),
+                _ => Err(JsValue::from_str("binaryLinprog: b must be a vector")),
+            }?;
+
+            let binary_vars_vec = match handles.get(binary_vars_handle) {
+                Some(Value::Vector(v)) => {
+                    // Convert f64 to usize
+                    Ok(v.data().iter().map(|&x| x as usize).collect::<Vec<usize>>())
+                },
+                _ => Err(JsValue::from_str("binaryLinprog: binary_vars must be a vector")),
+            }?;
+
+            Ok::<_, JsValue>((c, a, b, binary_vars_vec))
+        }?;
+
+        use achronyme_solver::binary_linprog;
+        let solution = binary_linprog(&c_vec, &a_mat, &b_vec, sense, &bin_vars)
+            .map_err(|e| JsValue::from_str(&e))?;
+
+        Ok(h.borrow_mut().create(Value::Vector(Vector::new(solution))))
+    })
+}
