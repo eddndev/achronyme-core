@@ -54,6 +54,10 @@ dependencies = [
 [[package]]
 name = "achronyme-parser"
 version = "0.1.0"
+dependencies = [
+ "pest",
+ "pest_derive",
+]
 
 [[package]]
 name = "achronyme-solver"

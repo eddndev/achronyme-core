@@ -192,6 +192,7 @@ fn build_phase1_tableau(
 
     // Fila objetivo de Fase 1: minimizar suma de artificiales
     // Coeficientes: 0 para x y s, 1 para artificiales
+    // PERO: debemos hacer que la fila objetivo sea consistente con la base
     for j in n + m..n + m + num_artificials {
         data[m][j] = 1.0; // Coeficiente 1 para artificiales
     }
@@ -205,6 +206,20 @@ fn build_phase1_tableau(
             artificial_idx += 1;
         } else {
             basis.push(n + i); // Holgura
+        }
+    }
+
+    // CRÍTICO: Hacer la fila objetivo compatible con la base inicial
+    // Eliminar las variables básicas de la fila objetivo
+    artificial_idx = 0;
+    for i in 0..m {
+        if b[i] < 0.0 {
+            // Esta fila tiene una artificial en la base
+            // Restar esta fila de la fila objetivo para eliminar la artificial
+            for j in 0..=total_vars {
+                data[m][j] -= data[i][j];
+            }
+            artificial_idx += 1;
         }
     }
 

@@ -16,6 +16,108 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.5.3] - 2025-11-06
 
+### Added - Parser Migration to Pest 🦀
+
+**Major Infrastructure Upgrade:**
+
+- **Migrated Parser from Hand-Written to Pest (PEG Parser Generator)**
+  - Replaced manual recursive descent parser with declarative Pest grammar
+  - ~150 lines of clean PEG grammar vs ~1000+ lines of hand-written code
+  - Better error messages with precise location information
+  - Easier to extend with new language features (conditionals, loops, pattern matching)
+  - More robust handling of precedence and associativity
+
+- **New Parser Module: `pest_parser.rs`**
+  - Complete SOC language grammar in `grammar.pest`
+  - Automatic tokenization and parsing via Pest macros
+  - Clean AST generation from Pest pairs
+  - Operator precedence correctly handled:
+    - Power (right-associative): `2^3^2 = 2^(3^2) = 512`
+    - Multiplicative: `*`, `/`, `%` (left-associative)
+    - Additive: `+`, `-` (left-associative)
+    - Comparison: `>`, `<`, `>=`, `<=`, `==`, `!=`
+
+- **New Evaluator API: `eval_str()`**
+  - Direct string-to-value evaluation using Pest parser
+  - Replaces `Lexer → Parser → Evaluator` chain with single call
+  - Example: `evaluator.eval_str("2 + 3 * 4")` → `Value::Number(14.0)`
+  - Supports all SOC features: lambdas, vectors, matrices, function calls, let statements
+
+- **Comprehensive Test Suite**
+  - 8 parser-specific tests (all passing)
+  - 12 evaluator integration tests (all passing)
+  - Tests for comments, multi-line scripts, and SOC-style code
+  - Validation against real `examples/soc/` files
+
+### Documentation - Linear Programming Standard Form 📋
+
+**Important Conventions for Optimization Functions:**
+
+All LP solvers (`linprog`, `simplex`, `dual_simplex`, `revised_simplex`) use **standard form**:
+
+```
+maximize/minimize z = c^T × x
+subject to: Ax ≤ b, x ≥ 0
+```
+
+**Key Points:**
+- ALL constraints must be in `Ax ≤ b` form (less-than-or-equal)
+- ALL values in vector `b` must be non-negative (b ≥ 0)
+- User is responsible for converting problems to standard form
+
+**Conversion Examples:**
+
+| Constraint Type | Original | Standard Form |
+|----------------|----------|---------------|
+| Greater-than | `x₁ + x₂ ≥ 5` | `-x₁ - x₂ ≤ -5` |
+| Equality | `x₁ + x₂ = 5` | Two constraints: `x₁ + x₂ ≤ 5` AND `-x₁ - x₂ ≤ -5` |
+| Negative RHS | `x₁ ≤ -3` | Multiply by -1: `-x₁ ≤ 3` |
+
+**Why This Design:**
+- Keeps the language syntax simple and mathematical
+- Follows standard LP textbook conventions
+- User maintains full control over problem formulation
+- Avoids domain-specific syntax complexity
+
+**Future Consideration:**
+Mixed constraint types (≤, ≥, =) may be supported in future versions, but the current design philosophy favors simplicity and mathematical clarity.
+
+**Grammar Features Implemented:**
+```pest
+// Expressions with correct precedence
+expr = { comparison }
+comparison = { additive ~ (cmp_op ~ additive)? }
+additive = { multiplicative ~ (add_op ~ multiplicative)* }
+multiplicative = { unary ~ (mult_op ~ unary)* }
+power = { primary ~ ("^" ~ power)? }  // Right-associative
+
+// Complex literals
+vector = { "[" ~ expr ~ ("," ~ expr)* ~ "]" }
+matrix = { "[" ~ vector ~ ("," ~ vector)* ~ "]" }
+complex = { number ~ "i" }
+
+// Lambdas and functions
+lambda = { lambda_params ~ "=>" ~ expr }
+function_call = { identifier ~ "(" ~ (expr ~ ("," ~ expr)*)? ~ ")" }
+
+// Statements
+let_statement = { "let" ~ identifier ~ "=" ~ expr }
+program = { SOI ~ statement* ~ EOI }
+```
+
+**Benefits of Pest Migration:**
+1. **Maintainability**: Grammar is declarative and self-documenting
+2. **Extensibility**: Easy to add new features (see `docs/roadmap.md` for planned conditionals)
+3. **Robustness**: Pest handles edge cases and ambiguities automatically
+4. **Error Handling**: Built-in error messages with line/column information
+5. **Performance**: Pest is highly optimized with zero-copy parsing
+
+**Backward Compatibility:**
+- Old hand-written parser still available (not removed yet)
+- All existing tests pass
+- No breaking changes to public API
+- Gradual migration path for downstream code
+
 ### Added - Linear Programming & Optimization Module 📊
 
 **Complete Linear Programming Suite:**

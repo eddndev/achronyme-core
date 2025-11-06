@@ -72,6 +72,34 @@ impl Evaluator {
         &mut self.functions
     }
 
+    /// Evaluate a SOC expression string using the Pest parser (NEW)
+    ///
+    /// This is the new and recommended way to evaluate SOC expressions.
+    /// It uses the Pest parser which is more robust and maintainable.
+    ///
+    /// Example:
+    /// ```rust
+    /// let mut evaluator = Evaluator::new();
+    /// let result = evaluator.eval_str("2 + 3 * 4").unwrap();
+    /// ```
+    pub fn eval_str(&mut self, source: &str) -> Result<Value, String> {
+        use achronyme_parser::parse_pest;
+
+        let statements = parse_pest(source)?;
+
+        if statements.is_empty() {
+            return Err("No statements to evaluate".to_string());
+        }
+
+        // Evaluate all statements, return the last one
+        let mut result = Value::Number(0.0);
+        for stmt in &statements {
+            result = self.evaluate(stmt)?;
+        }
+
+        Ok(result)
+    }
+
     /// Evaluate an AST and return the result
     pub fn evaluate(&mut self, node: &AstNode) -> Result<Value, String> {
         match node {
@@ -706,5 +734,113 @@ mod tests {
         // pipe with non-unary function should fail
         let result = eval("pipe(5,(x,y) => x + y)");
         assert!(result.is_err());
+    }
+
+    // ========================================================================
+    // Pest Parser Tests (New)
+    // ========================================================================
+
+    #[test]
+    fn test_pest_simple_arithmetic() {
+        let mut evaluator = Evaluator::new();
+        let result = evaluator.eval_str("2 + 3 * 4").unwrap();
+        assert_eq!(result, Value::Number(14.0)); // 2 + (3 * 4)
+    }
+
+    #[test]
+    fn test_pest_power_right_associative() {
+        let mut evaluator = Evaluator::new();
+        let result = evaluator.eval_str("2^3^2").unwrap();
+        assert_eq!(result, Value::Number(512.0)); // 2^(3^2) = 2^9
+    }
+
+    #[test]
+    fn test_pest_vector() {
+        let mut evaluator = Evaluator::new();
+        let result = evaluator.eval_str("[1, 2, 3]").unwrap();
+        match result {
+            Value::Vector(v) => {
+                assert_eq!(v.data(), &[1.0, 2.0, 3.0]);
+            }
+            _ => panic!("Expected vector"),
+        }
+    }
+
+    #[test]
+    fn test_pest_function_call() {
+        let mut evaluator = Evaluator::new();
+        let result = evaluator.eval_str("sin(0)").unwrap();
+        match result {
+            Value::Number(x) => assert!(x.abs() < 1e-10),
+            _ => panic!("Expected number"),
+        }
+    }
+
+    #[test]
+    fn test_pest_let_and_reference() {
+        let mut evaluator = Evaluator::new();
+        evaluator.eval_str("let x = 42").unwrap();
+        let result = evaluator.eval_str("x").unwrap();
+        assert_eq!(result, Value::Number(42.0));
+    }
+
+    #[test]
+    fn test_pest_lambda() {
+        let mut evaluator = Evaluator::new();
+        evaluator.eval_str("let f = x => x^2").unwrap();
+        // Lambda should be stored in environment
+        assert!(evaluator.environment().get("f").is_ok());
+    }
+
+    #[test]
+    fn test_pest_complex_expression() {
+        let mut evaluator = Evaluator::new();
+        let result = evaluator.eval_str("(2 + 3) * (4 - 1)").unwrap();
+        assert_eq!(result, Value::Number(15.0)); // 5 * 3
+    }
+
+    #[test]
+    fn test_pest_matrix() {
+        let mut evaluator = Evaluator::new();
+        let result = evaluator.eval_str("[[1, 2], [3, 4]]").unwrap();
+        match result {
+            Value::Matrix(_) => {}, // Success
+            _ => panic!("Expected matrix"),
+        }
+    }
+
+    #[test]
+    fn test_pest_comparison() {
+        let mut evaluator = Evaluator::new();
+        let result = evaluator.eval_str("5 > 3").unwrap();
+        assert_eq!(result, Value::Number(1.0)); // true = 1.0
+    }
+
+    #[test]
+    fn test_pest_multiple_statements() {
+        let mut evaluator = Evaluator::new();
+        let result = evaluator.eval_str("let x = 10\nlet y = 20\nx + y").unwrap();
+        assert_eq!(result, Value::Number(30.0));
+    }
+
+    #[test]
+    fn test_pest_with_comments() {
+        let mut evaluator = Evaluator::new();
+        let source = "// This is a comment\nlet x = 42\n// Another comment\nx * 2";
+        let result = evaluator.eval_str(source).unwrap();
+        assert_eq!(result, Value::Number(84.0));
+    }
+
+    #[test]
+    fn test_pest_soc_style_script() {
+        let mut evaluator = Evaluator::new();
+        let source = r#"
+// Test simple
+let x = 10
+let y = 20
+x + y
+"#;
+        let result = evaluator.eval_str(source).unwrap();
+        assert_eq!(result, Value::Number(30.0));
     }
 }

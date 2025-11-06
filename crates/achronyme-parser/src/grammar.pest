@@ -1,0 +1,152 @@
+// ============================================================================
+// Achronyme SOC Language Grammar (Pest PEG)
+// ============================================================================
+// This grammar defines the complete syntax for the SOC (Second-Order Calculus)
+// language used by Achronyme for mathematical computations.
+//
+// Features:
+// - Arithmetic expressions with proper precedence
+// - Function calls (sin, cos, map, etc.)
+// - Vectors and matrices
+// - Lambda functions with closures
+// - Variable declarations (let)
+// - Higher-order functions
+// - Complex numbers (3i, 2+3i)
+// ============================================================================
+
+// ============================================================================
+// Whitespace and Comments
+// ============================================================================
+
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
+COMMENT = _{ "//" ~ (!"\n" ~ ANY)* }
+
+// ============================================================================
+// Literals
+// ============================================================================
+
+// Numbers: 123, 3.14, -42, 1.5e-10, 2.5E+3
+number = @{
+    "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)?
+}
+
+// Complex numbers: 3i, -2i
+// Note: Full complex (2+3i) is handled as arithmetic expression
+complex = @{ number ~ "i" }
+
+// Identifiers: x, foo, my_var, PI, sin
+identifier = @{
+    (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")*
+}
+
+// ============================================================================
+// Composite Literals
+// ============================================================================
+
+// Vector: [1, 2, 3], [x, y+1, sin(z)]
+vector = {
+    "[" ~ expr ~ ("," ~ expr)* ~ "]"
+}
+
+// Matrix: [[1, 2], [3, 4]]
+matrix = {
+    "[" ~ vector ~ ("," ~ vector)* ~ "]"
+}
+
+// ============================================================================
+// Lambda Functions
+// ============================================================================
+
+// Lambda parameters: x or (x, y, z)
+lambda_params = {
+    identifier                                      // Single param: x
+  | ("(" ~ identifier ~ ("," ~ identifier)* ~ ")") // Multi param: (x, y)
+}
+
+// Lambda: x => x^2 or (x, y) => x + y
+lambda = {
+    lambda_params ~ "=>" ~ expr
+}
+
+// ============================================================================
+// Function Calls
+// ============================================================================
+
+// Function call: sin(x), map(f, v), linprog(c, A, b, 1)
+function_call = {
+    identifier ~ "(" ~ (expr ~ ("," ~ expr)*)? ~ ")"
+}
+
+// ============================================================================
+// Expressions (with operator precedence)
+// ============================================================================
+
+// Primary expressions (highest precedence)
+primary = {
+    complex     // Must come before number (3i contains number)
+  | number
+  | matrix      // Must come before vector (matrix starts with [)
+  | vector
+  | lambda
+  | function_call
+  | identifier
+  | "(" ~ expr ~ ")"
+}
+
+// Power (right-associative): 2^3^4 = 2^(3^4)
+power = {
+    primary ~ ("^" ~ power)?
+}
+
+// Unary operators: -x, -sin(x)
+unary = {
+    "-" ~ unary
+  | power
+}
+
+// Operators as separate rules (not silent, so they're captured)
+mult_op = { "*" | "/" | "%" }
+add_op = { "+" | "-" }
+cmp_op = { "==" | "!=" | ">=" | "<=" | ">" | "<" }
+
+// Multiplicative: *, /, %
+multiplicative = {
+    unary ~ (mult_op ~ unary)*
+}
+
+// Additive: +, -
+additive = {
+    multiplicative ~ (add_op ~ multiplicative)*
+}
+
+// Comparison: >, <, >=, <=, ==, !=
+comparison = {
+    additive ~ (cmp_op ~ additive)?
+}
+
+// Expression (entry point for expressions)
+expr = { comparison }
+
+// ============================================================================
+// Statements
+// ============================================================================
+
+// Let statement: let x = 42
+let_statement = {
+    "let" ~ identifier ~ "=" ~ expr
+}
+
+// Statement: either let or expression
+statement = {
+    let_statement
+  | expr
+}
+
+// ============================================================================
+// Program (entry point)
+// ============================================================================
+
+// Program: sequence of statements
+program = {
+    SOI ~ statement* ~ EOI
+}

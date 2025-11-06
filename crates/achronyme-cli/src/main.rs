@@ -1,6 +1,4 @@
 use achronyme_eval::Evaluator;
-use achronyme_parser::lexer::Lexer;
-use achronyme_parser::parser::Parser;
 use std::env;
 use std::fs;
 use std::io::{self, Write};
@@ -110,27 +108,12 @@ fn run_file(filename: &str) {
 
     let mut evaluator = Evaluator::new();
 
-    // Split by lines and execute each line
-    for (line_num, line) in contents.lines().enumerate() {
-        let line = line.trim();
-
-        // Skip empty lines and comments
-        if line.is_empty() || line.starts_with("#") || line.starts_with("//") {
-            continue;
-        }
-
-        match evaluate_expression(&mut evaluator, line) {
-            Ok(result) => {
-                // Only print if it's not a variable assignment
-                if !line.contains("=") || line.contains("==") {
-                    println!("{}", result);
-                }
-            }
-            Err(err) => {
-                eprintln!("Error at line {}: {}", line_num + 1, err);
-                eprintln!("  {}", line);
-                std::process::exit(1);
-            }
+    // Parse and evaluate the entire file using Pest
+    match evaluate_expression(&mut evaluator, &contents) {
+        Ok(result) => println!("{}", result),
+        Err(err) => {
+            eprintln!("Error: {}", err);
+            std::process::exit(1);
         }
     }
 }
@@ -148,16 +131,8 @@ fn run_expression(expr: &str) {
 }
 
 fn evaluate_expression(evaluator: &mut Evaluator, input: &str) -> Result<String, String> {
-    // Tokenize
-    let mut lexer = Lexer::new(input);
-    let tokens = lexer.tokenize()?;
-
-    // Parse
-    let mut parser = Parser::new(tokens);
-    let ast = parser.parse()?;
-
-    // Evaluate
-    let result = evaluator.evaluate(&ast)?;
+    // Parse and evaluate using Pest
+    let result = evaluator.eval_str(input)?;
 
     // Format result
     Ok(format_value(&result))

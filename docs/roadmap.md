@@ -311,3 +311,506 @@ let proyecto_pert = network {
 - **Flexible:** Permite definir topología pura, datos en nodos, datos en aristas, o una combinación.
 - **Extensible:** Los nuevos algoritmos pueden simplemente buscar las propiedades que necesitan en los `records` de los nodos o aristas, sin requerir cambios en la sintaxis.
 - **Legible:** La estructura del grafo y sus datos son fáciles de entender de un vistazo.
+
+---
+
+## Propuesta de Sintaxis para Condicionales y Funciones Piecewise (Futuro)
+
+*Esta es una propuesta para implementar funciones definidas por partes (piecewise functions) y condicionales en el lenguaje SOC, fundamentales para optimización, física, DSP y cálculo numérico.*
+
+### Motivación
+
+Las **funciones definidas por partes** son esenciales en matemáticas aplicadas:
+- **Optimización:** Costos escalonados, tarifas progresivas
+- **Física/Ingeniería:** Condiciones de frontera, cargas distribuidas
+- **DSP:** Ventanas rectangulares, funciones indicadoras
+- **Machine Learning:** Funciones de activación (ReLU, Leaky ReLU)
+- **Economía:** Impuestos progresivos, descuentos por volumen
+- **Cálculo Numérico:** Integración/derivación de funciones discontinuas
+
+### Principios de Diseño
+
+1. **Consistente:** Mantener el estilo funcional y declarativo de SOC
+2. **Multivariable:** Las condiciones deben soportar múltiples variables (igual que las lambdas)
+3. **Simple para casos simples:** `if()` para 2 ramas
+4. **Expresivo para casos complejos:** `piecewise()` para 3+ ramas
+5. **Default implícito:** Evitar `[true, valor]` explícito cuando sea posible
+
+### Sintaxis Propuesta: `if()` - Condicional Simple
+
+Para casos con 2 ramas (verdadero/falso):
+
+```soc
+if(condicion, valor_si_verdadero, valor_si_falso)
+```
+
+**Ejemplos:**
+
+```soc
+// Valor absoluto manual
+let abs_manual = x => if(x < 0, -x, x)
+
+// ReLU (función de activación)
+let relu = x => if(x > 0, x, 0)
+
+// Leaky ReLU
+let leaky_relu = x => if(x > 0, x, 0.01*x)
+
+// Función por partes simple
+let f = x => if(x < 0, x^2, sqrt(x))
+
+// Máximo personalizado
+let max_custom = (a, b) => if(a > b, a, b)
+
+// Multivariable: dentro de una región circular
+let dentro_circulo = (x, y) => if(x^2 + y^2 < 1, 1, 0)
+```
+
+### Sintaxis Propuesta: `piecewise()` - Funciones por Partes
+
+Para casos con 3+ ramas o dominios complejos:
+
+```soc
+piecewise(
+  [condicion1, valor1],
+  [condicion2, valor2],
+  [condicion3, valor3],
+  valor_default  // último argumento sin [] = caso por defecto
+)
+```
+
+**Características:**
+- **Evaluación en orden:** Las condiciones se evalúan secuencialmente (short-circuit)
+- **Default implícito:** El último argumento sin `[]` es el valor por defecto
+- **Default opcional:** Si no hay default y ninguna condición se cumple, genera error
+- **Multivariable:** Las condiciones pueden usar todas las variables de la lambda
+
+**Ejemplos:**
+
+```soc
+// 1. Función signo
+let signo = x => piecewise(
+  [x < 0, -1],
+  [x > 0, 1],
+  0  // cuando x == 0
+)
+
+// 2. Tarifa eléctrica escalonada (caso real de optimización)
+let tarifa = kwh => piecewise(
+  [kwh <= 100, 0.10 * kwh],
+  [kwh <= 300, 10 + 0.08 * (kwh - 100)],
+  [kwh <= 500, 26 + 0.06 * (kwh - 300)],
+  38 + 0.05 * (kwh - 500)  // más de 500 kWh
+)
+
+// 3. Función matemática compleja por dominios
+let f = x => piecewise(
+  [x < -1, 0],
+  [x >= -1 && x < 0, x^2 + 2*x + 1],
+  [x >= 0 && x < 1, sin(PI*x)],
+  exp(-x)  // x >= 1
+)
+
+// 4. Costo de producción con economías de escala
+let costo_produccion = unidades => piecewise(
+  [unidades <= 1000, 50*unidades],
+  [unidades <= 5000, 50000 + 45*(unidades-1000)],
+  230000 + 40*(unidades-5000)
+)
+
+// 5. Multivariable: Regiones en el plano
+let region = (x, y) => piecewise(
+  [x^2 + y^2 < 1, 1],            // círculo interior
+  [abs(x) < 2 && abs(y) < 2, 2], // cuadrado exterior
+  0                               // fuera del cuadrado
+)
+
+// 6. Física: Fuerza con fricción
+let fuerza = v => piecewise(
+  [v == 0, 0],
+  [v > 0, -0.5*v^2],  // fricción en dirección positiva
+  0.5*v^2             // fricción en dirección negativa
+)
+
+// 7. DSP: Ventana rectangular personalizada
+let ventana = t => piecewise(
+  [t >= 0 && t <= 1, 1],
+  0  // fuera del intervalo
+)
+
+// 8. Sin default (error si condición no se cumple)
+let f_parcial = x => piecewise(
+  [x >= 0 && x < 1, x^2],
+  [x >= 1 && x < 2, 2*x - 1]
+  // Error si x < 0 o x >= 2
+)
+```
+
+### Operadores Lógicos Requeridos
+
+Para condiciones complejas, se necesitan operadores lógicos:
+
+```soc
+// AND lógico
+x >= 0 && x <= 1
+
+// OR lógico
+x < -1 || x > 1
+
+// NOT lógico
+!(x == 0)
+
+// Combinaciones
+(x > 0 && y > 0) || (x < 0 && y < 0)
+```
+
+### Casos de Uso Desbloqueados
+
+#### 1. Integración Numérica con Discontinuidades
+
+```soc
+// Función con discontinuidad
+let f = x => piecewise(
+  [x < 0, 0],
+  [x >= 0 && x <= PI, sin(x)],
+  0
+)
+
+// Integrar correctamente
+let area = simpson(f, -1, 4, 100)
+```
+
+#### 2. Optimización con Costos por Tramos
+
+```soc
+// Minimizar costo total con función piecewise
+let costo_total = x => piecewise(
+  [x <= 100, 10*x],
+  [x <= 500, 1000 + 8*(x-100)],
+  4200 + 5*(x-500)
+)
+
+// Usar en optimización (futuro)
+let optimo = minimize(costo_total, 0, 1000)
+```
+
+#### 3. Impuestos Progresivos (Economía)
+
+```soc
+let impuesto = ingreso => piecewise(
+  [ingreso <= 10000, 0],
+  [ingreso <= 50000, 0.10 * (ingreso - 10000)],
+  [ingreso <= 100000, 4000 + 0.20 * (ingreso - 50000)],
+  14000 + 0.30 * (ingreso - 100000)
+)
+```
+
+#### 4. Derivación Numérica de Funciones Discontinuas
+
+```soc
+// Función con discontinuidad
+let g = x => if(x < 0, x^2, x^3)
+
+// Derivar numéricamente (cuidado en x=0)
+let dg = x => diff(g, x, 1e-5)
+```
+
+### Implementación Técnica (Resumen)
+
+**Nuevos tokens necesarios:**
+- `&&` (AND), `||` (OR), `!` (NOT)
+- `true`, `false` (booleanos)
+
+**Nuevos nodos AST:**
+```rust
+pub enum AstNode {
+    // ... existentes ...
+
+    If {
+        condition: Box<AstNode>,
+        then_expr: Box<AstNode>,
+        else_expr: Box<AstNode>,
+    },
+
+    Piecewise {
+        cases: Vec<(AstNode, AstNode)>,  // (condicion, valor)
+        default: Option<Box<AstNode>>,
+    },
+
+    Boolean(bool),
+}
+
+pub enum BinaryOp {
+    // ... existentes ...
+    And,  // &&
+    Or,   // ||
+}
+
+pub enum UnaryOp {
+    Negate,  // existente
+    Not,     // ! (nuevo)
+}
+```
+
+**Evaluación:**
+- Las condiciones evalúan a booleanos
+- `if()` evalúa condición, retorna rama correspondiente
+- `piecewise()` evalúa condiciones en orden (short-circuit)
+- Si ninguna condición se cumple y no hay default → error
+
+### Razón para Posponer: Migración a Pest
+
+**Problema actual:** El AST está creciendo rápidamente con un parser hand-written, lo que dificulta el mantenimiento y la adición de nuevas features.
+
+**Solución:** Migrar a **Pest** (parser generator con PEG) antes de implementar condicionales.
+
+**Beneficios de migrar primero:**
+1. Gramática declarativa más fácil de extender
+2. Mejor manejo de errores
+3. Parsing más robusto
+4. Menos código manual que mantener
+5. Preparación para features futuras (pattern matching, loops, etc.)
+
+**Plan recomendado:**
+1. ✅ Documentar propuesta de condicionales (este documento)
+2. ✅ Migrar parser actual a Pest (completado en v0.5.3)
+3. ✅ Validar migración con todos los ejemplos SOC (13/15 funcionando)
+4. 🔜 Remover parser hand-written (lexer.rs, parser.rs) - deprecado
+5. 🔜 Implementar condicionales sobre la base de Pest
+6. 🔜 Implementar piecewise functions
+7. 🔜 Implementar sintaxis de grafos para algoritmos de redes
+
+### Referencias
+
+- Sintaxis actual de lambdas: `x => x^2`, `(x, y) => x + y`
+- Operadores comparación existentes: `>`, `<`, `>=`, `<=`, `==`, `!=`
+- Funciones de orden superior existentes: `map`, `filter`, `reduce`
+
+---
+
+## Propuesta de Migración: Parser Hand-Written → Pest
+
+*Propuesta para modernizar el parser del lenguaje SOC usando Pest (Parser Generator)*
+
+### Motivación
+
+**Problema:** El parser hand-written actual (`achronyme-parser`) está creciendo en complejidad:
+- AST con 10+ variantes de nodos
+- Parsing manual de tokens
+- Difícil agregar nuevas features (condicionales, loops, pattern matching)
+- Propenso a errores de precedencia y asociatividad
+- Difícil de mantener y testear
+
+**Solución:** Migrar a **Pest** - un parser generator basado en PEG (Parsing Expression Grammars).
+
+### Beneficios de Pest
+
+1. **Gramática Declarativa:**
+   ```pest
+   expr = { term ~ (("+" | "-") ~ term)* }
+   term = { factor ~ (("*" | "/") ~ factor)* }
+   factor = { number | "(" ~ expr ~ ")" }
+   ```
+
+2. **Mejor Manejo de Errores:**
+   - Mensajes de error precisos con ubicación
+   - Stack trace de reglas de parsing
+   - Fácil debugging
+
+3. **Más Robusto:**
+   - Precedencia de operadores clara
+   - Asociatividad explícita
+   - Whitespace handling automático
+
+4. **Fácil de Extender:**
+   - Agregar condicionales: solo agregar regla `if_expr`
+   - Agregar loops: solo agregar regla `for_expr`
+   - Agregar pattern matching: solo agregar regla `match_expr`
+
+5. **Menos Código:**
+   - ~300-500 líneas de gramática Pest
+   - vs ~1000+ líneas de parser hand-written
+   - Menos bugs, más mantenible
+
+### Ejemplo: Gramática Actual en Pest
+
+```pest
+// grammar.pest - Lenguaje SOC
+
+WHITESPACE = _{ " " | "\t" | "\n" | "\r" }
+COMMENT = _{ "//" ~ (!"\n" ~ ANY)* }
+
+// Literales
+number = @{ "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)? }
+complex = { number ~ "i" }
+identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+
+// Vectores y matrices
+vector = { "[" ~ expr ~ ("," ~ expr)* ~ "]" }
+matrix = { "[" ~ vector ~ ("," ~ vector)* ~ "]" }
+
+// Expresiones
+primary = {
+    number
+  | complex
+  | vector
+  | matrix
+  | identifier
+  | lambda
+  | function_call
+  | "(" ~ expr ~ ")"
+}
+
+// Operadores (con precedencia implícita)
+power = { primary ~ ("^" ~ primary)* }
+unary = { ("-" | "!")? ~ power }
+factor = { unary ~ (("*" | "/" | "%") ~ unary)* }
+term = { factor ~ (("+" | "-") ~ factor)* }
+comparison = { term ~ ((">" | "<" | ">=" | "<=" | "==" | "!=") ~ term)? }
+logical_and = { comparison ~ ("&&" ~ comparison)* }
+logical_or = { logical_and ~ ("||" ~ logical_and)* }
+
+expr = { logical_or }
+
+// Lambdas
+lambda = { lambda_params ~ "=>" ~ expr }
+lambda_params = { identifier | ("(" ~ identifier ~ ("," ~ identifier)* ~ ")") }
+
+// Function calls
+function_call = { identifier ~ "(" ~ (expr ~ ("," ~ expr)*)? ~ ")" }
+
+// Statements
+let_stmt = { "let" ~ identifier ~ "=" ~ expr }
+statement = { let_stmt | expr }
+
+// Program
+program = { SOI ~ statement ~ (statement)* ~ EOI }
+```
+
+### Plan de Migración
+
+**Fase 1: Setup Pest**
+1. Agregar dependencia `pest = "2.7"` y `pest_derive = "2.7"`
+2. Crear `grammar.pest` con gramática básica
+3. Crear `pest_parser.rs` con generación de AST
+
+**Fase 2: Migrar Features Existentes**
+1. Migrar aritmética básica (`+`, `-`, `*`, `/`, `^`)
+2. Migrar funciones matemáticas
+3. Migrar vectores y matrices
+4. Migrar lambdas y HOF
+5. Migrar variables (`let`)
+
+**Fase 3: Validación**
+1. Ejecutar todos los tests existentes
+2. Comparar AST generado (Pest vs hand-written)
+3. Benchmarks de performance
+
+**Fase 4: Nuevas Features**
+1. Implementar condicionales (`if`, `piecewise`)
+2. Implementar operadores lógicos (`&&`, `||`, `!`)
+3. Agregar tests para nuevas features
+
+**Fase 5: Cleanup**
+1. Remover parser hand-written
+2. Actualizar documentación
+3. Release nueva versión
+
+### Estimación de Esfuerzo
+
+- **Fase 1-2:** ~2-3 días (gramática + migración)
+- **Fase 3:** ~1 día (validación)
+- **Fase 4:** ~1-2 días (condicionales)
+- **Fase 5:** ~0.5 días (cleanup)
+- **Total:** ~1 semana de trabajo
+
+### Riesgos y Mitigación
+
+**Riesgo 1:** Cambios en AST rompen evaluador
+- **Mitigación:** Mantener estructura de AST existente, solo cambiar generación
+
+**Riesgo 2:** Performance regression
+- **Mitigación:** Benchmarks antes/después, Pest es muy eficiente
+
+**Riesgo 3:** Bugs en migración
+- **Mitigación:** Test suite completo, migración incremental
+
+### Decisión Recomendada
+
+**Proceder con migración a Pest ANTES de implementar condicionales.**
+
+Esto nos dará una base sólida para agregar:
+- Condicionales y piecewise functions
+- Loops (`for`, `while`)
+- Pattern matching (`match`)
+- Bloques de código
+- Imports/modules
+- Y cualquier feature futura
+
+### Referencias
+
+- [Pest Book](https://pest.rs/book/)
+- [Pest GitHub](https://github.com/pest-parser/pest)
+- [Pest Examples](https://github.com/pest-parser/pest/tree/master/pest/examples)
+
+---
+
+## Limitaciones Conocidas y Diseño Intencional
+
+### Programación Lineal: Forma Estándar Requerida
+
+**Estado Actual (v0.5.3):**
+
+Todos los solvers de LP (`linprog`, `simplex`, `dual_simplex`, `revised_simplex`, `two_phase_simplex`) requieren que el usuario convierta su problema a **forma estándar**:
+
+```
+maximize/minimize z = c^T × x
+subject to: Ax ≤ b, x ≥ 0
+```
+
+**Restricciones:**
+- TODAS las restricciones deben ser `Ax ≤ b` (menor-o-igual)
+- TODOS los valores en `b` deben ser no-negativos (b ≥ 0)
+- El usuario es responsable de convertir restricciones mixtas (≥, =) a esta forma
+
+**Conversiones Requeridas:**
+
+| Tipo | Original | Forma Estándar |
+|------|----------|----------------|
+| Mayor-igual | `x₁ + x₂ ≥ 5` | `-x₁ - x₂ ≤ -5` |
+| Igualdad | `x₁ + x₂ = 5` | Dos restricciones: `x₁ + x₂ ≤ 5` Y `-x₁ - x₂ ≤ -5` |
+| RHS negativo | `x₁ ≤ -3` | `-x₁ ≤ 3` |
+
+**Filosofía de Diseño:**
+
+Esta es una **decisión intencional**, no un bug:
+
+1. **Simplicidad**: Mantiene la sintaxis del lenguaje limpia y matemática
+2. **Control**: El usuario mantiene control total sobre la formulación del problema
+3. **Educación**: Fuerza comprensión de conceptos fundamentales de LP
+4. **Minimalismo**: Evita sintaxis mágica específica del dominio
+5. **Extensibilidad**: Más fácil agregar nuevos métodos sin complicar la API
+
+**Opciones Consideradas (Rechazadas por Ahora):**
+
+```javascript
+// Opción A: Vector de tipos de restricción
+linprog(c, A, b, ["<=", ">=", "="], sense)  // ❌ Complejo
+
+// Opción B: Matriz extendida
+let constraints = [[[1,1], 5, "="], [[2,1], 4, ">="]]  // ❌ Confuso
+
+// Opción C: Funciones separadas
+linprog_mixed(c, A_le, b_le, A_ge, b_ge, A_eq, b_eq, sense)  // ❌ Verboso
+```
+
+**¿Cuándo Podría Cambiar?**
+
+Si en el futuro Achronyme implementa un sistema de modelado de optimización de alto nivel (como AMPL o GAMS), podríamos considerar sintaxis más expresiva. Pero para el núcleo del lenguaje matemático, mantenemos la simplicidad.
+
+**Workaround Actual:**
+
+Los ejemplos en `examples/soc/` muestran cómo convertir problemas comunes a forma estándar. Ver especialmente:
+- `08-simple-linprog-test.soc` - Maximización estándar
+- `09-production-problem.soc` - Problema de producción
+- `11-two-phase-example.soc` - Minimización con conversión documentada
