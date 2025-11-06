@@ -4,6 +4,8 @@ use achronyme_types::matrix::Matrix;
 use achronyme_types::complex::Complex as AchronymeComplex;
 use std::collections::HashMap;
 
+use crate::function_modules;
+
 /// Type for built-in function implementations
 pub type BuiltinFunction = fn(&[Value]) -> Result<Value, String>;
 
@@ -52,93 +54,100 @@ impl FunctionRegistry {
 
     /// Register all standard math functions
     fn register_math_functions(&mut self) {
-        // Trigonometric functions
-        self.register("sin", sin, 1);
-        self.register("cos", cos, 1);
-        self.register("tan", tan, 1);
-        self.register("asin", asin, 1);
-        self.register("acos", acos, 1);
-        self.register("atan", atan, 1);
-        self.register("atan2", atan2, 2);
+        // Delegate to specialized modules
+        function_modules::trig::register_functions(self);
 
-        // Hyperbolic functions
-        self.register("sinh", sinh, 1);
-        self.register("cosh", cosh, 1);
-        self.register("tanh", tanh, 1);
+        // Register functions organized by category
+        self.register_exponential_functions();
+        self.register_rounding_functions();
+        self.register_complex_functions();
+        self.register_vector_functions();
+        self.register_matrix_functions();
+        self.register_statistical_functions();
+        self.register_dsp_functions();
 
-        // Exponential and logarithmic
+        // NOTE: Numerical calculus functions (diff, integral, solve, etc.) are
+        // implemented directly in the evaluator (evaluator.rs) because they need
+        // access to the evaluator to call lambda functions, similar to HOF functions.
+    }
+
+    /// Register exponential and logarithmic functions
+    fn register_exponential_functions(&mut self) {
         self.register("exp", exp, 1);
         self.register("ln", ln, 1);
         self.register("log", ln, 1); // alias
         self.register("log10", log10, 1);
         self.register("log2", log2, 1);
-
-        // Power and roots
         self.register("sqrt", sqrt, 1);
         self.register("cbrt", cbrt, 1);
         self.register("pow", pow, 2);
+    }
 
-        // Rounding
+    /// Register rounding and utility functions
+    fn register_rounding_functions(&mut self) {
         self.register("floor", floor, 1);
         self.register("ceil", ceil, 1);
         self.register("round", round, 1);
         self.register("trunc", trunc, 1);
         self.register("abs", abs, 1);
         self.register("sign", sign, 1);
-
-        // Angle conversions
         self.register("deg", deg, 1);  // radians to degrees
         self.register("rad", rad, 1);  // degrees to radians
+        self.register("min", min, -1); // variadic
+        self.register("max", max, -1); // variadic
+    }
 
-        // Min/Max (variadic)
-        self.register("min", min, -1);
-        self.register("max", max, -1);
-
-        // Complex number functions
+    /// Register complex number functions
+    fn register_complex_functions(&mut self) {
         self.register("complex", complex, 2);
         self.register("real", real, 1);
         self.register("imag", imag, 1);
         self.register("conj", conj, 1);
         self.register("arg", arg, 1);
+    }
 
-        // Vector operations
+    /// Register vector operations
+    fn register_vector_functions(&mut self) {
         self.register("dot", dot, 2);
         self.register("cross", cross, 2);
         self.register("norm", norm, 1);
         self.register("normalize", normalize, 1);
+    }
 
-        // Statistical functions
+    /// Register matrix operations
+    fn register_matrix_functions(&mut self) {
+        self.register("transpose", transpose, 1);
+        self.register("det", det, 1);
+        self.register("trace", trace, 1);
+    }
+
+    /// Register statistical functions
+    fn register_statistical_functions(&mut self) {
         self.register("sum", sum, 1);
         self.register("mean", mean, 1);
         self.register("std", std, 1);
+    }
 
-        // DSP: FFT functions
+    /// Register DSP functions (FFT, convolution, windows)
+    fn register_dsp_functions(&mut self) {
+        // FFT functions
         self.register("fft", fft, 1);
         self.register("ifft", ifft, 1);
         self.register("fft_mag", fft_mag, 1);
         self.register("fft_phase", fft_phase, 1);
 
-        // DSP: Convolution
+        // Convolution
         self.register("conv", conv, 2);
         self.register("conv_fft", conv_fft, 2);
 
-        // DSP: Window functions
+        // Window functions
         self.register("hanning", hanning, 1);
         self.register("hamming", hamming, 1);
         self.register("blackman", blackman, 1);
         self.register("rectangular", rectangular, 1);
 
-        // DSP: Utilities
+        // Utilities
         self.register("linspace", linspace, 3);
-
-        // Matrix operations
-        self.register("transpose", transpose, 1);
-        self.register("det", det, 1);
-        self.register("trace", trace, 1);
-
-        // NOTE: Numerical calculus functions (diff, integral, solve, etc.) are
-        // implemented directly in the evaluator (evaluator.rs) because they need
-        // access to the evaluator to call lambda functions, similar to HOF functions.
     }
 
     /// Register a function
@@ -187,49 +196,11 @@ impl Default for FunctionRegistry {
 // ============================================================================
 // Mathematical Function Implementations
 // ============================================================================
+// Note: Trigonometric functions have been moved to functions/trig.rs
 
-fn sin(args: &[Value]) -> Result<Value, String> {
-    unary_math_fn!("sin", f64::sin, &args[0])
-}
-
-fn cos(args: &[Value]) -> Result<Value, String> {
-    unary_math_fn!("cos", f64::cos, &args[0])
-}
-
-fn tan(args: &[Value]) -> Result<Value, String> {
-    unary_math_fn!("tan", f64::tan, &args[0])
-}
-
-fn asin(args: &[Value]) -> Result<Value, String> {
-    unary_math_fn!("asin", f64::asin, &args[0])
-}
-
-fn acos(args: &[Value]) -> Result<Value, String> {
-    unary_math_fn!("acos", f64::acos, &args[0])
-}
-
-fn atan(args: &[Value]) -> Result<Value, String> {
-    unary_math_fn!("atan", f64::atan, &args[0])
-}
-
-fn atan2(args: &[Value]) -> Result<Value, String> {
-    match (&args[0], &args[1]) {
-        (Value::Number(y), Value::Number(x)) => Ok(Value::Number(y.atan2(*x))),
-        _ => Err("atan2() requires two numbers".to_string()),
-    }
-}
-
-fn sinh(args: &[Value]) -> Result<Value, String> {
-    unary_math_fn!("sinh", f64::sinh, &args[0])
-}
-
-fn cosh(args: &[Value]) -> Result<Value, String> {
-    unary_math_fn!("cosh", f64::cosh, &args[0])
-}
-
-fn tanh(args: &[Value]) -> Result<Value, String> {
-    unary_math_fn!("tanh", f64::tanh, &args[0])
-}
+// ============================================================================
+// Exponential and Logarithmic Functions
+// ============================================================================
 
 fn exp(args: &[Value]) -> Result<Value, String> {
     unary_math_fn!("exp", f64::exp, &args[0])

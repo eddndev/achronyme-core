@@ -1,0 +1,5 @@
+let c = [3, 5]
+let A = [[1, 0], [0, 2], [3, 2]]
+let b = [4, 12, 18]
+let solution = linprog(c, A, b, 1)
+objective_value(c, solution)

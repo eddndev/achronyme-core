@@ -1,0 +1,11 @@
+/// Handlers for different types of operations
+///
+/// This module organizes the evaluation logic into specialized handlers,
+/// making the codebase more maintainable and easier to extend.
+
+pub mod binary_ops;
+pub mod unary_ops;
+pub mod hof;
+pub mod numerical;
+pub mod optimization;
+pub mod function_call;

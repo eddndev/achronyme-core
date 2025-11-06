@@ -187,6 +187,62 @@ await ach.use(async () => {
 
 ---
 
+## Numerical Calculus
+
+The `numerical` module provides powerful tools for calculus operations directly on SOC expression strings.
+
+### Numerical Differentiation
+
+```typescript
+await ach.use(async () => {
+    // Define a function as a string
+    const func = 'x => x^3 + 2*x';
+
+    // Calculate the first derivative at x = 2
+    const derivative = ach.numerical.diff(func, 2);
+    // Analytical derivative is 3*x^2 + 2, so at x=2 it's 3*(2^2) + 2 = 14
+    console.log(`f'(2) of ${func} is:`, derivative); // ~14
+
+    // Calculate the second derivative at x = 2
+    const derivative2 = ach.numerical.diff2(func, 2);
+    // Analytical second derivative is 6*x, so at x=2 it's 12
+    console.log(`f''(2) of ${func} is:`, derivative2); // ~12
+});
+```
+
+### Numerical Integration
+
+```typescript
+await ach.use(async () => {
+    // Define the function to integrate
+    const func = 'x => x^2';
+
+    // Calculate the definite integral from 0 to 1
+    // Analytical integral is x^3/3, from 0 to 1 is 1/3
+    const area = ach.numerical.integral(func, 0, 1);
+    console.log(`Integral of ${func} from 0 to 1 is:`, area); // ~0.333
+
+    // For higher accuracy, use Simpson's rule or adaptive quadrature
+    const accurateArea = ach.numerical.quad(func, 0, 1);
+    console.log(`More accurate integral:`, accurateArea); // ~0.333333
+});
+```
+
+### Root Finding
+
+```typescript
+await ach.use(async () => {
+    // Find the root of cos(x) in the interval [0, PI]
+    const func = 'x => cos(x)';
+    const root = ach.numerical.solve(func, 0, Math.PI);
+
+    // The root of cos(x) is at PI/2
+    console.log(`Root of ${func} is at x =`, root); // ~1.5707 (PI / 2)
+});
+```
+
+---
+
 ## Expression Evaluator (`eval`)
 
 The `eval` engine allows you to run complex sequences of operations defined in a string, minimizing JS-WASM overhead.

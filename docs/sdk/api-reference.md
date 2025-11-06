@@ -18,6 +18,7 @@ This document provides a detailed reference for all classes, methods, and functi
   - [VectorOps (`ach.vecOps`)](#vectorops-achvecops)
   - [StatsOps (`ach.stats`)](#statsops-achstats)
   - [HOFOps (`ach.hof`)](#hofops-achhof)
+  - [NumericalOps (`ach.numerical`)](#numericalops-achnumerical)
 
 ---
 
@@ -229,10 +230,74 @@ Statistical functions.
 
 ### HOFOps (`ach.hof`)
 
+
+
 Higher-Order Functions.
 
+
+
 - `map(fn, vector: Vector): Vector`: Applies a function to each element.
+
 - `filter(fn, vector: Vector): Vector`: Filters elements based on a predicate.
+
 - `reduce(fn, initialValue, vector: Vector): T`: Reduces a vector to a single value.
+
 - `pipe(fns: Function[]): Function`: Left-to-right function composition.
+
 - `compose(fns: Function[]): Function`: Right-to-left function composition.
+
+
+
+---
+
+
+
+### NumericalOps (`ach.numerical`)
+
+
+
+Numerical calculus functions that operate on SOC expression strings.
+
+
+
+#### Numerical Differentiation
+
+- `diff(fn: string, x: number): number`: Computes the first derivative of a function `fn` at point `x` using the central difference method.
+
+- `diff2(fn: string, x: number): number`: Computes the second derivative.
+
+- `diff3(fn: string, x: number): number`: Computes the third derivative.
+
+
+
+_Example:_ `ach.numerical.diff('x => x^2', 2)` returns `4`.
+
+
+
+#### Numerical Integration
+
+- `integral(fn: string, a: number, b: number): number`: Computes the definite integral of `fn` from `a` to `b` using the trapezoidal rule.
+
+- `simpson(fn: string, a: number, b: number): number`: Computes the definite integral using Simpson's 1/3 rule for higher accuracy.
+
+- `romberg(fn: string, a: number, b: number): number`: Computes the definite integral using Romberg integration.
+
+- `quad(fn: string, a: number, b: number): number`: Computes the definite integral using adaptive quadrature for automatic accuracy.
+
+
+
+_Example:_ `ach.numerical.integral('x => x', 0, 1)` returns `0.5`.
+
+
+
+#### Root Finding
+
+- `solve(fn: string, a: number, b: number): number`: Finds a root of the function `fn` within the bracket `[a, b]` using the bisection method.
+
+- `newton(fn: string, x0: number): number`: Finds a root using Newton's method, starting from `x0`. Requires the function's derivative to be defined within the SOC expression.
+
+- `secant(fn: string, x0: number, x1: number): number`: Finds a root using the secant method, starting from `x0` and `x1`.
+
+
+
+_Example:_ `ach.numerical.solve('x => x^2 - 4', 0, 5)` returns `2`.

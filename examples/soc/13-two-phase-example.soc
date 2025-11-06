@@ -1,0 +1,26 @@
+// Two-Phase Simplex Example
+// Problem with equality and >= constraints that requires artificial variables
+//
+// minimize z = 2x₁ + 3x₂
+// subject to:
+//   x₁ + x₂ = 5    (equality constraint - needs artificial variable)
+//   2x₁ + x₂ ≥ 4   (>= constraint - needs artificial variable)
+//   x₁, x₂ ≥ 0
+
+let c = [2, 3]
+let A = [[1, 1], [2, 1]]
+let b = [5, 4]
+
+// Use two_phase_simplex for problems with difficult starting conditions
+let solution = two_phase_simplex(c, A, b, -1)
+print("Solución óptima (two-phase):")
+print("  x₁ = " + solution[0])
+print("  x₂ = " + solution[1])
+
+let z_min = objective_value(c, solution)
+print("Valor objetivo mínimo z* = " + z_min)
+
+// Compare with linprog (should auto-select appropriate method)
+let solution2 = linprog(c, A, b, -1)
+let z_min2 = objective_value(c, solution2)
+print("\nVerificación con linprog: z* = " + z_min2)

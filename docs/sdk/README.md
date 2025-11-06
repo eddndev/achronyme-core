@@ -70,7 +70,8 @@ src/sdk/
 │   ├── LinalgOps.ts       # (ach.linalg) lu, qr, svd, det
 │   ├── VectorOps.ts       # (ach.vecOps) dot, cross, norm
 │   ├── StatsOps.ts        # (ach.stats) sum, mean, std
-│   └── HOFOps.ts          # (ach.hof) map, filter, reduce
+│   ├── HOFOps.ts          # (ach.hof) map, filter, reduce
+│   └── NumericalOps.ts    # (ach.numerical) diff, integral, solve
 └── values/             # Data structure classes
     ├── Value.ts           # Abstract base class for all values
     ├── Vector.ts          # 1D data with zero-copy .data view

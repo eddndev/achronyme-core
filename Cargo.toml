@@ -8,7 +8,7 @@ members = [
     "crates/achronyme-dsp",
     "crates/achronyme-numerical",
     "crates/achronyme-wasm",
-    "crates/achronyme-cli",
+    "crates/achronyme-cli", "crates/achronyme-solver",
 ]
 
 [workspace.dependencies]

@@ -1,0 +1,93 @@
+// ============================================================================
+// FASE 1: OPTIMIZACIÓN LINEAL - EJEMPLOS BÁSICOS
+// ============================================================================
+
+// Ejemplo 1: Problema Simple de Producción
+// -----------------------------------------
+// Una fábrica produce dos productos: A y B
+// Ganancia: $40 por A, $30 por B
+// Restricciones:
+//   - Máximo 40 unidades de A (materia prima A)
+//   - Máximo 50 unidades de B (materia prima B)
+//   - Máximo 70 horas de trabajo disponibles
+//
+// ¿Cuántas unidades de A y B producir para maximizar ganancias?
+
+let c_prod = [40, 30]  // Ganancia por unidad
+
+let A_prod = [
+    [1, 0],   // x1 <= 40 (restricción de materia prima A)
+    [0, 1],   // x2 <= 50 (restricción de materia prima B)
+    [1, 1]    // x1 + x2 <= 70 (restricción de horas de trabajo)
+]
+
+let b_prod = [40, 50, 70]  // Límites
+
+// Resolver usando linprog (auto-selección de método)
+let solution_prod = linprog(c_prod, A_prod, b_prod, 1)
+
+// Calcular ganancia óptima
+let profit = objective_value(c_prod, solution_prod)
+
+// Resultados esperados:
+// solution_prod = [40, 30]
+// profit = 40*40 + 30*30 = 2500
+
+
+// Ejemplo 2: Problema Estándar de Simplex
+// ----------------------------------------
+// maximize z = 3x₁ + 5x₂
+// subject to:
+//   x₁ <= 4
+//   2x₂ <= 12
+//   3x₁ + 2x₂ <= 18
+//   x₁, x₂ >= 0
+
+let c_std = [3, 5]
+
+let A_std = [
+    [1, 0],
+    [0, 2],
+    [3, 2]
+]
+
+let b_std = [4, 12, 18]
+
+// Usar simplex directamente
+let solution_std = simplex(c_std, A_std, b_std, 1)
+let z_opt = objective_value(c_std, solution_std)
+
+// Resultados esperados:
+// solution_std = [2, 6]
+// z_opt = 3*2 + 5*6 = 36
+
+
+// Ejemplo 3: Problema de Minimización
+// ------------------------------------
+// minimize z = x₁ + 2x₂
+// subject to:
+//   x₁ + x₂ <= 10
+//   2x₁ + x₂ <= 15
+//   x₁, x₂ >= 0
+//
+// Solución trivial: x₁ = 0, x₂ = 0 (sin límites inferiores forzados)
+
+let c_min = [1, 2]
+
+let A_min = [
+    [1, 1],
+    [2, 1]
+]
+
+let b_min = [10, 15]
+
+let solution_min = linprog(c_min, A_min, b_min, -1)  // -1 = minimizar
+let z_min = objective_value(c_min, solution_min)
+
+// Resultados esperados:
+// solution_min = [0, 0]
+// z_min = 0
+
+
+// Retornar vector con todos los resultados
+[solution_prod, profit, solution_std, z_opt, solution_min, z_min]
