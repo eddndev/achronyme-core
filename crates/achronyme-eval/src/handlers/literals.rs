@@ -28,39 +28,40 @@ pub fn evaluate_vector(evaluator: &mut Evaluator, elements: &[AstNode]) -> Resul
         return Ok(Value::Vector(Vector::new(vec![])));
     }
 
-    // Evaluate first element to determine vector type
-    let first_value = evaluator.evaluate(&elements[0])?;
+    // Evaluate ALL elements first to determine if type promotion is needed
+    let mut values = Vec::new();
+    let mut has_complex = false;
 
-    match first_value {
-        Value::Number(n) => {
-            // Real vector
-            let mut data = vec![n];
-            for element in &elements[1..] {
-                let value = evaluator.evaluate(element)?;
-                match value {
-                    Value::Number(num) => data.push(num),
-                    _ => return Err("All vector elements must be of the same type (numbers)".to_string()),
-                }
-            }
-            Ok(Value::Vector(Vector::new(data)))
+    for element in elements {
+        let value = evaluator.evaluate(element)?;
+        match &value {
+            Value::Complex(_) => has_complex = true,
+            Value::Number(_) => {},
+            _ => return Err("Vector elements must be numbers or complex numbers".to_string()),
         }
-        Value::Complex(c) => {
-            // Complex vector
-            let mut data = vec![c];
-            for element in &elements[1..] {
-                let value = evaluator.evaluate(element)?;
-                match value {
-                    Value::Complex(complex) => data.push(complex),
-                    Value::Number(n) => {
-                        // Auto-promote real numbers to complex
-                        data.push(Complex::new(n, 0.0));
-                    }
-                    _ => return Err("All vector elements must be numbers or complex numbers".to_string()),
-                }
-            }
-            Ok(Value::ComplexVector(ComplexVector::new(data)))
-        }
-        _ => Err("Vector elements must be numbers or complex numbers".to_string()),
+        values.push(value);
+    }
+
+    // Decide vector type based on ALL elements
+    if has_complex {
+        // Promote entire vector to ComplexVector
+        let complex_data: Vec<Complex> = values.into_iter()
+            .map(|v| match v {
+                Value::Complex(c) => c,
+                Value::Number(n) => Complex::new(n, 0.0),
+                _ => unreachable!(), // Already validated above
+            })
+            .collect();
+        Ok(Value::ComplexVector(ComplexVector::new(complex_data)))
+    } else {
+        // All elements are real numbers
+        let real_data: Vec<f64> = values.into_iter()
+            .map(|v| match v {
+                Value::Number(n) => n,
+                _ => unreachable!(), // Already validated above
+            })
+            .collect();
+        Ok(Value::Vector(Vector::new(real_data)))
     }
 }
 

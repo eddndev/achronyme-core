@@ -1,6 +1,8 @@
 use achronyme_parser::ast::BinaryOp;
 use achronyme_types::complex::Complex;
+use achronyme_types::complex_vector::ComplexVector;
 use achronyme_types::value::Value;
+use achronyme_types::vector::Vector;
 
 /// Apply a binary operation to two values
 pub fn apply(op: &BinaryOp, left: Value, right: Value) -> Result<Value, String> {
@@ -45,6 +47,50 @@ fn apply_add(left: Value, right: Value) -> Result<Value, String> {
         (Value::Complex(a), Value::Number(b)) => {
             Ok(Value::Complex(a + Complex::from_real(b)))
         }
+        // Broadcasting: Scalar + Vector
+        (Value::Number(scalar), Value::Vector(vec)) => {
+            let data: Vec<f64> = vec.data().iter().map(|x| x + scalar).collect();
+            Ok(Value::Vector(Vector::new(data)))
+        }
+        (Value::Vector(vec), Value::Number(scalar)) => {
+            let data: Vec<f64> = vec.data().iter().map(|x| x + scalar).collect();
+            Ok(Value::Vector(Vector::new(data)))
+        }
+        // Broadcasting: Complex + Vector → ComplexVector
+        (Value::Complex(c), Value::Vector(vec)) => {
+            let data: Vec<Complex> = vec.data().iter()
+                .map(|x| Complex::from_real(*x) + c)
+                .collect();
+            Ok(Value::ComplexVector(ComplexVector::new(data)))
+        }
+        (Value::Vector(vec), Value::Complex(c)) => {
+            let data: Vec<Complex> = vec.data().iter()
+                .map(|x| Complex::from_real(*x) + c)
+                .collect();
+            Ok(Value::ComplexVector(ComplexVector::new(data)))
+        }
+        // Broadcasting: Scalar + ComplexVector
+        (Value::Number(scalar), Value::ComplexVector(vec)) => {
+            let data: Vec<Complex> = vec.data().iter()
+                .map(|c| *c + Complex::from_real(scalar))
+                .collect();
+            Ok(Value::ComplexVector(ComplexVector::new(data)))
+        }
+        (Value::ComplexVector(vec), Value::Number(scalar)) => {
+            let data: Vec<Complex> = vec.data().iter()
+                .map(|c| *c + Complex::from_real(scalar))
+                .collect();
+            Ok(Value::ComplexVector(ComplexVector::new(data)))
+        }
+        // Broadcasting: Complex + ComplexVector
+        (Value::Complex(c), Value::ComplexVector(vec)) => {
+            let data: Vec<Complex> = vec.data().iter().map(|x| *x + c).collect();
+            Ok(Value::ComplexVector(ComplexVector::new(data)))
+        }
+        (Value::ComplexVector(vec), Value::Complex(c)) => {
+            let data: Vec<Complex> = vec.data().iter().map(|x| *x + c).collect();
+            Ok(Value::ComplexVector(ComplexVector::new(data)))
+        }
         _ => Err("Incompatible types for addition".to_string()),
     }
 }
@@ -71,6 +117,50 @@ fn apply_subtract(left: Value, right: Value) -> Result<Value, String> {
         (Value::Complex(a), Value::Number(b)) => {
             Ok(Value::Complex(a - Complex::from_real(b)))
         }
+        // Broadcasting: Scalar - Vector
+        (Value::Number(scalar), Value::Vector(vec)) => {
+            let data: Vec<f64> = vec.data().iter().map(|x| scalar - x).collect();
+            Ok(Value::Vector(Vector::new(data)))
+        }
+        (Value::Vector(vec), Value::Number(scalar)) => {
+            let data: Vec<f64> = vec.data().iter().map(|x| x - scalar).collect();
+            Ok(Value::Vector(Vector::new(data)))
+        }
+        // Broadcasting: Complex - Vector → ComplexVector
+        (Value::Complex(c), Value::Vector(vec)) => {
+            let data: Vec<Complex> = vec.data().iter()
+                .map(|x| c - Complex::from_real(*x))
+                .collect();
+            Ok(Value::ComplexVector(ComplexVector::new(data)))
+        }
+        (Value::Vector(vec), Value::Complex(c)) => {
+            let data: Vec<Complex> = vec.data().iter()
+                .map(|x| Complex::from_real(*x) - c)
+                .collect();
+            Ok(Value::ComplexVector(ComplexVector::new(data)))
+        }
+        // Broadcasting: Scalar - ComplexVector
+        (Value::Number(scalar), Value::ComplexVector(vec)) => {
+            let data: Vec<Complex> = vec.data().iter()
+                .map(|c| Complex::from_real(scalar) - *c)
+                .collect();
+            Ok(Value::ComplexVector(ComplexVector::new(data)))
+        }
+        (Value::ComplexVector(vec), Value::Number(scalar)) => {
+            let data: Vec<Complex> = vec.data().iter()
+                .map(|c| *c - Complex::from_real(scalar))
+                .collect();
+            Ok(Value::ComplexVector(ComplexVector::new(data)))
+        }
+        // Broadcasting: Complex - ComplexVector
+        (Value::Complex(c), Value::ComplexVector(vec)) => {
+            let data: Vec<Complex> = vec.data().iter().map(|x| c - *x).collect();
+            Ok(Value::ComplexVector(ComplexVector::new(data)))
+        }
+        (Value::ComplexVector(vec), Value::Complex(c)) => {
+            let data: Vec<Complex> = vec.data().iter().map(|x| *x - c).collect();
+            Ok(Value::ComplexVector(ComplexVector::new(data)))
+        }
         _ => Err("Incompatible types for subtraction".to_string()),
     }
 }
@@ -96,6 +186,50 @@ fn apply_multiply(left: Value, right: Value) -> Result<Value, String> {
         }
         (Value::Complex(a), Value::Number(b)) => {
             Ok(Value::Complex(a * Complex::from_real(b)))
+        }
+        // Broadcasting: Scalar * Vector
+        (Value::Number(scalar), Value::Vector(vec)) => {
+            let data: Vec<f64> = vec.data().iter().map(|x| x * scalar).collect();
+            Ok(Value::Vector(Vector::new(data)))
+        }
+        (Value::Vector(vec), Value::Number(scalar)) => {
+            let data: Vec<f64> = vec.data().iter().map(|x| x * scalar).collect();
+            Ok(Value::Vector(Vector::new(data)))
+        }
+        // Broadcasting: Complex * Vector → ComplexVector
+        (Value::Complex(c), Value::Vector(vec)) => {
+            let data: Vec<Complex> = vec.data().iter()
+                .map(|x| Complex::from_real(*x) * c)
+                .collect();
+            Ok(Value::ComplexVector(ComplexVector::new(data)))
+        }
+        (Value::Vector(vec), Value::Complex(c)) => {
+            let data: Vec<Complex> = vec.data().iter()
+                .map(|x| Complex::from_real(*x) * c)
+                .collect();
+            Ok(Value::ComplexVector(ComplexVector::new(data)))
+        }
+        // Broadcasting: Scalar * ComplexVector
+        (Value::Number(scalar), Value::ComplexVector(vec)) => {
+            let data: Vec<Complex> = vec.data().iter()
+                .map(|c| *c * Complex::from_real(scalar))
+                .collect();
+            Ok(Value::ComplexVector(ComplexVector::new(data)))
+        }
+        (Value::ComplexVector(vec), Value::Number(scalar)) => {
+            let data: Vec<Complex> = vec.data().iter()
+                .map(|c| *c * Complex::from_real(scalar))
+                .collect();
+            Ok(Value::ComplexVector(ComplexVector::new(data)))
+        }
+        // Broadcasting: Complex * ComplexVector
+        (Value::Complex(c), Value::ComplexVector(vec)) => {
+            let data: Vec<Complex> = vec.data().iter().map(|x| *x * c).collect();
+            Ok(Value::ComplexVector(ComplexVector::new(data)))
+        }
+        (Value::ComplexVector(vec), Value::Complex(c)) => {
+            let data: Vec<Complex> = vec.data().iter().map(|x| *x * c).collect();
+            Ok(Value::ComplexVector(ComplexVector::new(data)))
         }
         _ => Err("Incompatible types for multiplication".to_string()),
     }
@@ -125,6 +259,56 @@ fn apply_divide(left: Value, right: Value) -> Result<Value, String> {
         (Value::Complex(a), Value::Number(b)) => {
             Ok(Value::Complex(a / Complex::from_real(b)))
         }
+        // Broadcasting: Scalar / Vector
+        (Value::Number(scalar), Value::Vector(vec)) => {
+            let data: Vec<f64> = vec.data().iter().map(|x| scalar / x).collect();
+            Ok(Value::Vector(Vector::new(data)))
+        }
+        (Value::Vector(vec), Value::Number(scalar)) => {
+            if scalar == 0.0 {
+                return Err("Division by zero".to_string());
+            }
+            let data: Vec<f64> = vec.data().iter().map(|x| x / scalar).collect();
+            Ok(Value::Vector(Vector::new(data)))
+        }
+        // Broadcasting: Complex / Vector → ComplexVector
+        (Value::Complex(c), Value::Vector(vec)) => {
+            let data: Vec<Complex> = vec.data().iter()
+                .map(|x| c / Complex::from_real(*x))
+                .collect();
+            Ok(Value::ComplexVector(ComplexVector::new(data)))
+        }
+        (Value::Vector(vec), Value::Complex(c)) => {
+            let data: Vec<Complex> = vec.data().iter()
+                .map(|x| Complex::from_real(*x) / c)
+                .collect();
+            Ok(Value::ComplexVector(ComplexVector::new(data)))
+        }
+        // Broadcasting: Scalar / ComplexVector
+        (Value::Number(scalar), Value::ComplexVector(vec)) => {
+            let data: Vec<Complex> = vec.data().iter()
+                .map(|c| Complex::from_real(scalar) / *c)
+                .collect();
+            Ok(Value::ComplexVector(ComplexVector::new(data)))
+        }
+        (Value::ComplexVector(vec), Value::Number(scalar)) => {
+            if scalar == 0.0 {
+                return Err("Division by zero".to_string());
+            }
+            let data: Vec<Complex> = vec.data().iter()
+                .map(|c| *c / Complex::from_real(scalar))
+                .collect();
+            Ok(Value::ComplexVector(ComplexVector::new(data)))
+        }
+        // Broadcasting: Complex / ComplexVector
+        (Value::Complex(c), Value::ComplexVector(vec)) => {
+            let data: Vec<Complex> = vec.data().iter().map(|x| c / *x).collect();
+            Ok(Value::ComplexVector(ComplexVector::new(data)))
+        }
+        (Value::ComplexVector(vec), Value::Complex(c)) => {
+            let data: Vec<Complex> = vec.data().iter().map(|x| *x / c).collect();
+            Ok(Value::ComplexVector(ComplexVector::new(data)))
+        }
         _ => Err("Incompatible types for division".to_string()),
     }
 }
@@ -136,6 +320,54 @@ fn apply_power(left: Value, right: Value) -> Result<Value, String> {
         (Value::Complex(a), Value::Complex(b)) => Ok(Value::Complex(a.pow_complex(&b))),
         (Value::Number(a), Value::Complex(b)) => {
             Ok(Value::Complex(Complex::from_real(a).pow_complex(&b)))
+        }
+        // Broadcasting: Vector ^ Scalar
+        (Value::Vector(vec), Value::Number(scalar)) => {
+            let data: Vec<f64> = vec.data().iter().map(|x| x.powf(scalar)).collect();
+            Ok(Value::Vector(Vector::new(data)))
+        }
+        (Value::Number(scalar), Value::Vector(vec)) => {
+            let data: Vec<f64> = vec.data().iter().map(|x| scalar.powf(*x)).collect();
+            Ok(Value::Vector(Vector::new(data)))
+        }
+        // Broadcasting: Vector ^ Complex → ComplexVector
+        (Value::Vector(vec), Value::Complex(c)) => {
+            let data: Vec<Complex> = vec.data().iter()
+                .map(|x| Complex::from_real(*x).pow_complex(&c))
+                .collect();
+            Ok(Value::ComplexVector(ComplexVector::new(data)))
+        }
+        (Value::Complex(c), Value::Vector(vec)) => {
+            let data: Vec<Complex> = vec.data().iter()
+                .map(|x| c.pow(*x))
+                .collect();
+            Ok(Value::ComplexVector(ComplexVector::new(data)))
+        }
+        // Broadcasting: ComplexVector ^ Scalar
+        (Value::ComplexVector(vec), Value::Number(scalar)) => {
+            let data: Vec<Complex> = vec.data().iter()
+                .map(|c| c.pow(scalar))
+                .collect();
+            Ok(Value::ComplexVector(ComplexVector::new(data)))
+        }
+        (Value::Number(scalar), Value::ComplexVector(vec)) => {
+            let data: Vec<Complex> = vec.data().iter()
+                .map(|c| Complex::from_real(scalar).pow_complex(c))
+                .collect();
+            Ok(Value::ComplexVector(ComplexVector::new(data)))
+        }
+        // Broadcasting: ComplexVector ^ Complex
+        (Value::ComplexVector(vec), Value::Complex(c)) => {
+            let data: Vec<Complex> = vec.data().iter()
+                .map(|x| x.pow_complex(&c))
+                .collect();
+            Ok(Value::ComplexVector(ComplexVector::new(data)))
+        }
+        (Value::Complex(c), Value::ComplexVector(vec)) => {
+            let data: Vec<Complex> = vec.data().iter()
+                .map(|x| c.pow_complex(x))
+                .collect();
+            Ok(Value::ComplexVector(ComplexVector::new(data)))
         }
         _ => Err("Incompatible types for power".to_string()),
     }

@@ -11,3 +11,7 @@ path = "src/main.rs"
 achronyme-parser = { path = "../achronyme-parser" }
 achronyme-eval = { path = "../achronyme-eval" }
 achronyme-types = { path = "../achronyme-types" }
+rustyline = "14.0"
+nu-ansi-term = "0.50"
+pest = "2.7"
+dirs = "5.0"

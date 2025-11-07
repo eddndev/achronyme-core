@@ -1,7 +1,13 @@
 use achronyme_eval::Evaluator;
+use rustyline::error::ReadlineError;
+use rustyline::{Editor, Config};
 use std::env;
 use std::fs;
-use std::io::{self, Write};
+
+mod highlighter;
+mod repl_helper;
+
+use repl_helper::ReplHelper;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -47,19 +53,36 @@ fn print_usage(program_name: &str) {
 
 fn run_repl() {
     println!("Achronyme REPL v0.1.0");
-    println!("Type 'exit' or 'quit' to exit, 'help' for help");
+    println!("Type 'exit' or 'quit' to exit, 'help' for help, 'clear' to clear screen");
     println!();
+
+    let config = Config::builder()
+        .auto_add_history(true)
+        .build();
+
+    let helper = ReplHelper::new();
+    let mut rl = Editor::with_config(config).expect("Failed to create editor");
+    rl.set_helper(Some(helper));
+
+    // Load history from file
+    let history_path = dirs::home_dir()
+        .map(|mut p| {
+            p.push(".achronyme_history");
+            p
+        });
+
+    if let Some(ref path) = history_path {
+        let _ = rl.load_history(path);
+    }
 
     let mut evaluator = Evaluator::new();
     let mut line_number = 1;
 
     loop {
-        print!("ach[{}]> ", line_number);
-        io::stdout().flush().unwrap();
+        let prompt = format!("ach[{}]> ", line_number);
 
-        let mut input = String::new();
-        match io::stdin().read_line(&mut input) {
-            Ok(_) => {
+        match rl.readline(&prompt) {
+            Ok(input) => {
                 let input = input.trim();
 
                 // Handle special commands
@@ -73,8 +96,16 @@ fn run_repl() {
                         continue;
                     }
                     "clear" => {
+                        // Clear the screen
+                        clear_screen();
+                        // Also reset the evaluator environment
                         evaluator = Evaluator::new();
-                        println!("Environment cleared");
+                        println!("Screen cleared and environment reset");
+                        continue;
+                    }
+                    "cls" => {
+                        // Just clear the screen without resetting environment
+                        clear_screen();
                         continue;
                     }
                     "" => continue,
@@ -89,12 +120,43 @@ fn run_repl() {
 
                 line_number += 1;
             }
-            Err(error) => {
-                eprintln!("Error reading input: {}", error);
+            Err(ReadlineError::Interrupted) => {
+                println!("^C");
+                continue;
+            }
+            Err(ReadlineError::Eof) => {
+                println!("Goodbye!");
+                break;
+            }
+            Err(err) => {
+                eprintln!("Error reading input: {}", err);
                 break;
             }
         }
     }
+
+    // Save history to file
+    if let Some(path) = history_path {
+        let _ = rl.save_history(&path);
+    }
+}
+
+fn clear_screen() {
+    // Cross-platform screen clearing
+    #[cfg(target_os = "windows")]
+    {
+        let _ = std::process::Command::new("cmd")
+            .args(&["/C", "cls"])
+            .status();
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = std::process::Command::new("clear").status();
+    }
+
+    // Also try ANSI escape sequence as fallback
+    print!("\x1B[2J\x1B[1;1H");
 }
 
 fn run_file(filename: &str) {
@@ -187,16 +249,25 @@ fn format_value(value: &achronyme_types::value::Value) -> String {
 }
 
 fn print_help() {
-    println!("Achronyme REPL Commands:");
-    println!("  help        - Show this help message");
-    println!("  clear       - Clear the environment");
-    println!("  exit, quit  - Exit the REPL");
+    use nu_ansi_term::Color;
+
+    println!("{}", Color::Green.bold().paint("Achronyme REPL Commands:"));
+    println!("  {}        - Show this help message", Color::Cyan.paint("help"));
+    println!("  {}       - Clear screen and reset environment", Color::Cyan.paint("clear"));
+    println!("  {}        - Clear screen only (keep environment)", Color::Cyan.paint("cls"));
+    println!("  {}  - Exit the REPL", Color::Cyan.paint("exit, quit"));
     println!();
-    println!("Examples:");
-    println!("  2 + 2");
-    println!("  x = 5");
-    println!("  f = x => x^2");
-    println!("  diff(f, 2, 1e-5)");
-    println!("  integral(sin, 0, pi, 100)");
-    println!("  solve(x => x^2 - 4, 0, 5, 1e-6)");
+    println!("{}", Color::Green.bold().paint("Features:"));
+    println!("  - Syntax highlighting (automatic)");
+    println!("  - Command history (use ↑/↓ arrows)");
+    println!("  - Tab completion for built-in functions");
+    println!("  - History saved to ~/.achronyme_history");
+    println!();
+    println!("{}", Color::Green.bold().paint("Examples:"));
+    println!("  {}         - Basic arithmetic", Color::Yellow.paint("2 + 2"));
+    println!("  {}  - Variable assignment", Color::Yellow.paint("let x = 5"));
+    println!("  {}    - Lambda function", Color::Yellow.paint("let f = x => x^2"));
+    println!("  {}  - Numerical derivative", Color::Yellow.paint("diff(f, 2, 1e-5)"));
+    println!("  {}  - Numerical integration", Color::Yellow.paint("integral(sin, 0, 3.14159, 100)"));
+    println!("  {}  - FFT magnitude", Color::Yellow.paint("fft_mag([1, 2, 3, 4])"));
 }
