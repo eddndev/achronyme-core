@@ -1,6 +1,7 @@
 use crate::functions::FunctionRegistry;
 use crate::unary_math_fn;
 use achronyme_types::value::Value;
+use achronyme_types::vector::Vector;
 
 pub fn register_functions(registry: &mut FunctionRegistry) {
     registry.register("floor", floor, 1);
@@ -30,7 +31,23 @@ fn round(args: &[Value]) -> Result<Value, String> {
 }
 
 fn abs(args: &[Value]) -> Result<Value, String> {
-    unary_math_fn!("abs", f64::abs, &args[0])
+    match &args[0] {
+        Value::Number(x) => Ok(Value::Number(x.abs())),
+        Value::Vector(v) => {
+            let result: Vec<f64> = v.data().iter().map(|x| x.abs()).collect();
+            Ok(Value::Vector(Vector::new(result)))
+        }
+        Value::Complex(c) => {
+            // For complex numbers, abs returns the magnitude as a real number
+            Ok(Value::Number(c.magnitude()))
+        }
+        Value::ComplexVector(cv) => {
+            // For complex vectors, return vector of magnitudes
+            let magnitudes: Vec<f64> = cv.data().iter().map(|c| c.magnitude()).collect();
+            Ok(Value::Vector(Vector::new(magnitudes)))
+        }
+        _ => Err("abs() requires a number, vector, complex number, or complex vector".to_string()),
+    }
 }
 
 fn trunc(args: &[Value]) -> Result<Value, String> {

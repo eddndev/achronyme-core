@@ -56,7 +56,12 @@ fn fft_mag(args: &[Value]) -> Result<Value, String> {
             let magnitudes: Vec<f64> = spectrum.iter().map(|c| c.magnitude()).collect();
             Ok(Value::Vector(Vector::new(magnitudes)))
         }
-        _ => Err("fft_mag() requires a vector".to_string()),
+        Value::ComplexVector(cv) => {
+            // Direct magnitude calculation from ComplexVector
+            let magnitudes: Vec<f64> = cv.data().iter().map(|c| c.magnitude()).collect();
+            Ok(Value::Vector(Vector::new(magnitudes)))
+        }
+        _ => Err("fft_mag() requires a vector or complex vector".to_string()),
     }
 }
 
@@ -67,7 +72,12 @@ fn fft_phase(args: &[Value]) -> Result<Value, String> {
             let phases: Vec<f64> = spectrum.iter().map(|c| c.im.atan2(c.re)).collect();
             Ok(Value::Vector(Vector::new(phases)))
         }
-        _ => Err("fft_phase() requires a vector".to_string()),
+        Value::ComplexVector(cv) => {
+            // Direct phase calculation from ComplexVector
+            let phases: Vec<f64> = cv.data().iter().map(|c| c.im.atan2(c.re)).collect();
+            Ok(Value::Vector(Vector::new(phases)))
+        }
+        _ => Err("fft_phase() requires a vector or complex vector".to_string()),
     }
 }
 

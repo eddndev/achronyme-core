@@ -112,6 +112,7 @@ pub fn handle_map(evaluator: &mut Evaluator, args: &[AstNode]) -> Result<Value, 
 /// filter(predicate, collection) - Filter elements
 ///
 /// Returns elements where predicate returns true (non-zero).
+/// Supports both Vector and ComplexVector.
 pub fn handle_filter(evaluator: &mut Evaluator, args: &[AstNode]) -> Result<Value, String> {
     if args.len() != 2 {
         return Err("filter requires 2 arguments: predicate and collection".to_string());
@@ -124,44 +125,70 @@ pub fn handle_filter(evaluator: &mut Evaluator, args: &[AstNode]) -> Result<Valu
         _ => return Err("First argument to filter must be a function".to_string()),
     };
 
-    // Evaluate second argument (must be a vector)
-    let collection_value = evaluator.evaluate(&args[1])?;
-    let collection = match collection_value {
-        Value::Vector(v) => v,
-        _ => return Err("Second argument to filter must be a vector".to_string()),
-    };
-
     // Predicate must be unary
     if predicate.arity() != 1 {
         return Err("filter predicate must take exactly 1 argument".to_string());
     }
 
-    // Filter elements
-    let mut results = Vec::new();
-    for i in 0..collection.len() {
-        let elem = Value::Number(collection.data()[i]);
+    // Evaluate second argument (must be a vector - real or complex)
+    let collection_value = evaluator.evaluate(&args[1])?;
 
-        // Apply predicate
-        let result = evaluator.apply_lambda(&predicate, vec![elem])?;
+    match collection_value {
+        Value::Vector(collection) => {
+            // Filter real vector
+            let mut results = Vec::new();
+            for i in 0..collection.len() {
+                let elem = Value::Number(collection.data()[i]);
 
-        // Check result (boolean or non-zero number = true)
-        let should_include = match result {
-            Value::Boolean(b) => b,
-            Value::Number(n) => n != 0.0,
-            _ => return Err("filter predicate must return a boolean or number".to_string()),
-        };
+                // Apply predicate
+                let result = evaluator.apply_lambda(&predicate, vec![elem])?;
 
-        if should_include {
-            results.push(collection.data()[i]);
+                // Check result (boolean or non-zero number = true)
+                let should_include = match result {
+                    Value::Boolean(b) => b,
+                    Value::Number(n) => n != 0.0,
+                    _ => return Err("filter predicate must return a boolean or number".to_string()),
+                };
+
+                if should_include {
+                    results.push(collection.data()[i]);
+                }
+            }
+
+            Ok(Value::Vector(Vector::new(results)))
         }
-    }
+        Value::ComplexVector(collection) => {
+            // Filter complex vector
+            let mut results = Vec::new();
+            for i in 0..collection.len() {
+                let elem = Value::Complex(collection.data()[i]);
 
-    Ok(Value::Vector(Vector::new(results)))
+                // Apply predicate
+                let result = evaluator.apply_lambda(&predicate, vec![elem])?;
+
+                // Check result (boolean or non-zero number = true)
+                let should_include = match result {
+                    Value::Boolean(b) => b,
+                    Value::Number(n) => n != 0.0,
+                    _ => return Err("filter predicate must return a boolean or number".to_string()),
+                };
+
+                if should_include {
+                    results.push(collection.data()[i]);
+                }
+            }
+
+            Ok(Value::ComplexVector(ComplexVector::new(results)))
+        }
+        _ => Err("Second argument to filter must be a vector (real or complex)".to_string()),
+    }
 }
 
 /// reduce(f, init, collection) - Reduce collection to single value
 ///
 /// Applies f(accumulator, element) repeatedly.
+/// Supports both Vector and ComplexVector.
+/// Initial value can be Number or Complex.
 pub fn handle_reduce(evaluator: &mut Evaluator, args: &[AstNode]) -> Result<Value, String> {
     if args.len() != 3 {
         return Err("reduce requires 3 arguments: function, initial value, and collection".to_string());
@@ -174,41 +201,84 @@ pub fn handle_reduce(evaluator: &mut Evaluator, args: &[AstNode]) -> Result<Valu
         _ => return Err("First argument to reduce must be a function".to_string()),
     };
 
-    // Evaluate second argument (initial value, must be number for now)
-    let init_value = evaluator.evaluate(&args[1])?;
-    let mut accumulator = match init_value {
-        Value::Number(n) => n,
-        _ => return Err("reduce initial value must be a number".to_string()),
-    };
-
-    // Evaluate third argument (must be a vector)
-    let collection_value = evaluator.evaluate(&args[2])?;
-    let collection = match collection_value {
-        Value::Vector(v) => v,
-        _ => return Err("Third argument to reduce must be a vector".to_string()),
-    };
-
     // Function must be binary
     if func.arity() != 2 {
         return Err("reduce function must take exactly 2 arguments".to_string());
     }
 
-    // Reduce elements
-    for i in 0..collection.len() {
-        let acc_val = Value::Number(accumulator);
-        let elem_val = Value::Number(collection.data()[i]);
+    // Evaluate second argument (initial value)
+    let init_value = evaluator.evaluate(&args[1])?;
 
-        // Apply function
-        let result = evaluator.apply_lambda(&func, vec![acc_val, elem_val])?;
+    // Evaluate third argument (collection)
+    let collection_value = evaluator.evaluate(&args[2])?;
 
-        // Result must be number
-        match result {
-            Value::Number(n) => accumulator = n,
-            _ => return Err("reduce function must return a number".to_string()),
+    match (init_value, collection_value) {
+        // Number accumulator, real vector
+        (Value::Number(mut accumulator), Value::Vector(collection)) => {
+            for i in 0..collection.len() {
+                let acc_val = Value::Number(accumulator);
+                let elem_val = Value::Number(collection.data()[i]);
+
+                let result = evaluator.apply_lambda(&func, vec![acc_val, elem_val])?;
+
+                match result {
+                    Value::Number(n) => accumulator = n,
+                    _ => return Err("reduce function must return a number when accumulator is a number".to_string()),
+                }
+            }
+            Ok(Value::Number(accumulator))
         }
-    }
+        // Complex accumulator, real vector (promotes to complex)
+        (Value::Complex(mut accumulator), Value::Vector(collection)) => {
+            for i in 0..collection.len() {
+                let acc_val = Value::Complex(accumulator);
+                let elem_val = Value::Number(collection.data()[i]);
 
-    Ok(Value::Number(accumulator))
+                let result = evaluator.apply_lambda(&func, vec![acc_val, elem_val])?;
+
+                match result {
+                    Value::Complex(c) => accumulator = c,
+                    Value::Number(n) => accumulator = Complex::new(n, 0.0),
+                    _ => return Err("reduce function must return a number or complex".to_string()),
+                }
+            }
+            Ok(Value::Complex(accumulator))
+        }
+        // Number accumulator, complex vector (promotes to complex)
+        (Value::Number(n), Value::ComplexVector(collection)) => {
+            let mut accumulator = Complex::new(n, 0.0);
+            for i in 0..collection.len() {
+                let acc_val = Value::Complex(accumulator);
+                let elem_val = Value::Complex(collection.data()[i]);
+
+                let result = evaluator.apply_lambda(&func, vec![acc_val, elem_val])?;
+
+                match result {
+                    Value::Complex(c) => accumulator = c,
+                    Value::Number(n) => accumulator = Complex::new(n, 0.0),
+                    _ => return Err("reduce function must return a number or complex".to_string()),
+                }
+            }
+            Ok(Value::Complex(accumulator))
+        }
+        // Complex accumulator, complex vector
+        (Value::Complex(mut accumulator), Value::ComplexVector(collection)) => {
+            for i in 0..collection.len() {
+                let acc_val = Value::Complex(accumulator);
+                let elem_val = Value::Complex(collection.data()[i]);
+
+                let result = evaluator.apply_lambda(&func, vec![acc_val, elem_val])?;
+
+                match result {
+                    Value::Complex(c) => accumulator = c,
+                    Value::Number(n) => accumulator = Complex::new(n, 0.0),
+                    _ => return Err("reduce function must return a number or complex".to_string()),
+                }
+            }
+            Ok(Value::Complex(accumulator))
+        }
+        _ => Err("reduce requires initial value (number or complex) and collection (vector or complex vector)".to_string()),
+    }
 }
 
 /// pipe(value, f1, f2, ...) - Apply functions left-to-right
