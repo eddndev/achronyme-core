@@ -7,6 +7,148 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - String & Record Types 📝🗂️
+
+**Sprint 0a: String Type Implementation**
+
+- **New `String` Type**
+  - First-class string support: `Value::String(String)`
+  - String literals with double quotes: `"Hello World"`
+  - Full Unicode support (UTF-8): emojis, Spanish (¡, ñ), Chinese, etc.
+  - Escape sequences: `\n`, `\t`, `\r`, `\\`, `\"`
+  - Examples:
+    ```javascript
+    "Hello World"
+    "Line 1\nLine 2"
+    "Say \"Hello\""
+    "¡Hola Mundo! 🚀"
+    ```
+
+- **String Functions**
+  - `concat(s1, s2)` - Concatenate two strings
+  - `length(s)` - Get string length (returns number)
+  - String comparison operators: `==`, `!=`
+  - Examples:
+    ```javascript
+    concat("Hello", " World")  // → "Hello World"
+    length("Hello")            // → 5
+    "hello" == "hello"         // → true
+    ```
+
+- **String Variables**
+  - Store strings in variables: `let name = "Alice"`
+  - Use in expressions: `concat(greeting, name)`
+  - Pass to functions and comparisons
+
+**Sprint 0b: Record Type Implementation**
+
+- **New `Record` Type**
+  - Key-value data structures: `Value::Record(HashMap<String, Value>)`
+  - Record literals with curly braces: `{ key: value, ... }`
+  - Values can be any type: numbers, strings, booleans, vectors, nested records
+  - Empty records supported: `{}`
+  - Examples:
+    ```javascript
+    { name: "Alice", age: 30 }
+    { x: 10, y: 20, z: 30 }
+    { id: "A", position: { x: 100, y: 200 } }
+    ```
+
+- **Field Access Syntax**
+  - Dot notation: `record.field`
+  - Nested access: `record.nested.field`
+  - Chained access: `data.user.profile.name`
+  - Access from literals: `{ x: 100 }.x`
+  - Examples:
+    ```javascript
+    person.name
+    node.position.x
+    data.user.profile.name
+    ```
+
+- **Record Functions**
+  - `keys(record)` - Get count of keys (returns number)
+  - `values(record)` - Extract numeric values as vector
+  - `has_field(record, "fieldname")` - Check if field exists (returns boolean)
+  - Examples:
+    ```javascript
+    keys({ a: 1, b: 2, c: 3 })        // → 3
+    values({ a: 10, b: 20 })          // → [10, 20]
+    has_field(person, "name")         // → true
+    ```
+
+- **Nested Records**
+  - Records inside records: `{ user: { name: "Alice" } }`
+  - Deep nesting supported: `{ a: { b: { c: 1 } } }`
+  - Mixed types: records with vectors, strings, numbers
+  - Example:
+    ```javascript
+    let node = {
+        id: "A",
+        position: { x: 100, y: 200 },
+        data: { label: "Node A", values: [1, 2, 3] }
+    }
+    node.position.x      // → 100
+    node.data.values     // → [1, 2, 3]
+    ```
+
+**REPL Enhancement: Multi-line Expression Support**
+
+- **Smart Expression Detection**
+  - Hybrid approach: fast delimiter check + parser validation
+  - Automatically detects incomplete expressions
+  - Dynamic prompts: `ach[n]>` for new, `     ...>` for continuation
+  - Examples:
+    ```javascript
+    ach[1]> let calc = {
+         ...>     sum: 10 + 20,
+         ...>     product: 5 * 6
+         ...> }
+    { product: 30, sum: 30 }
+    ```
+
+- **Balanced Delimiter Detection**
+  - Fast O(n) check for `()`, `{}`, `[]`
+  - Handles strings correctly (ignores delimiters in `"..."`)
+  - Supports escape sequences (`\"`, `\\`)
+  - Detects malformed expressions (more closings than openings)
+
+- **Ctrl+C Buffer Clearing**
+  - Cancel incomplete multi-line expressions
+  - Clears buffer and returns to normal prompt
+  - No need to close all delimiters if you made a mistake
+
+- **Supported Multi-line Constructs**
+  - Records: `{ key: value, ... }`
+  - Vectors: `[1, 2, 3]`
+  - Matrices: `[[1, 2], [3, 4]]`
+  - Nested structures: `{ a: { b: { c: 1 } } }`
+  - Arithmetic expressions: `(10 + 20 + 30)`
+
+**Parser & Grammar Enhancements**
+
+- Extended Pest grammar with string literals and escape sequences
+- Added record literal syntax and field access operators
+- Multi-character lookahead for field access (`.` operator)
+- AST nodes: `StringLiteral`, `RecordLiteral`, `FieldAccess`
+
+**Bug Fixes**
+
+- Fixed Unicode handling in REPL helper (char boundary issues with `¡`, `ñ`, emojis)
+- Proper character boundary detection using `char_indices()` instead of byte indexing
+
+**Testing**
+
+- 31 comprehensive tests for strings (literals, escapes, functions, comparisons, Unicode)
+- 23 comprehensive tests for records (literals, field access, nesting, functions, errors)
+- Total test suite: 212 tests passing
+
+**Examples & Documentation**
+
+- `examples/strings-demo.soc` - String operations showcase
+- `examples/records-demo.soc` - Record operations showcase
+- `examples/multiline-test.txt` - Multi-line REPL test cases
+
 ### Added - Complex Numbers & Complex Vectors 🔢✨
 
 **Complex Number System Enhanced:**
