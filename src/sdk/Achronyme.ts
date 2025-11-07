@@ -14,6 +14,7 @@ import { HOFOps } from './operations/HOFOps';
 import { StatsOps } from './operations/StatsOps';
 import { NumericalOps } from './operations/NumericalOps';
 import { OptimizationOps } from './operations/OptimizationOps';
+import { ConditionalOps } from './operations/ConditionalOps';
 import { Vector } from './values/Vector';
 import { Matrix } from './values/Matrix';
 import { Scalar } from './values/Scalar';
@@ -60,6 +61,7 @@ export class Achronyme {
     readonly stats: StatsOps;
     readonly numerical: NumericalOps;
     readonly optimization: OptimizationOps;
+    readonly conditional: ConditionalOps;
 
     constructor() {
         this.session = new AchronymeSession();
@@ -73,6 +75,7 @@ export class Achronyme {
         this.stats = new StatsOps(this.session);
         this.numerical = new NumericalOps(this.session.wasm, this.session);
         this.optimization = new OptimizationOps(this.session.wasm, this.session);
+        this.conditional = new ConditionalOps(this.session);
     }
 
     // ========================================================================
@@ -339,21 +342,17 @@ export class Achronyme {
         return this.stats.max(vector);
     }
 
-    // HOF operations
-    map(fn: (value: number, index: number) => number, vector: Vector): Vector {
-        return this.hof.map(fn, vector);
+    // HOF operations (use Rust engine with SOC expressions)
+    map(socExpr: string, vector: Vector): Vector {
+        return this.hof.map(socExpr, vector);
     }
 
-    filter(fn: (value: number, index: number) => boolean, vector: Vector): Vector {
-        return this.hof.filter(fn, vector);
+    filter(socExpr: string, vector: Vector): Vector {
+        return this.hof.filter(socExpr, vector);
     }
 
-    reduce<T>(
-        fn: (acc: T, value: number, index: number) => T,
-        initialValue: T,
-        vector: Vector
-    ): T {
-        return this.hof.reduce(fn, initialValue, vector);
+    reduce(socExpr: string, initialValue: number, vector: Vector): number {
+        return this.hof.reduce(socExpr, initialValue, vector);
     }
 
     // ========================================================================

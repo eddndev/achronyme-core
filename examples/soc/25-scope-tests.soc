@@ -1,0 +1,39 @@
+// Test exhaustivo de scope y closures
+
+// ========================================
+// 1. CLOSURES FUNCIONAN ✓
+// ========================================
+let a = 5
+let f = (x) => x + a
+// f(3) debería ser 8
+
+// ========================================
+// 2. SHADOWING EN PARÁMETROS DE LAMBDA
+// ========================================
+let z = 10
+let g = (z) => z * 2  // El parámetro 'z' debería ocultar al 'z' externo
+// g(3) debería ser 6, NO 20
+
+// ========================================
+// 3. PIECEWISE CON COMPLEJOS ✓
+// ========================================
+let test_complex = piecewise([3 > 2, 1+i], [1 > 2, 2+i], 3+i)
+// Debería ser 1+i
+
+// ========================================
+// 4. MAP CON CLOSURE
+// ========================================
+let multiplier = 2
+let vec = [1, 2, 3]
+let scaled = map(x => x * multiplier, vec)
+// Debería ser [2, 4, 6]
+
+// ========================================
+// 5. CLOSURE CON VARIABLES COMPLEJAS
+// ========================================
+let offset = 1+i
+let shift = (z) => z + offset
+// shift(2+i) debería ser 3+2i
+
+// Resultado final
+shift(2+i)

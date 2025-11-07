@@ -11,10 +11,28 @@ pub fn format_value(value: &Value) -> String {
     match value {
         Value::Number(n) => n.to_string(),
         Value::Boolean(b) => b.to_string(),
-        Value::Complex(c) => format!("{}+{}i", c.re, c.im),
+        Value::Complex(c) => {
+            if c.im >= 0.0 {
+                format!("{}+{}i", c.re, c.im)
+            } else {
+                format!("{}{}i", c.re, c.im)
+            }
+        }
         Value::Vector(v) => {
             let elements: Vec<String> = v.data().iter()
                 .map(|x| format!("{:.6}", x))
+                .collect();
+            format!("[{}]", elements.join(", "))
+        }
+        Value::ComplexVector(cv) => {
+            let elements: Vec<String> = cv.data().iter()
+                .map(|c| {
+                    if c.im >= 0.0 {
+                        format!("{}+{}i", c.re, c.im)
+                    } else {
+                        format!("{}{}i", c.re, c.im)
+                    }
+                })
                 .collect();
             format!("[{}]", elements.join(", "))
         }

@@ -1,6 +1,8 @@
 use achronyme_parser::ast::AstNode;
 use achronyme_types::value::Value;
 use achronyme_types::vector::Vector;
+use achronyme_types::complex::Complex;
+use achronyme_types::complex_vector::ComplexVector;
 
 use crate::evaluator::Evaluator;
 
@@ -14,6 +16,7 @@ use crate::evaluator::Evaluator;
 ///   map(f, [1,2,3]) → applies f(x) to each element
 ///   map(f, [1,2], [3,4]) → applies f(x,y) to pairs
 ///
+/// Supports both real and complex vectors.
 /// Truncates to shortest collection.
 pub fn handle_map(evaluator: &mut Evaluator, args: &[AstNode]) -> Result<Value, String> {
     if args.len() < 2 {
@@ -27,18 +30,29 @@ pub fn handle_map(evaluator: &mut Evaluator, args: &[AstNode]) -> Result<Value, 
         _ => return Err("First argument to map must be a function".to_string()),
     };
 
-    // Evaluate all collection arguments (must be vectors)
-    let mut collections: Vec<Vector> = Vec::new();
+    // Evaluate all collection arguments (must be vectors - real or complex)
+    enum Collection {
+        Real(Vector),
+        Complex(ComplexVector),
+    }
+
+    let mut collections: Vec<Collection> = Vec::new();
     let mut min_length = usize::MAX;
+    let mut has_complex = false;
 
     for arg in &args[1..] {
         let coll_value = evaluator.evaluate(arg)?;
         match coll_value {
             Value::Vector(v) => {
                 min_length = min_length.min(v.len());
-                collections.push(v);
+                collections.push(Collection::Real(v));
             }
-            _ => return Err("map arguments must be vectors".to_string()),
+            Value::ComplexVector(cv) => {
+                min_length = min_length.min(cv.len());
+                collections.push(Collection::Complex(cv));
+                has_complex = true;
+            }
+            _ => return Err("map arguments must be vectors (real or complex)".to_string()),
         }
     }
 
@@ -52,25 +66,47 @@ pub fn handle_map(evaluator: &mut Evaluator, args: &[AstNode]) -> Result<Value, 
     }
 
     // Apply function to each element
-    let mut results = Vec::new();
+    let mut real_results = Vec::new();
+    let mut complex_results = Vec::new();
+    let mut result_is_complex = false;
+
     for i in 0..min_length {
         // Gather arguments for this iteration
         let mut func_args = Vec::new();
         for coll in &collections {
-            func_args.push(Value::Number(coll.data()[i]));
+            match coll {
+                Collection::Real(v) => {
+                    func_args.push(Value::Number(v.data()[i]));
+                }
+                Collection::Complex(cv) => {
+                    func_args.push(Value::Complex(cv.data()[i]));
+                }
+            }
         }
 
         // Apply function
         let result = evaluator.apply_lambda(&func, func_args)?;
 
-        // Result must be a number (for now)
+        // Store result
         match result {
-            Value::Number(n) => results.push(n),
-            _ => return Err("map function must return numbers".to_string()),
+            Value::Number(n) => {
+                real_results.push(n);
+                complex_results.push(Complex::new(n, 0.0));
+            }
+            Value::Complex(c) => {
+                complex_results.push(c);
+                result_is_complex = true;
+            }
+            _ => return Err("map function must return numbers or complex numbers".to_string()),
         }
     }
 
-    Ok(Value::Vector(Vector::new(results)))
+    // Return complex vector if any input was complex or result is complex
+    if has_complex || result_is_complex {
+        Ok(Value::ComplexVector(ComplexVector::new(complex_results)))
+    } else {
+        Ok(Value::Vector(Vector::new(real_results)))
+    }
 }
 
 /// filter(predicate, collection) - Filter elements

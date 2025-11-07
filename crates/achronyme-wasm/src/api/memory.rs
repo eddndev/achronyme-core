@@ -2,6 +2,8 @@ use wasm_bindgen::prelude::*;
 use crate::state::{HANDLES, Handle};
 use achronyme_types::value::Value;
 use achronyme_types::vector::Vector;
+use achronyme_types::complex::Complex;
+use achronyme_types::complex_vector::ComplexVector;
 use achronyme_types::matrix::Matrix;
 
 // ============================================================================
@@ -115,4 +117,45 @@ pub fn release_handle(handle: Handle) {
     HANDLES.with(|h| {
         h.borrow_mut().release(handle);
     });
+}
+
+// ============================================================================
+// Complex Vector API
+// ============================================================================
+
+/// Create complex vector from interleaved real/imaginary components
+/// data format: [re0, im0, re1, im1, ...]
+#[wasm_bindgen(js_name = createComplexVector)]
+pub fn create_complex_vector(data: Vec<f64>) -> Result<Handle, JsValue> {
+    if data.len() % 2 != 0 {
+        return Err(JsValue::from_str("Complex vector data must have even length (re, im pairs)"));
+    }
+
+    let complex_data: Vec<Complex> = data
+        .chunks(2)
+        .map(|chunk| Complex::new(chunk[0], chunk[1]))
+        .collect();
+
+    let vector = ComplexVector::new(complex_data);
+    Ok(HANDLES.with(|h| h.borrow_mut().create(Value::ComplexVector(vector))))
+}
+
+/// Get complex vector data as interleaved real/imaginary components
+/// Returns format: [re0, im0, re1, im1, ...]
+#[wasm_bindgen(js_name = getComplexVector)]
+pub fn get_complex_vector(handle: Handle) -> Result<Vec<f64>, JsValue> {
+    HANDLES.with(|handles| {
+        let h = handles.borrow();
+        match h.get(handle) {
+            Some(Value::ComplexVector(cv)) => {
+                let data: Vec<f64> = cv.data()
+                    .iter()
+                    .flat_map(|c| vec![c.re, c.im])
+                    .collect();
+                Ok(data)
+            }
+            Some(_) => Err(JsValue::from_str("Handle does not reference a complex vector")),
+            None => Err(JsValue::from_str("Invalid handle")),
+        }
+    })
 }

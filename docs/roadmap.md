@@ -17,77 +17,94 @@
 
 ---
 
-## 🚧 En Desarrollo (v0.4 - v0.6)
+## ✅ Completado Recientemente (v0.4 - v0.7)
 
-### Phase 5: Álgebra Lineal Avanzada (v0.4)
+### Álgebra Lineal Avanzada (v0.4)
+- [x] **Descomposición de matrices**:
+  - [x] LU decomposition (factorización PA = LU)
+  - [x] QR decomposition (Gram-Schmidt, Householder)
+  - [x] Cholesky decomposition (matrices positivas definidas)
+  - [x] SVD - Singular Value Decomposition
+- [x] **Eigenvalues y eigenvectors**:
+  - [x] Método de potencias (power iteration)
+  - [x] Algoritmo QR para eigenvalues
+  - [x] Eigenvalues de matrices simétricas
 
-**Descomposición de matrices:**
-- [ ] LU decomposition (factorización PA = LU)
-- [ ] QR decomposition (Gram-Schmidt, Householder)
-- [ ] Cholesky decomposition (matrices positivas definidas)
-- [ ] SVD - Singular Value Decomposition
+### Cálculo Numérico (v0.5)
+- [x] **Derivación numérica**:
+  - [x] Diferencias finitas (central)
+  - [x] Derivadas de orden superior
+- [x] **Integración numérica**:
+  - [x] Regla del trapecio
+  - [x] Regla de Simpson
+  - [x] Cuadratura de Gauss (adaptativa)
+  - [x] Integración de Romberg
+- [x] **Solución de ecuaciones**:
+  - [x] Métodos de bisección y secante
+  - [x] Newton-Raphson (una variable)
 
-**Eigenvalues y eigenvectors:**
-- [ ] Método de potencias (power iteration)
-- [ ] Algoritmo QR para eigenvalues
-- [ ] Eigenvalues de matrices simétricas (Jacobi)
+### Optimización (v0.6)
+- [x] **Programación Lineal**:
+  - [x] Simplex method
+  - [x] Dual Simplex, Two-Phase Simplex, Revised Simplex
 
-**Operaciones avanzadas:**
-- [ ] Rank, null space, column space
-- [ ] Pseudoinversa (Moore-Penrose)
-- [ ] Normas matriciales (Frobenius, 1-norm, ∞-norm)
-- [ ] Condición de matriz (condition number)
-
-### Phase 6: Cálculo Numérico (v0.5)
-
-**Derivación numérica:**
-- [ ] Diferencias finitas (forward, backward, central)
-- [ ] Derivadas de orden superior
-- [ ] Derivadas parciales
-- [ ] Gradiente, divergencia, curl
-
-**Integración numérica:**
-- [ ] Regla del trapecio
-- [ ] Regla de Simpson (1/3, 3/8)
-- [ ] Cuadratura de Gauss
-- [ ] Integración adaptativa (Romberg)
-- [ ] Integrales dobles y triples
-
-**Solución de ecuaciones:**
-- [ ] Métodos de bisección y secante
-- [ ] Newton-Raphson (una variable)
-- [ ] Newton-Raphson multidimensional
-- [ ] Métodos de punto fijo
-
-**Sistemas de ecuaciones lineales:**
-- [ ] Eliminación gaussiana con pivoteo
-- [ ] Métodos iterativos (Jacobi, Gauss-Seidel)
-- [ ] Gradiente conjugado
-- [ ] Sparse matrices (matrices dispersas)
-
-### Phase 7: Optimización (v0.6)
-
-**Optimización sin restricciones:**
-- [ ] Gradiente descendente (vanilla, momentum, AdaGrad, Adam)
-- [ ] Método de Newton
-- [ ] Quasi-Newton (BFGS, L-BFGS)
-- [ ] Nelder-Mead (simplex)
-- [ ] Simulated annealing
-
-**Optimización con restricciones:**
-- [ ] Simplex method (programación lineal)
-- [ ] Interior point methods
-- [ ] Lagrange multipliers
-- [ ] Sequential Quadratic Programming (SQP)
-
-**Optimización combinatoria:**
-- [ ] Genetic algorithms
-- [ ] Particle swarm optimization
-- [ ] Ant colony optimization
+### Sistema de Scopes y Refactorización (v0.7)
+- [x] **Refactorización del evaluador**:
+  - [x] Separación de lógica en handlers especializados
+  - [x] Reducción de evaluator.rs (1179 → 203 líneas, 83%)
+  - [x] Tests movidos a archivos de integración
+- [x] **Variable Shadowing**:
+  - [x] Sistema de scopes stack-based
+  - [x] Shadowing en parámetros de lambda
+  - [x] Redeclaración con `let` en mismo scope
+  - [x] Closures preservados correctamente
+  - [x] Pipelines de transformación sin duplicar memoria
 
 ---
 
-## 🔮 Futuro (v0.7+)
+## 🚧 En Desarrollo (v0.7+)
+
+### Álgebra Lineal Avanzada
+- [ ] **Operaciones avanzadas**:
+  - [ ] Rank, null space, column space
+  - [ ] Pseudoinversa (Moore-Penrose)
+  - [ ] Normas matriciales (Frobenius, 1-norm, ∞-norm)
+  - [ ] Condición de matriz (condition number)
+
+### Cálculo Numérico
+- [ ] **Derivación numérica**:
+  - [ ] Derivadas parciales
+  - [ ] Gradiente, divergencia, curl
+- [ ] **Integración numérica**:
+  - [ ] Integrales dobles y triples
+- [ ] **Solución de ecuaciones**:
+  - [ ] Newton-Raphson multidimensional
+  - [ ] Métodos de punto fijo
+- [ ] **Sistemas de ecuaciones lineales**:
+  - [ ] Eliminación gaussiana con pivoteo
+  - [ ] Métodos iterativos (Jacobi, Gauss-Seidel)
+  - [ ] Gradiente conjugado
+  - [ ] Sparse matrices (matrices dispersas)
+
+### Optimización
+- [ ] **Optimización sin restricciones**:
+  - [ ] Gradiente descendente (vanilla, momentum, AdaGrad, Adam)
+  - [ ] Método de Newton
+  - [ ] Quasi-Newton (BFGS, L-BFGS)
+  - [ ] Nelder-Mead (simplex)
+  - [ ] Simulated annealing
+- [ ] **Optimización con restricciones**:
+  - [ ] Interior point methods
+  - [ ] Lagrange multipliers
+  - [ ] Sequential Quadratic Programming (SQP)
+- [ ] **Optimización combinatoria**:
+  - [ ] Genetic algorithms
+  - [ ] Particle swarm optimization
+  - [ ] Ant colony optimization
+
+---
+
+## 🔮 Futuro (v0.8+)
 
 ### Phase 8: Estadística y Probabilidad
 - [ ] Distribuciones (normal, binomial, Poisson, t, chi-cuadrado, F)

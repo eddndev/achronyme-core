@@ -29,6 +29,10 @@ fn apply_add(left: Value, right: Value) -> Result<Value, String> {
             .add(&b)
             .map(Value::Vector)
             .map_err(|e| e.to_string()),
+        (Value::ComplexVector(a), Value::ComplexVector(b)) => a
+            .add(&b)
+            .map(Value::ComplexVector)
+            .map_err(|e| e.to_string()),
         (Value::Matrix(a), Value::Matrix(b)) => a
             .add(&b)
             .map(Value::Matrix)
@@ -52,6 +56,10 @@ fn apply_subtract(left: Value, right: Value) -> Result<Value, String> {
             .sub(&b)
             .map(Value::Vector)
             .map_err(|e| e.to_string()),
+        (Value::ComplexVector(a), Value::ComplexVector(b)) => a
+            .sub(&b)
+            .map(Value::ComplexVector)
+            .map_err(|e| e.to_string()),
         (Value::Matrix(a), Value::Matrix(b)) => a
             .sub(&b)
             .map(Value::Matrix)
@@ -73,6 +81,10 @@ fn apply_multiply(left: Value, right: Value) -> Result<Value, String> {
         (Value::Vector(a), Value::Vector(b)) => a
             .mul(&b)
             .map(Value::Vector)
+            .map_err(|e| e.to_string()),
+        (Value::ComplexVector(a), Value::ComplexVector(b)) => a
+            .mul(&b)
+            .map(Value::ComplexVector)
             .map_err(|e| e.to_string()),
         (Value::Matrix(a), Value::Matrix(b)) => a
             .mul(&b)
@@ -102,6 +114,10 @@ fn apply_divide(left: Value, right: Value) -> Result<Value, String> {
             .div(&b)
             .map(Value::Vector)
             .map_err(|e| e.to_string()),
+        (Value::ComplexVector(a), Value::ComplexVector(b)) => a
+            .div(&b)
+            .map(Value::ComplexVector)
+            .map_err(|e| e.to_string()),
         (Value::Complex(a), Value::Complex(b)) => Ok(Value::Complex(a / b)),
         (Value::Number(a), Value::Complex(b)) => {
             Ok(Value::Complex(Complex::from_real(a) / b))
@@ -117,6 +133,10 @@ fn apply_power(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
         (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a.powf(b))),
         (Value::Complex(a), Value::Number(b)) => Ok(Value::Complex(a.pow(b))),
+        (Value::Complex(a), Value::Complex(b)) => Ok(Value::Complex(a.pow_complex(&b))),
+        (Value::Number(a), Value::Complex(b)) => {
+            Ok(Value::Complex(Complex::from_real(a).pow_complex(&b)))
+        }
         _ => Err("Incompatible types for power".to_string()),
     }
 }

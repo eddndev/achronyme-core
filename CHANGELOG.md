@@ -7,12 +7,386 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Complex Numbers & Complex Vectors 🔢✨
+
+**Complex Number System Enhanced:**
+
+- **Complex^Complex Power Operation**
+  - Full support for complex exponents: `z^w` where both base and exponent are complex
+  - Implementation using formula: `a^b = e^(b * ln(a))`
+  - Examples:
+    ```javascript
+    i^i           // → e^(-π/2) ≈ 0.2079
+    (1+i)^2       // → 0 + 2i
+    2^i           // → cos(ln(2)) + i*sin(ln(2))
+    (2i)^2        // → -4
+    (1+i)^(2+i)   // → complex result
+    ```
+
+- **Imaginary Unit Constant `i`**
+  - Built-in constant `i` = `0+1i` (imaginary unit)
+  - Available globally without declaration
+  - Case-insensitive: `i` or `I`
+  - Automatic type promotion in expressions
+  - Example: `let z = 3 + 4i`
+
+**New `ComplexVector` Type:**
+
+- **Native Complex Vector Support**
+  - First-class type for vectors of complex numbers
+  - Automatic type detection from literals
+  - Internal storage: interleaved format `[re0, im0, re1, im1, ...]`
+  - Examples:
+    ```javascript
+    [i, 2+3i, 4]              // → ComplexVector
+    [0+1i, 2+3i, 4+0i]       // Promoted to complex
+    ```
+
+- **Type Promotion System**
+  - Vector literals auto-detect complex elements
+  - Real numbers promoted to complex in mixed contexts
+  - `[1, 2+i]` → `[1+0i, 2+i]` (ComplexVector)
+  - Consistent behavior across all operations
+
+- **Vector Operations**
+  - Element-wise arithmetic: `+`, `-`, `*`, `/`
+  - Power operations: `[1+i, 2+i]^2`
+  - Examples:
+    ```javascript
+    let v1 = [1+2i, 3+4i]
+    let v2 = [5+6i, 7+8i]
+    v1 + v2  // → [6+8i, 10+12i]
+    v1 * v2  // → [element-wise multiplication]
+    ```
+
+**Complex Functions Extended for Vectors:**
+
+- **`real(z)` - Extract Real Part**
+  - Works with: number, complex number, or ComplexVector
+  - `real(3+4i)` → `3`
+  - `real([1+i, 2+3i])` → `[1, 2]` (Vector)
+
+- **`imag(z)` - Extract Imaginary Part**
+  - Works with: number, complex number, or ComplexVector
+  - `imag(3+4i)` → `4`
+  - `imag([1+i, 2+3i])` → `[1, 3]` (Vector)
+
+- **`conj(z)` - Complex Conjugate**
+  - Works with: number, complex number, or ComplexVector
+  - `conj(3+4i)` → `3-4i`
+  - `conj([1+i, 2+3i])` → `[1-i, 2-3i]` (ComplexVector)
+
+- **`arg(z)` - Phase/Argument**
+  - Returns phase angle in radians
+  - `arg(1+i)` → `π/4`
+
+**Higher-Order Functions with Complex Support:**
+
+- **`map()` Enhanced**
+  - Now accepts both `Vector` and `ComplexVector`
+  - Automatic type promotion based on inputs/outputs
+  - Returns ComplexVector if any input or result is complex
+  - Examples:
+    ```javascript
+    let v = [2+i, 3+i]
+    map(z => z^2, v)           // → [3+4i, 8+6i]
+
+    // With closure capturing
+    let offset = 1+i
+    map(z => z + offset, v)    // → [3+2i, 4+2i]
+    ```
+
+**DSP Functions Modernized:**
+
+- **`fft(signal)` - Fast Fourier Transform**
+  - **NEW**: Returns `ComplexVector` (was: Matrix [N×2])
+  - Much cleaner API - no more matrix manipulation
+  - Direct access to complex spectrum
+  - Example:
+    ```javascript
+    let signal = [0, 0.707, 1, 0.707, 0, -0.707, -1, -0.707]
+    let spectrum = fft(signal)           // ComplexVector
+    let real_part = real(spectrum)       // Extract reals
+    let imag_part = imag(spectrum)       // Extract imaginaries
+    ```
+
+- **`ifft(spectrum)` - Inverse FFT**
+  - **NEW**: Accepts `ComplexVector` (was: Matrix [N×2])
+  - Perfect roundtrip: `signal → fft → ifft → signal`
+  - Example:
+    ```javascript
+    let spectrum = fft(signal)
+    let recovered = ifft(spectrum)       // Recovers original
+    ```
+
+- **FFT Analysis Workflow**
+  ```javascript
+  // Modern workflow with ComplexVector
+  let spectrum = fft(signal)
+  let magnitudes = fft_mag(signal)      // Or: map(z => abs(z), spectrum)
+  let phases = fft_phase(signal)
+
+  // Process spectrum
+  let filtered = map(z => z * filter, spectrum)
+  let result = ifft(filtered)
+
+  // Extract components
+  let real_parts = real(spectrum)
+  let imag_parts = imag(spectrum)
+  ```
+
+**WASM & TypeScript SDK:**
+
+- **New WASM Bindings**
+  - `createComplexVector(data)` - Create from interleaved `[re, im, ...]` format
+  - `getComplexVector(handle)` - Extract to interleaved format
+  - Efficient memory layout for JavaScript interop
+
+- **TypeScript `ComplexVector` Class**
+  - `.get(index)` → `{re: number, im: number}`
+  - `.toComplexArray()` → `Array<{re, im}>`
+  - `.toArray()` → `number[]` (interleaved)
+  - Iterator support: `for (const z of complexVec)`
+  - `.length` property
+  - `.toString()` for display
+
+**Closure Support Validated:**
+
+- **Lambda Closures Work Correctly** ✓
+  - Lambdas can capture variables from outer scope
+  - Example:
+    ```javascript
+    let multiplier = 2
+    map(x => x * multiplier, [1, 2, 3])  // → [2, 4, 6]
+
+    let offset = 1+i
+    let shift = (z) => z + offset
+    shift(2+i)  // → 3+2i
+    ```
+
+- **Piecewise with Complex Values** ✓
+  - Piecewise functions support complex return values
+  - Example:
+    ```javascript
+    piecewise([x > 0, 1+i], [x < 0, -1+i], 0+0i)
+    ```
+
+**Implementation Details:**
+
+- Complex vector storage: interleaved `[re0, im0, re1, im1, ...]`
+- Efficient memory layout for WASM/JavaScript interop
+- Full integration with existing binary operations
+- CLI display format: `[a+bi, c+di]`
+- Automatic negative sign handling: `3-4i` (not `3+-4i`)
+
+### Added - Variable Shadowing & Scope System 🔄
+
+**Stack-Based Scope System:**
+
+- ✅ **Variable Shadowing in Lambdas**
+  - Lambda parameters can now shadow outer variables
+  - Example:
+    ```javascript
+    let z = 10
+    let f = (z) => z * 2
+    f(3)  // → 6 (uses parameter z=3, not outer z=10)
+    ```
+
+- ✅ **Let Redeclaration (Shadowing in Same Scope)**
+  - Variables can be redeclared with `let` to shadow previous definitions
+  - Enables clean pipeline transformations without memory duplication
+  - Example:
+    ```javascript
+    let v = [1,2,3,4]
+    let v = map(x => x^2, v)   // [1,4,9,16]
+    let v = map(x => x+1, v)   // [2,5,10,17]
+    ```
+
+- ✅ **Closures Preserved**
+  - Closures continue to capture variables correctly
+  - Each closure captures the value at creation time
+  - Example:
+    ```javascript
+    let x = 5
+    let f1 = (y) => x + y  // Captures x=5
+
+    let x = 10             // Shadow x
+    let f2 = (y) => x + y  // Captures x=10
+
+    f1(1)  // → 6  (uses captured x=5)
+    f2(1)  // → 11 (uses captured x=10)
+    ```
+
+**Implementation Details:**
+
+- Environment uses stack-based scopes (Vec<HashMap>)
+- Lambda parameters create new scope automatically
+- Variable lookup: innermost → outermost scope
+- Shadowing does not modify outer scope values
+- 131 tests passing, including 11 new shadowing tests
+
+**Benefits:**
+
+1. **Memory Efficiency**: Reuse variable names without duplicating large vectors
+2. **Clean Pipelines**: Natural data transformation workflows
+3. **Functional Programming**: Standard shadowing semantics
+4. **Better Ergonomics**: No need for `v2`, `v3`, `v_final` naming
+
+### Refactoring - Evaluator Architecture 🏗️
+
+**Code Organization Improvements:**
+
+- Evaluator reduced from 1179 → 203 lines (83% reduction)
+- Logic separated into specialized handlers:
+  - `handlers/literals.rs` (94 lines): Number, boolean, complex, vector, matrix literals
+  - `handlers/variables.rs` (42 lines): Variable declaration and reference
+  - `handlers/control_flow.rs` (60 lines): If expressions, piecewise functions
+  - `handlers/functions.rs` (66 lines): Lambda evaluation and application
+- Tests moved to `tests/test_evaluator.rs` (744 lines)
+- Cleaner, more maintainable codebase
+- Easier to extend with new features
+
+### Known Limitations
+
+**Variable Scoping:**
+
+- **No Variable Reassignment** (by design)
+  - Variables cannot be reassigned without `let`
+  - Example (not supported):
+    ```javascript
+    let x = 5
+    x = 10  // Error: reassignment not supported
+    ```
+  - Use shadowing instead:
+    ```javascript
+    let x = 5
+    let x = 10  // OK: shadowing with new let
+    ```
+
+**Note**: Variable reassignment (mutation without `let`) is intentionally not supported. Achronyme is designed as a functional computation engine where data transformations are expressed through shadowing, not mutation. This design choice:
+- Simplifies reasoning about code
+- Prevents accidental side effects
+- Aligns with mathematical notation (definitions, not mutations)
+- Enables future optimizations (immutable data structures)
+
 ### Planned Features (Phase 5+)
 - Symbolic computation
 - Units and dimensions
 - Ordinary Differential Equations (ODEs)
 - Nonlinear optimization (gradient descent, conjugate gradient, BFGS)
 - Constrained optimization (SQP, barrier methods)
+
+## [0.5.3] - 2025-11-06
+
+### Added - Conditional Expressions & Piecewise Functions 🎯
+
+**Boolean Logic & Conditionals:**
+
+- **Boolean Type System**
+  - New `Value::Boolean(bool)` variant in type system
+  - Boolean literals: `true`, `false`
+  - Automatic type conversion: `Number → Boolean` (0 = false, non-zero = true)
+
+- **Logical Operators**
+  - AND operator: `&&` with short-circuit evaluation
+  - OR operator: `||` with short-circuit evaluation
+  - NOT operator: `!` for boolean negation
+  - Operator precedence: `!` > `&&` > `||`
+
+- **Comparison Operators (Enhanced)**
+  - Now return `Boolean` type instead of `Number`
+  - Operators: `>`, `<`, `>=`, `<=`, `==`, `!=`
+  - Example: `5 > 3` → `true` (not `1.0`)
+
+- **`if()` Function - Conditional Expression**
+  - Syntax: `if(condition, then_value, else_value)`
+  - Short-circuit evaluation (only evaluates chosen branch)
+  - Works with any expression type
+  - Examples:
+    ```javascript
+    if(x > 0, x, -x)              // Absolute value
+    if(x > 0, x, 0)               // ReLU activation
+    if(x > 10, 2, 1)              // Conditional logic
+    ```
+
+**Piecewise Functions:**
+
+- **`piecewise()` Function - Multi-Branch Conditionals**
+  - Syntax: `piecewise([cond1, val1], [cond2, val2], ..., default)`
+  - Sequential evaluation with short-circuit
+  - Optional default value (last argument without `[]`)
+  - Error if no condition matches and no default provided
+  - Full support for multivariable lambdas
+
+  - **Mathematical Applications:**
+    ```javascript
+    // Sign function
+    let signo = x => piecewise([x < 0, -1], [x > 0, 1], 0)
+
+    // Progressive tax brackets
+    let tax = income => piecewise(
+      [income <= 10000, income * 0.1],
+      [income <= 50000, income * 0.2],
+      income * 0.3
+    )
+
+    // Piecewise polynomial
+    let f = x => piecewise([x < -1, x^2], [x < 1, 2*x + 1], x^3)
+
+    // Heaviside step function
+    let H = x => piecewise([x < 0, 0], 1)
+    ```
+
+**DSP & Signal Processing Integration:**
+
+- **Classic Waveforms Implemented:**
+  - Square Wave (FFT → odd harmonics)
+  - Sawtooth Wave, Triangle Wave
+  - Rectangular Pulse (FFT → sinc pattern)
+  - Half-Wave & Full-Wave Rectifiers
+  - Pulse Train (digital signals)
+
+- **Numerical Analysis Validation:**
+  - ✅ **FFT**: Spectral analysis of discontinuous signals
+  - ✅ **Differentiation**: Correct derivatives at discontinuities
+  - ✅ **Integration**: `trapz(relu, -1, 2, 100)` = 2.0 (exact)
+
+**Testing & Validation:**
+
+- **Unit Tests:** 92 total (20 new for conditionals/piecewise), all passing ✅
+- **DSP Integration:** Square wave FFT, rectifiers, numerical analysis ✅
+- **CLI Validation:** All example files execute correctly ✅
+
+**Example Files:**
+
+- `examples/soc/15-conditionals.soc` - Boolean logic and `if()` expressions
+- `examples/soc/16-piecewise.soc` - 14 piecewise function examples
+- `examples/soc/17-piecewise-analysis.soc` - DSP + numerical analysis integration
+
+**Use Cases Unlocked:**
+
+1. **Mathematical Modeling:** Discontinuous functions, piecewise polynomials
+2. **Digital Signal Processing:** Waveform generation, rectification, FFT analysis
+3. **Machine Learning:** Activation functions (ReLU, Leaky ReLU)
+4. **Economics:** Progressive tax systems, tiered pricing
+5. **Physics & Engineering:** Boundary conditions, control systems
+
+### Changed
+
+- **Comparison Operators:** Now return `Value::Boolean` instead of `Value::Number`
+- **Parser Cleanup:** Removed legacy hand-written parser (lexer.rs, parser.rs, token.rs)
+
+### Breaking Changes
+
+- Comparison operators return `Boolean` instead of `Number` (1.0/0.0)
+- Migration: `filter()` automatically handles both boolean and numeric predicates
+
+### Performance
+
+- Boolean operations: <1μs
+- `if()` evaluation: <2μs (short-circuit)
+- `piecewise()`: <5μs for 3 cases
+- FFT of piecewise signals: ~1ms for 32 samples
 
 ## [0.5.3] - 2025-11-06
 

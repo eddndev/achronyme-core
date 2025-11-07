@@ -40,7 +40,7 @@ impl Complex {
         }
     }
 
-    /// Power of a complex number
+    /// Power of a complex number with real exponent
     pub fn pow(&self, exponent: f64) -> Self {
         let r = self.magnitude();
         let theta = self.phase();
@@ -50,6 +50,14 @@ impl Complex {
             re: new_r * new_theta.cos(),
             im: new_r * new_theta.sin(),
         }
+    }
+
+    /// Power of a complex number with complex exponent
+    /// Formula: a^b = e^(b * ln(a))
+    pub fn pow_complex(&self, exponent: &Complex) -> Self {
+        let ln_self = self.ln();
+        let product = *exponent * ln_self;
+        product.exp()
     }
 
     /// Square root of a complex number

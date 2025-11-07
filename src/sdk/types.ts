@@ -40,7 +40,7 @@ export interface ValueMetadata {
     createdAt: number;
 
     /** Type of value */
-    type: 'scalar' | 'vector' | 'matrix' | 'complex';
+    type: 'scalar' | 'vector' | 'matrix' | 'complex' | 'complex_vector';
 }
 
 /**

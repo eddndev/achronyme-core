@@ -12,6 +12,7 @@ import { Vector } from '../values/Vector';
 import { Matrix } from '../values/Matrix';
 import { Scalar } from '../values/Scalar';
 import { Complex } from '../values/Complex';
+import { ComplexVector } from '../values/ComplexVector';
 import type { Value } from '../values/Value';
 
 /**
@@ -243,5 +244,50 @@ export class AchronymeSession {
 
         const handle = this.wasm.createVector([re, im]);
         return new Complex(this, handle, re, im);
+    }
+
+    /**
+     * Create a complex vector
+     *
+     * @param data Array of {re, im} objects or interleaved [re0, im0, re1, im1, ...]
+     * @returns ComplexVector value
+     *
+     * @example
+     * ```typescript
+     * // From objects
+     * const cv1 = session.complexVector([{re: 1, im: 2}, {re: 3, im: 4}]);
+     *
+     * // From interleaved array
+     * const cv2 = session.complexVectorFromInterleaved([1, 2, 3, 4]); // 1+2i, 3+4i
+     * ```
+     */
+    complexVector(data: Array<{re: number, im: number}>): ComplexVector {
+        if (!this.isActive) {
+            throw new Error('Session not initialized. Call init() first.');
+        }
+
+        // Convert to interleaved format
+        const interleaved: number[] = [];
+        for (const z of data) {
+            interleaved.push(z.re, z.im);
+        }
+
+        const handle = this.wasm.createComplexVector(interleaved);
+        return new ComplexVector(this, handle);
+    }
+
+    /**
+     * Create a complex vector from interleaved array
+     *
+     * @param data Interleaved array [re0, im0, re1, im1, ...]
+     * @returns ComplexVector value
+     */
+    complexVectorFromInterleaved(data: number[]): ComplexVector {
+        if (!this.isActive) {
+            throw new Error('Session not initialized. Call init() first.');
+        }
+
+        const handle = this.wasm.createComplexVector(data);
+        return new ComplexVector(this, handle);
     }
 }

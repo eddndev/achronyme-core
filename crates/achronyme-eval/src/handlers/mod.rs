@@ -9,3 +9,9 @@ pub mod hof;
 pub mod numerical;
 pub mod optimization;
 pub mod function_call;
+
+// Node evaluation handlers
+pub mod literals;
+pub mod variables;
+pub mod control_flow;
+pub mod functions;

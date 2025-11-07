@@ -129,6 +129,35 @@ export class RustWASM {
     }
 
     /**
+     * Create complex vector from JavaScript array
+     * @param data Interleaved array: [re0, im0, re1, im1, ...]
+     * @returns Handle to the complex vector
+     */
+    createComplexVector(data: number[]): Handle {
+        const mod = this.ensureInit();
+        try {
+            const float64Data = new Float64Array(data);
+            return mod.createComplexVector(float64Data);
+        } catch (error) {
+            throw new Error(`Failed to create complex vector: ${error}`);
+        }
+    }
+
+    /**
+     * Get complex vector data (interleaved format)
+     * @returns Array in format [re0, im0, re1, im1, ...]
+     */
+    getComplexVector(handle: Handle): number[] {
+        const mod = this.ensureInit();
+        try {
+            const float64Array = mod.getComplexVector(handle);
+            return Array.from(float64Array);
+        } catch (error) {
+            throw new Error(`Failed to get complex vector: ${error}`);
+        }
+    }
+
+    /**
      * Create matrix from JavaScript array (row-major order)
      * @param data Flattened array in row-major order
      * @param rows Number of rows
@@ -211,6 +240,85 @@ export class RustWASM {
         } catch (error) {
             throw new Error(`sqrt failed: ${error}`);
         }
+    }
+
+    // Inverse Trigonometric Functions
+    asin(handle: Handle): Handle {
+        const mod = this.ensureInit();
+        return mod.mathAsin(handle);
+    }
+
+    acos(handle: Handle): Handle {
+        const mod = this.ensureInit();
+        return mod.mathAcos(handle);
+    }
+
+    atan(handle: Handle): Handle {
+        const mod = this.ensureInit();
+        return mod.mathAtan(handle);
+    }
+
+    // Hyperbolic Functions
+    sinh(handle: Handle): Handle {
+        const mod = this.ensureInit();
+        return mod.mathSinh(handle);
+    }
+
+    cosh(handle: Handle): Handle {
+        const mod = this.ensureInit();
+        return mod.mathCosh(handle);
+    }
+
+    tanh(handle: Handle): Handle {
+        const mod = this.ensureInit();
+        return mod.mathTanh(handle);
+    }
+
+    asinh(handle: Handle): Handle {
+        const mod = this.ensureInit();
+        return mod.mathAsinh(handle);
+    }
+
+    acosh(handle: Handle): Handle {
+        const mod = this.ensureInit();
+        return mod.mathAcosh(handle);
+    }
+
+    atanh(handle: Handle): Handle {
+        const mod = this.ensureInit();
+        return mod.mathAtanh(handle);
+    }
+
+    // Rounding Functions
+    ceil(handle: Handle): Handle {
+        const mod = this.ensureInit();
+        return mod.mathCeil(handle);
+    }
+
+    floor(handle: Handle): Handle {
+        const mod = this.ensureInit();
+        return mod.mathFloor(handle);
+    }
+
+    round(handle: Handle): Handle {
+        const mod = this.ensureInit();
+        return mod.mathRound(handle);
+    }
+
+    trunc(handle: Handle): Handle {
+        const mod = this.ensureInit();
+        return mod.mathTrunc(handle);
+    }
+
+    // Other Math Functions
+    cbrt(handle: Handle): Handle {
+        const mod = this.ensureInit();
+        return mod.mathCbrt(handle);
+    }
+
+    log10(handle: Handle): Handle {
+        const mod = this.ensureInit();
+        return mod.mathLog10(handle);
     }
 
     // ========================================================================
@@ -671,10 +779,6 @@ export class RustWASM {
         return mod.intlinprog(c, A, b, sense, integerVars);
     }
 
-    /**
-     * Binary Linear Programming (0-1 Integer Programming)
-     * Solves LP where specified variables must be binary (0 or 1)
-     */
     binaryLinprog(c: Handle, A: Handle, b: Handle, sense: number, binaryVars: Handle): Handle {
         const mod = this.ensureInit();
         return mod.binaryLinprog(c, A, b, sense, binaryVars);

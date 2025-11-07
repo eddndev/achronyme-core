@@ -1,6 +1,6 @@
 use crate::functions::FunctionRegistry;
 use achronyme_types::complex::Complex as AchronymeComplex;
-use achronyme_types::matrix::Matrix;
+use achronyme_types::complex_vector::ComplexVector;
 use achronyme_types::value::Value;
 use achronyme_types::vector::Vector;
 
@@ -31,15 +31,8 @@ fn fft(args: &[Value]) -> Result<Value, String> {
     match &args[0] {
         Value::Vector(v) => {
             let spectrum = achronyme_dsp::fft_real(v);
-            let n = spectrum.len();
-            let mut data = Vec::with_capacity(n * 2);
-            for c in spectrum {
-                data.push(c.re);
-                data.push(c.im);
-            }
-            let matrix = Matrix::new(n, 2, data)
-                .map_err(|e| format!("FFT result conversion failed: {}", e))?;
-            Ok(Value::Matrix(matrix))
+            let complex_vector = ComplexVector::new(spectrum);
+            Ok(Value::ComplexVector(complex_vector))
         }
         _ => Err("fft() requires a vector".to_string()),
     }
@@ -47,20 +40,12 @@ fn fft(args: &[Value]) -> Result<Value, String> {
 
 fn ifft(args: &[Value]) -> Result<Value, String> {
     match &args[0] {
-        Value::Matrix(m) => {
-            if m.cols != 2 {
-                return Err("ifft() requires matrix with 2 columns [real, imag]".to_string());
-            }
-            let mut spectrum = Vec::with_capacity(m.rows);
-            for i in 0..m.rows {
-                let re = m.get(i, 0).map_err(|e| e.to_string())?;
-                let im = m.get(i, 1).map_err(|e| e.to_string())?;
-                spectrum.push(AchronymeComplex::new(re, im));
-            }
+        Value::ComplexVector(cv) => {
+            let spectrum: Vec<AchronymeComplex> = cv.data().to_vec();
             let result = achronyme_dsp::ifft_real(&spectrum);
             Ok(Value::Vector(result))
         }
-        _ => Err("ifft() requires a matrix [N x 2]".to_string()),
+        _ => Err("ifft() requires a ComplexVector".to_string()),
     }
 }
 

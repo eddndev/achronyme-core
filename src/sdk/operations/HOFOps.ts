@@ -2,7 +2,7 @@
  * HOFOps.ts
  *
  * Higher-Order Functions operations module
- * Provides map, filter, reduce, pipe, compose, etc.
+ * All operations use the Rust/WASM engine - no JavaScript computation
  */
 
 import type { AchronymeSession } from '../core/Session';
@@ -12,55 +12,58 @@ import type { Value } from '../values/Value';
 /**
  * Higher-Order Functions operations
  *
+ * All methods use the Rust/WASM engine internally.
+ * Functions are passed as SOC expression strings.
+ *
  * Provides functional programming utilities:
- * - map, filter, reduce
- * - pipe, compose
+ * - map, filter, reduce (use Rust engine)
+ * - pipe, compose (JavaScript orchestration only)
  */
 export class HOFOps {
     constructor(private session: AchronymeSession) {}
 
     // ========================================================================
-    // Basic HOF Operations
+    // Basic HOF Operations (Use Rust Engine)
     // ========================================================================
 
     /**
-     * Map function over vector elements
+     * Map function over vector elements using Rust engine
      *
-     * @param fn Mapping function (value, index) => newValue
+     * @param socExpr SOC lambda expression as string (e.g., "x => x * 2")
      * @param vector Input vector
      * @returns New vector with mapped values
      *
      * @example
      * ```typescript
      * const v = session.vector([1, 2, 3, 4]);
-     * const squared = hof.map(x => x * x, v); // [1, 4, 9, 16]
+     * const squared = hof.map("x => x * x", v); // [1, 4, 9, 16]
      * ```
      */
-    map(fn: (value: number, index: number) => number, vector: Vector): Vector {
-        return vector.map(fn);
+    map(socExpr: string, vector: Vector): Vector {
+        return vector.map(socExpr);
     }
 
     /**
-     * Filter vector elements
+     * Filter vector elements using Rust engine
      *
-     * @param fn Filter predicate (value, index) => boolean
+     * @param socExpr SOC lambda expression as string (e.g., "x => x > 0")
      * @param vector Input vector
      * @returns New vector with filtered values
      *
      * @example
      * ```typescript
      * const v = session.vector([1, 2, 3, 4, 5, 6]);
-     * const evens = hof.filter(x => x % 2 === 0, v); // [2, 4, 6]
+     * const evens = hof.filter("x => x % 2 == 0", v); // [2, 4, 6]
      * ```
      */
-    filter(fn: (value: number, index: number) => boolean, vector: Vector): Vector {
-        return vector.filter(fn);
+    filter(socExpr: string, vector: Vector): Vector {
+        return vector.filter(socExpr);
     }
 
     /**
-     * Reduce vector to single value
+     * Reduce vector to single value using Rust engine
      *
-     * @param fn Reducer function (acc, value, index) => newAcc
+     * @param socExpr SOC lambda expression as string (e.g., "(acc, x) => acc + x")
      * @param initialValue Initial accumulator value
      * @param vector Input vector
      * @returns Reduced value
@@ -68,15 +71,11 @@ export class HOFOps {
      * @example
      * ```typescript
      * const v = session.vector([1, 2, 3, 4]);
-     * const sum = hof.reduce((acc, x) => acc + x, 0, v); // 10
+     * const sum = hof.reduce("(acc, x) => acc + x", 0, v); // 10
      * ```
      */
-    reduce<T>(
-        fn: (acc: T, value: number, index: number) => T,
-        initialValue: T,
-        vector: Vector
-    ): T {
-        return vector.reduce(fn, initialValue);
+    reduce(socExpr: string, initialValue: number, vector: Vector): number {
+        return vector.reduce(socExpr, initialValue);
     }
 
     // ========================================================================

@@ -1,5 +1,6 @@
 use crate::complex::Complex;
 use crate::vector::Vector;
+use crate::complex_vector::ComplexVector;
 use crate::matrix::Matrix;
 use crate::function::Function;
 
@@ -14,6 +15,7 @@ pub enum Value {
     Boolean(bool),
     Complex(Complex),
     Vector(Vector),
+    ComplexVector(ComplexVector),
     Matrix(Matrix),
     Function(Function),
 }

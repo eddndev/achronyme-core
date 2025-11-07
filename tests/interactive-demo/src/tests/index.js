@@ -8,6 +8,7 @@ import { tests as hofTests } from './hof.js';
 import { tests as socTests } from './soc.js';
 import { tests as numericalTests } from './numerical.js';
 import { tests as optimizationTests } from './optimization.js';
+import { tests as conditionalTests } from './conditional.js';
 import { tests as stressTests } from './stress.js';
 import { tests as benchmarkTests } from './benchmarks.js';
 
@@ -21,6 +22,7 @@ export const allTests = {
   ...socTests,
   ...numericalTests,
   ...optimizationTests,
+  ...conditionalTests,
   ...stressTests,
   ...benchmarkTests,
 };

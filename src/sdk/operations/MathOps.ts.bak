@@ -243,7 +243,7 @@ export class MathOps {
         }
 
         if (x instanceof Vector) {
-            const handle = this.session.wasm.log10(x.handle); return new Vector(this.session, handle);
+            return x.map(Math.log10);
         }
 
         throw new Error('log10: unsupported value type');
@@ -260,8 +260,7 @@ export class MathOps {
         }
 
         if (x instanceof Vector) {
-            // Note: log2 binding not yet added to WASM
-        return x.map("x => log(x) / log(2)");
+            return x.map(Math.log2);
         }
 
         throw new Error('log2: unsupported value type');
@@ -279,8 +278,7 @@ export class MathOps {
         }
 
         if (x instanceof Vector) {
-            // Use SOC expression with the exponent embedded
-            return x.map(`x => x ^ ${y}`);
+            return x.map((val) => Math.pow(val, y));
         }
 
         throw new Error('pow: unsupported value type');
@@ -301,7 +299,7 @@ export class MathOps {
         }
 
         if (x instanceof Vector) {
-            const handle = this.session.wasm.floor(x.handle); return new Vector(this.session, handle);
+            return x.map(Math.floor);
         }
 
         throw new Error('floor: unsupported value type');
@@ -318,7 +316,7 @@ export class MathOps {
         }
 
         if (x instanceof Vector) {
-            const handle = this.session.wasm.ceil(x.handle); return new Vector(this.session, handle);
+            return x.map(Math.ceil);
         }
 
         throw new Error('ceil: unsupported value type');
@@ -335,7 +333,7 @@ export class MathOps {
         }
 
         if (x instanceof Vector) {
-            const handle = this.session.wasm.round(x.handle); return new Vector(this.session, handle);
+            return x.map(Math.round);
         }
 
         throw new Error('round: unsupported value type');
@@ -352,7 +350,7 @@ export class MathOps {
         }
 
         if (x instanceof Vector) {
-            const handle = this.session.wasm.trunc(x.handle); return new Vector(this.session, handle);
+            return x.map(Math.trunc);
         }
 
         throw new Error('trunc: unsupported value type');
@@ -387,7 +385,7 @@ export class MathOps {
         }
 
         if (x instanceof Vector) {
-            const handle = this.session.wasm.cbrt(x.handle); return new Vector(this.session, handle);
+            return x.map(Math.cbrt);
         }
 
         throw new Error('cbrt: unsupported value type');
@@ -418,8 +416,7 @@ export class MathOps {
         }
 
         if (x instanceof Vector) {
-            // Note: use conditional.signVector() instead
-        throw new Error("sign: use ach.conditional.signVector() for vectors");
+            return x.map(Math.sign);
         }
 
         throw new Error('sign: unsupported value type');

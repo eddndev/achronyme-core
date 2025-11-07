@@ -136,64 +136,67 @@ export class Vector extends Value {
     }
 
     /**
-     * Map over vector elements
+     * Map over vector elements using Rust engine
      *
-     * @param fn Mapping function
+     * All computation is performed in the Rust/WASM engine for maximum performance.
+     *
+     * @param socExpr SOC lambda expression as string (e.g., "x => x * 2")
      * @returns New vector with mapped values
+     *
+     * @example
+     * ```typescript
+     * const v = session.vector([1, 2, 3, 4]);
+     * const doubled = v.map("x => x * 2");  // [2, 4, 6, 8]
+     * const squared = v.map("x => x * x");  // [1, 4, 9, 16]
+     * ```
      */
-    map(fn: (value: number, index: number) => number): Vector {
-        const data = this.data;
-        const result = new Float64Array(data.length);
-
-        for (let i = 0; i < data.length; i++) {
-            result[i] = fn(data[i], i);
-        }
-
-        // Create new vector from result
-        const handle = this.wasm.createVector(Array.from(result));
+    map(socExpr: string): Vector {
+        const vecSOC = `[${Array.from(this.data).join(', ')}]`;
+        const handle = this.wasm.evalToHandle(`map(${socExpr}, ${vecSOC})`);
         return new Vector(this.session, handle);
     }
 
     /**
-     * Filter vector elements
+     * Filter vector elements using Rust engine
      *
-     * @param fn Filter predicate
+     * All computation is performed in the Rust/WASM engine for maximum performance.
+     *
+     * @param socExpr SOC lambda expression as string (e.g., "x => x > 0")
      * @returns New vector with filtered values
+     *
+     * @example
+     * ```typescript
+     * const v = session.vector([-2, -1, 0, 1, 2]);
+     * const positive = v.filter("x => x > 0");  // [1, 2]
+     * const evens = v.filter("x => x % 2 == 0");  // [-2, 0, 2]
+     * ```
      */
-    filter(fn: (value: number, index: number) => boolean): Vector {
-        const data = this.data;
-        const result: number[] = [];
-
-        for (let i = 0; i < data.length; i++) {
-            if (fn(data[i], i)) {
-                result.push(data[i]);
-            }
-        }
-
-        // Create new vector from result
-        const handle = this.wasm.createVector(result);
+    filter(socExpr: string): Vector {
+        const vecSOC = `[${Array.from(this.data).join(', ')}]`;
+        const handle = this.wasm.evalToHandle(`filter(${socExpr}, ${vecSOC})`);
         return new Vector(this.session, handle);
     }
 
     /**
-     * Reduce vector to single value
+     * Reduce vector to single value using Rust engine
      *
-     * @param fn Reducer function
+     * All computation is performed in the Rust/WASM engine for maximum performance.
+     *
+     * @param socExpr SOC lambda expression as string (e.g., "(acc, x) => acc + x")
      * @param initialValue Initial accumulator value
      * @returns Reduced value
+     *
+     * @example
+     * ```typescript
+     * const v = session.vector([1, 2, 3, 4]);
+     * const sum = v.reduce("(acc, x) => acc + x", 0);  // 10
+     * const product = v.reduce("(acc, x) => acc * x", 1);  // 24
+     * ```
      */
-    reduce<T>(
-        fn: (acc: T, value: number, index: number) => T,
-        initialValue: T
-    ): T {
-        const data = this.data;
-        let acc = initialValue;
-
-        for (let i = 0; i < data.length; i++) {
-            acc = fn(acc, data[i], i);
-        }
-
-        return acc;
+    reduce(socExpr: string, initialValue: number): number {
+        const vecSOC = `[${Array.from(this.data).join(', ')}]`;
+        const result = this.wasm._eval(`reduce(${socExpr}, ${initialValue}, ${vecSOC})`);
+        return parseFloat(result);
     }
 
     /**

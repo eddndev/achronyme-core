@@ -43,6 +43,85 @@ pub fn math_sqrt(handle: Handle) -> Result<Handle, JsValue> {
     apply_unary_op(handle, "mathSqrt", |x| x.sqrt())
 }
 
+// Inverse Trigonometric Functions
+#[wasm_bindgen(js_name = "mathAsin")]
+pub fn math_asin(handle: Handle) -> Result<Handle, JsValue> {
+    apply_unary_op(handle, "mathAsin", |x| x.asin())
+}
+
+#[wasm_bindgen(js_name = "mathAcos")]
+pub fn math_acos(handle: Handle) -> Result<Handle, JsValue> {
+    apply_unary_op(handle, "mathAcos", |x| x.acos())
+}
+
+#[wasm_bindgen(js_name = "mathAtan")]
+pub fn math_atan(handle: Handle) -> Result<Handle, JsValue> {
+    apply_unary_op(handle, "mathAtan", |x| x.atan())
+}
+
+// Hyperbolic Functions
+#[wasm_bindgen(js_name = "mathSinh")]
+pub fn math_sinh(handle: Handle) -> Result<Handle, JsValue> {
+    apply_unary_op(handle, "mathSinh", |x| x.sinh())
+}
+
+#[wasm_bindgen(js_name = "mathCosh")]
+pub fn math_cosh(handle: Handle) -> Result<Handle, JsValue> {
+    apply_unary_op(handle, "mathCosh", |x| x.cosh())
+}
+
+#[wasm_bindgen(js_name = "mathTanh")]
+pub fn math_tanh(handle: Handle) -> Result<Handle, JsValue> {
+    apply_unary_op(handle, "mathTanh", |x| x.tanh())
+}
+
+#[wasm_bindgen(js_name = "mathAsinh")]
+pub fn math_asinh(handle: Handle) -> Result<Handle, JsValue> {
+    apply_unary_op(handle, "mathAsinh", |x| x.asinh())
+}
+
+#[wasm_bindgen(js_name = "mathAcosh")]
+pub fn math_acosh(handle: Handle) -> Result<Handle, JsValue> {
+    apply_unary_op(handle, "mathAcosh", |x| x.acosh())
+}
+
+#[wasm_bindgen(js_name = "mathAtanh")]
+pub fn math_atanh(handle: Handle) -> Result<Handle, JsValue> {
+    apply_unary_op(handle, "mathAtanh", |x| x.atanh())
+}
+
+// Rounding Functions
+#[wasm_bindgen(js_name = "mathCeil")]
+pub fn math_ceil(handle: Handle) -> Result<Handle, JsValue> {
+    apply_unary_op(handle, "mathCeil", |x| x.ceil())
+}
+
+#[wasm_bindgen(js_name = "mathFloor")]
+pub fn math_floor(handle: Handle) -> Result<Handle, JsValue> {
+    apply_unary_op(handle, "mathFloor", |x| x.floor())
+}
+
+#[wasm_bindgen(js_name = "mathRound")]
+pub fn math_round(handle: Handle) -> Result<Handle, JsValue> {
+    apply_unary_op(handle, "mathRound", |x| x.round())
+}
+
+#[wasm_bindgen(js_name = "mathTrunc")]
+pub fn math_trunc(handle: Handle) -> Result<Handle, JsValue> {
+    apply_unary_op(handle, "mathTrunc", |x| x.trunc())
+}
+
+// Other Math Functions
+#[wasm_bindgen(js_name = "mathCbrt")]
+pub fn math_cbrt(handle: Handle) -> Result<Handle, JsValue> {
+    apply_unary_op(handle, "mathCbrt", |x| x.cbrt())
+}
+
+#[wasm_bindgen(js_name = "mathLog10")]
+pub fn math_log10(handle: Handle) -> Result<Handle, JsValue> {
+    apply_unary_op(handle, "mathLog10", |x| x.log10())
+}
+
 #[wasm_bindgen]
 pub fn linspace(start: f64, end: f64, n: usize) -> Result<Handle, JsValue> {
     if n < 2 {
