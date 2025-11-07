@@ -60,6 +60,11 @@ pub enum AstNode {
     },
     VectorLiteral(Vec<AstNode>),
     MatrixLiteral(Vec<Vec<AstNode>>),
+    RecordLiteral(Vec<(String, AstNode)>), // Vec of (key, value) pairs
+    FieldAccess {
+        record: Box<AstNode>,
+        field: String,
+    },
     VariableDecl {
         name: String,
         initializer: Box<AstNode>,

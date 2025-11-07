@@ -3,6 +3,7 @@ pub mod complex;
 pub mod dsp;
 pub mod exponential;
 pub mod matrix;
+pub mod records;
 pub mod rounding;
 pub mod stats;
 pub mod strings;

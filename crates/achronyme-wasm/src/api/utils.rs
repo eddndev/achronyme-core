@@ -50,6 +50,13 @@ pub fn format_value(value: &Value) -> String {
             }
             format!("[{}]", rows.join(", "))
         }
+        Value::Record(map) => {
+            let mut fields: Vec<String> = map.iter()
+                .map(|(k, v)| format!("{}: {}", k, format_value(v)))
+                .collect();
+            fields.sort(); // Sort for consistent output
+            format!("{{ {} }}", fields.join(", "))
+        }
         Value::Function(_) => "x => <function>".to_string(),
     }
 }

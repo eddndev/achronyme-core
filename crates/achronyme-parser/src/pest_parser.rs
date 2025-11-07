@@ -230,7 +230,7 @@ fn build_unary(pair: Pair<Rule>) -> Result<AstNode, String> {
 
 fn build_power(pair: Pair<Rule>) -> Result<AstNode, String> {
     let mut inner = pair.into_inner();
-    let base = build_ast_from_expr(inner.next().ok_or("Missing base in power")?)?;
+    let base = build_field_access(inner.next().ok_or("Missing base in power")?)?;
 
     if let Some(exponent_pair) = inner.next() {
         // Right-associative: 2^3^4 = 2^(3^4)
@@ -243,6 +243,22 @@ fn build_power(pair: Pair<Rule>) -> Result<AstNode, String> {
     } else {
         Ok(base)
     }
+}
+
+fn build_field_access(pair: Pair<Rule>) -> Result<AstNode, String> {
+    let mut inner = pair.into_inner();
+    let mut base = build_primary(inner.next().ok_or("Missing primary in field_access")?)?;
+
+    // Process each field access (e.g., .field1.field2.field3)
+    for field_pair in inner {
+        let field_name = field_pair.as_str().to_string();
+        base = AstNode::FieldAccess {
+            record: Box::new(base),
+            field: field_name,
+        };
+    }
+
+    Ok(base)
 }
 
 /// Process escape sequences in string literals
@@ -312,6 +328,7 @@ fn build_primary(pair: Pair<Rule>) -> Result<AstNode, String> {
         }
         Rule::vector => build_vector(inner),
         Rule::matrix => build_matrix(inner),
+        Rule::record => build_record(inner),
         Rule::lambda => build_lambda(inner),
         Rule::function_call => build_function_call(inner),
         Rule::expr => build_ast_from_expr(inner),
@@ -339,6 +356,26 @@ fn build_matrix(pair: Pair<Rule>) -> Result<AstNode, String> {
         .collect();
 
     Ok(AstNode::MatrixLiteral(rows?))
+}
+
+fn build_record(pair: Pair<Rule>) -> Result<AstNode, String> {
+    let fields: Result<Vec<(String, AstNode)>, String> = pair
+        .into_inner()
+        .map(|field_pair| {
+            // Each field_pair is a record_field: identifier ~ ":" ~ expr
+            let mut field_inner = field_pair.into_inner();
+            let key = field_inner.next()
+                .ok_or("Missing field key")?
+                .as_str()
+                .to_string();
+            let value = build_ast_from_expr(
+                field_inner.next().ok_or("Missing field value")?
+            )?;
+            Ok((key, value))
+        })
+        .collect();
+
+    Ok(AstNode::RecordLiteral(fields?))
 }
 
 fn build_lambda(pair: Pair<Rule>) -> Result<AstNode, String> {

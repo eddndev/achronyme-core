@@ -122,9 +122,14 @@ primary = {
   | "(" ~ expr ~ ")"
 }
 
+// Field access: record.field, record.nested.field
+field_access = {
+    primary ~ ("." ~ identifier)*
+}
+
 // Power (right-associative): 2^3^4 = 2^(3^4)
 power = {
-    primary ~ ("^" ~ power)?
+    field_access ~ ("^" ~ power)?
 }
 
 // Unary operators: -x, !x

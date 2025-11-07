@@ -98,3 +98,17 @@ pub fn evaluate_matrix(evaluator: &mut Evaluator, rows: &[Vec<AstNode>]) -> Resu
         .map(Value::Matrix)
         .map_err(|e| e.to_string())
 }
+
+/// Evaluate a record literal
+pub fn evaluate_record(evaluator: &mut Evaluator, fields: &[(String, AstNode)]) -> Result<Value, String> {
+    use std::collections::HashMap;
+
+    let mut record = HashMap::new();
+
+    for (key, value_node) in fields {
+        let value = evaluator.evaluate(value_node)?;
+        record.insert(key.clone(), value);
+    }
+
+    Ok(Value::Record(record))
+}

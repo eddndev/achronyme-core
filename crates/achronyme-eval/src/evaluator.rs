@@ -113,12 +113,26 @@ impl Evaluator {
             AstNode::ComplexLiteral { re, im } => handlers::literals::evaluate_complex(*re, *im),
             AstNode::VectorLiteral(elements) => handlers::literals::evaluate_vector(self, elements),
             AstNode::MatrixLiteral(rows) => handlers::literals::evaluate_matrix(self, rows),
+            AstNode::RecordLiteral(fields) => handlers::literals::evaluate_record(self, fields),
 
             // Variables
             AstNode::VariableDecl { name, initializer } => {
                 handlers::variables::evaluate_declaration(self, name, initializer)
             }
             AstNode::VariableRef(name) => handlers::variables::evaluate_reference(self, name),
+
+            // Field access
+            AstNode::FieldAccess { record, field } => {
+                let record_value = self.evaluate(record)?;
+                match record_value {
+                    Value::Record(ref map) => {
+                        map.get(field)
+                            .cloned()
+                            .ok_or_else(|| format!("Field '{}' not found in record", field))
+                    }
+                    _ => Err(format!("Cannot access field '{}' on non-record value", field)),
+                }
+            }
 
             // Control flow
             AstNode::If {

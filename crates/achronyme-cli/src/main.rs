@@ -77,51 +77,74 @@ fn run_repl() {
 
     let mut evaluator = Evaluator::new();
     let mut line_number = 1;
+    let mut input_buffer = String::new();
 
     loop {
-        let prompt = format!("ach[{}]> ", line_number);
+        let prompt = if input_buffer.is_empty() {
+            format!("ach[{}]> ", line_number)
+        } else {
+            "     ...> ".to_string()
+        };
 
         match rl.readline(&prompt) {
-            Ok(input) => {
-                let input = input.trim();
+            Ok(line) => {
+                // Add line to buffer
+                if !input_buffer.is_empty() {
+                    input_buffer.push('\n');
+                }
+                input_buffer.push_str(&line);
 
-                // Handle special commands
-                match input {
-                    "exit" | "quit" => {
-                        println!("Goodbye!");
-                        break;
+                let trimmed = input_buffer.trim();
+
+                // Handle special commands (only when buffer is a single line)
+                if input_buffer.lines().count() == 1 {
+                    match trimmed {
+                        "exit" | "quit" => {
+                            println!("Goodbye!");
+                            break;
+                        }
+                        "help" => {
+                            print_help();
+                            input_buffer.clear();
+                            continue;
+                        }
+                        "clear" => {
+                            clear_screen();
+                            evaluator = Evaluator::new();
+                            println!("Screen cleared and environment reset");
+                            input_buffer.clear();
+                            continue;
+                        }
+                        "cls" => {
+                            clear_screen();
+                            input_buffer.clear();
+                            continue;
+                        }
+                        "" => {
+                            input_buffer.clear();
+                            continue;
+                        }
+                        _ => {}
                     }
-                    "help" => {
-                        print_help();
-                        continue;
-                    }
-                    "clear" => {
-                        // Clear the screen
-                        clear_screen();
-                        // Also reset the evaluator environment
-                        evaluator = Evaluator::new();
-                        println!("Screen cleared and environment reset");
-                        continue;
-                    }
-                    "cls" => {
-                        // Just clear the screen without resetting environment
-                        clear_screen();
-                        continue;
-                    }
-                    "" => continue,
-                    _ => {}
                 }
 
-                // Evaluate expression
-                match evaluate_expression(&mut evaluator, input) {
+                // Check if expression should continue (is incomplete)
+                if should_continue_reading(&input_buffer) {
+                    continue; // Wait for more input
+                }
+
+                // Expression is complete, evaluate it
+                match evaluate_expression(&mut evaluator, trimmed) {
                     Ok(result) => println!("{}", result),
                     Err(err) => eprintln!("Error: {}", err),
                 }
 
+                input_buffer.clear();
                 line_number += 1;
             }
             Err(ReadlineError::Interrupted) => {
                 println!("^C");
+                input_buffer.clear();
                 continue;
             }
             Err(ReadlineError::Eof) => {
@@ -139,6 +162,74 @@ fn run_repl() {
     if let Some(path) = history_path {
         let _ = rl.save_history(&path);
     }
+}
+
+/// Check if we should continue reading more input (expression is incomplete)
+/// Uses a hybrid approach: fast delimiter check + parser confirmation
+fn should_continue_reading(input: &str) -> bool {
+    // First: Quick check for balanced delimiters
+    if !has_balanced_delimiters(input) {
+        return true; // Definitely incomplete
+    }
+
+    // Second: If delimiters are balanced, try parsing to confirm
+    // We use the parser to distinguish between "complete but invalid" vs "incomplete"
+    match achronyme_parser::parse(input) {
+        Ok(_) => false, // ✅ Complete and valid
+        Err(e) => {
+            // Check if it looks like an incomplete expression error
+            let error_msg = e.to_string();
+            // Pest reports "expected X, found EOI" when input ends prematurely
+            error_msg.contains("expected") && error_msg.contains("EOI")
+        }
+    }
+}
+
+/// Fast check for balanced delimiters (parentheses, braces, brackets)
+/// Also handles strings to avoid counting delimiters inside string literals
+fn has_balanced_delimiters(input: &str) -> bool {
+    let mut paren_count = 0;
+    let mut brace_count = 0;
+    let mut bracket_count = 0;
+    let mut in_string = false;
+    let mut escape_next = false;
+
+    for ch in input.chars() {
+        if escape_next {
+            escape_next = false;
+            continue;
+        }
+
+        match ch {
+            '\\' if in_string => escape_next = true,
+            '"' => in_string = !in_string,
+            '(' if !in_string => paren_count += 1,
+            ')' if !in_string => {
+                paren_count -= 1;
+                if paren_count < 0 {
+                    return false; // More closing than opening
+                }
+            }
+            '{' if !in_string => brace_count += 1,
+            '}' if !in_string => {
+                brace_count -= 1;
+                if brace_count < 0 {
+                    return false; // More closing than opening
+                }
+            }
+            '[' if !in_string => bracket_count += 1,
+            ']' if !in_string => {
+                bracket_count -= 1;
+                if bracket_count < 0 {
+                    return false; // More closing than opening
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // Balanced if all counts are zero and not inside a string
+    paren_count == 0 && brace_count == 0 && bracket_count == 0 && !in_string
 }
 
 fn clear_screen() {
@@ -244,6 +335,13 @@ fn format_value(value: &achronyme_types::value::Value) -> String {
                 rows.push(format!("[{}]", row_elements.join(", ")));
             }
             format!("[{}]", rows.join(",\n "))
+        }
+        Value::Record(map) => {
+            let mut fields: Vec<String> = map.iter()
+                .map(|(k, v)| format!("{}: {}", k, format_value(v)))
+                .collect();
+            fields.sort(); // Sort for consistent output
+            format!("{{ {} }}", fields.join(", "))
         }
         Value::Function(_) => "<function>".to_string(),
     }
