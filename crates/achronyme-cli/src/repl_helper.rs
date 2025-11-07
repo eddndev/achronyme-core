@@ -92,13 +92,15 @@ impl Hinter for ReplHelper {
             return None;
         }
 
-        // Find the start of the current word
-        let start = line[..pos]
-            .rfind(|c: char| !c.is_alphanumeric() && c != '_')
-            .map(|i| i + 1)
+        // Find the start of the current word using char boundaries
+        let start_char = line[..pos]
+            .char_indices()
+            .rev()
+            .find(|(_, c)| !c.is_alphanumeric() && *c != '_')
+            .map(|(i, c)| i + c.len_utf8())
             .unwrap_or(0);
 
-        let word = &line[start..];
+        let word = &line[start_char..];
 
         if word.is_empty() {
             return None;

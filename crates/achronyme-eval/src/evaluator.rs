@@ -109,6 +109,7 @@ impl Evaluator {
             // Literals
             AstNode::Number(n) => handlers::literals::evaluate_number(*n),
             AstNode::Boolean(b) => handlers::literals::evaluate_boolean(*b),
+            AstNode::StringLiteral(s) => handlers::literals::evaluate_string(s),
             AstNode::ComplexLiteral { re, im } => handlers::literals::evaluate_complex(*re, *im),
             AstNode::VectorLiteral(elements) => handlers::literals::evaluate_vector(self, elements),
             AstNode::MatrixLiteral(rows) => handlers::literals::evaluate_matrix(self, rows),

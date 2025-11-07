@@ -40,6 +40,17 @@ number = @{
 // Note: Full complex (2+3i) is handled as arithmetic expression
 complex = @{ number ~ "i" }
 
+// String literals: "hello", "world"
+// Supports escape sequences: \n, \t, \r, \\, \"
+string_literal = @{
+    "\"" ~ string_char* ~ "\""
+}
+
+string_char = {
+    !("\"" | "\\") ~ ANY
+  | "\\" ~ ("\"" | "\\" | "n" | "t" | "r")
+}
+
 // Identifiers: x, foo, my_var, PI, sin
 identifier = @{
     (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")*
@@ -57,6 +68,15 @@ vector = {
 // Matrix: [[1, 2], [3, 4]]
 matrix = {
     "[" ~ vector ~ ("," ~ vector)* ~ "]"
+}
+
+// Record: { name: "Alice", age: 30, city: "Madrid" }
+record = {
+    "{" ~ (record_field ~ ("," ~ record_field)*)? ~ "}"
+}
+
+record_field = {
+    identifier ~ ":" ~ expr
 }
 
 // ============================================================================
@@ -89,10 +109,12 @@ function_call = {
 
 // Primary expressions (highest precedence)
 primary = {
-    boolean     // Boolean literals
-  | complex     // Must come before number (3i contains number)
+    boolean        // Boolean literals
+  | string_literal // String literals
+  | complex        // Must come before number (3i contains number)
   | number
-  | matrix      // Must come before vector (matrix starts with [)
+  | record         // Record literals { key: value }
+  | matrix         // Must come before vector (matrix starts with [)
   | vector
   | lambda
   | function_call

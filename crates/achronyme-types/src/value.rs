@@ -3,6 +3,7 @@ use crate::vector::Vector;
 use crate::complex_vector::ComplexVector;
 use crate::matrix::Matrix;
 use crate::function::Function;
+use std::collections::HashMap;
 
 #[derive(Debug)]
 pub enum TypeError {
@@ -18,6 +19,8 @@ pub enum Value {
     ComplexVector(ComplexVector),
     Matrix(Matrix),
     Function(Function),
+    String(String),
+    Record(HashMap<String, Value>),
 }
 
 // Conversiones automáticas con From/Into

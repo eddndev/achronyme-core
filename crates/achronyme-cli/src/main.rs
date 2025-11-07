@@ -206,6 +206,7 @@ fn format_value(value: &achronyme_types::value::Value) -> String {
     match value {
         Value::Number(n) => format!("{}", n),
         Value::Boolean(b) => format!("{}", b),
+        Value::String(s) => format!("\"{}\"", s),
         Value::Complex(c) => {
             if c.im >= 0.0 {
                 format!("{}+{}i", c.re, c.im)

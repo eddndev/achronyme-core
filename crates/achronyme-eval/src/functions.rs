@@ -32,6 +32,7 @@ impl FunctionRegistry {
         function_modules::matrix::register_functions(self);
         function_modules::stats::register_functions(self);
         function_modules::dsp::register_functions(self);
+        function_modules::strings::register_functions(self);
     }
 
     /// Register a function

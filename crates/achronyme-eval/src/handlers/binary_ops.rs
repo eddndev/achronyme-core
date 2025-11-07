@@ -419,7 +419,8 @@ fn apply_eq(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
         (Value::Number(a), Value::Number(b)) => Ok(Value::Boolean(a == b)),
         (Value::Boolean(a), Value::Boolean(b)) => Ok(Value::Boolean(a == b)),
-        _ => Err("Comparison operators currently only support numbers and booleans".to_string()),
+        (Value::String(a), Value::String(b)) => Ok(Value::Boolean(a == b)),
+        _ => Err("Comparison operators support numbers, booleans, and strings".to_string()),
     }
 }
 
@@ -427,7 +428,8 @@ fn apply_neq(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
         (Value::Number(a), Value::Number(b)) => Ok(Value::Boolean(a != b)),
         (Value::Boolean(a), Value::Boolean(b)) => Ok(Value::Boolean(a != b)),
-        _ => Err("Comparison operators currently only support numbers and booleans".to_string()),
+        (Value::String(a), Value::String(b)) => Ok(Value::Boolean(a != b)),
+        _ => Err("Comparison operators support numbers, booleans, and strings".to_string()),
     }
 }
 

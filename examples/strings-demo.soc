@@ -1,0 +1,52 @@
+// Demo de Strings en Achronyme
+// Sprint 0a: Soporte básico de strings
+
+// 1. String literals básicos
+let greeting = "Hello"
+let name = "Achronyme"
+
+// 2. Función concat - concatenar strings
+let message = concat(greeting, concat(" ", name))
+message
+
+// 3. Función length - obtener longitud
+length(greeting)
+length(name)
+length(message)
+
+// 4. Comparación de strings
+greeting == "Hello"
+name != "Other"
+
+// 5. Strings con espacios
+let phrase = "¡Hola Mundo desde Achronyme!"
+phrase
+length(phrase)
+
+// 6. Escape sequences
+let multiline = "Line 1\nLine 2\nLine 3"
+multiline
+
+let tabbed = "Column1\tColumn2\tColumn3"
+tabbed
+
+// 7. Strings con caracteres especiales
+let quote = "Dijeron: \"Bienvenido\""
+quote
+
+// 8. Combinación con otras operaciones
+let count = length("test")
+count == 4
+
+// 9. Strings vacíos
+let empty = ""
+length(empty)
+
+// 10. Unicode support
+let spanish = "¡Hola! ¿Cómo estás?"
+let chinese = "你好世界"
+let emoji = "🚀 Achronyme 🎉"
+
+spanish
+chinese
+emoji

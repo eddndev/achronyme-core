@@ -31,6 +31,7 @@ pub enum UnaryOp {
 pub enum AstNode {
     Number(f64),
     Boolean(bool),
+    StringLiteral(String),
     BinaryOp {
         op: BinaryOp,
         left: Box<AstNode>,

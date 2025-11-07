@@ -8,7 +8,19 @@ members = [
     "crates/achronyme-dsp",
     "crates/achronyme-numerical",
     "crates/achronyme-wasm",
-    "crates/achronyme-cli", "crates/achronyme-solver",
+    "crates/achronyme-cli",
+    "crates/achronyme-solver",
+]
+# Exclude CLI from default members to avoid pulling CLI dependencies when building WASM
+default-members = [
+    "crates/achronyme-parser",
+    "crates/achronyme-eval",
+    "crates/achronyme-types",
+    "crates/achronyme-linalg",
+    "crates/achronyme-dsp",
+    "crates/achronyme-numerical",
+    "crates/achronyme-wasm",
+    "crates/achronyme-solver",
 ]
 
 [workspace.dependencies]

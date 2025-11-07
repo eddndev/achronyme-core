@@ -245,6 +245,37 @@ fn build_power(pair: Pair<Rule>) -> Result<AstNode, String> {
     }
 }
 
+/// Process escape sequences in string literals
+fn process_escape_sequences(s: &str) -> String {
+    let mut result = String::new();
+    let mut chars = s.chars();
+
+    while let Some(ch) = chars.next() {
+        if ch == '\\' {
+            if let Some(next_ch) = chars.next() {
+                match next_ch {
+                    'n' => result.push('\n'),
+                    't' => result.push('\t'),
+                    'r' => result.push('\r'),
+                    '\\' => result.push('\\'),
+                    '"' => result.push('"'),
+                    _ => {
+                        // Unknown escape sequence, keep as is
+                        result.push('\\');
+                        result.push(next_ch);
+                    }
+                }
+            } else {
+                result.push('\\');
+            }
+        } else {
+            result.push(ch);
+        }
+    }
+
+    result
+}
+
 fn build_primary(pair: Pair<Rule>) -> Result<AstNode, String> {
     let inner = pair.into_inner().next()
         .ok_or("Empty primary expression")?;
@@ -253,6 +284,15 @@ fn build_primary(pair: Pair<Rule>) -> Result<AstNode, String> {
         Rule::boolean => {
             let value = inner.as_str() == "true";
             Ok(AstNode::Boolean(value))
+        }
+        Rule::string_literal => {
+            // Parse string literal: "hello" -> hello
+            let s = inner.as_str();
+            // Remove surrounding quotes
+            let content = &s[1..s.len()-1];
+            // Process escape sequences
+            let processed = process_escape_sequences(content);
+            Ok(AstNode::StringLiteral(processed))
         }
         Rule::number => {
             let num = inner.as_str().parse::<f64>()

@@ -17,6 +17,11 @@ pub fn evaluate_boolean(b: bool) -> Result<Value, String> {
     Ok(Value::Boolean(b))
 }
 
+/// Evaluate a string literal
+pub fn evaluate_string(s: &str) -> Result<Value, String> {
+    Ok(Value::String(s.to_string()))
+}
+
 /// Evaluate a complex literal
 pub fn evaluate_complex(re: f64, im: f64) -> Result<Value, String> {
     Ok(Value::Complex(Complex::new(re, im)))

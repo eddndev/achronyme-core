@@ -11,6 +11,7 @@ pub fn format_value(value: &Value) -> String {
     match value {
         Value::Number(n) => n.to_string(),
         Value::Boolean(b) => b.to_string(),
+        Value::String(s) => format!("\"{}\"", s),
         Value::Complex(c) => {
             if c.im >= 0.0 {
                 format!("{}+{}i", c.re, c.im)

@@ -5,5 +5,6 @@ pub mod exponential;
 pub mod matrix;
 pub mod rounding;
 pub mod stats;
+pub mod strings;
 pub mod trig;
 pub mod vector;

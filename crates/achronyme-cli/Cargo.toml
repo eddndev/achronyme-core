@@ -6,12 +6,17 @@ edition = "2021"
 [[bin]]
 name = "achronyme"
 path = "src/main.rs"
+required-features = ["cli"]
+
+[features]
+default = ["cli"]
+cli = ["dep:rustyline", "dep:nu-ansi-term", "dep:pest", "dep:dirs"]
 
 [dependencies]
 achronyme-parser = { path = "../achronyme-parser" }
 achronyme-eval = { path = "../achronyme-eval" }
 achronyme-types = { path = "../achronyme-types" }
-rustyline = "14.0"
-nu-ansi-term = "0.50"
-pest = "2.7"
-dirs = "5.0"
+rustyline = { version = "14.0", optional = true }
+nu-ansi-term = { version = "0.50", optional = true }
+pest = { version = "2.7", optional = true }
+dirs = { version = "5.0", optional = true }
