@@ -9,7 +9,7 @@ use std::collections::HashMap;
 /// Example:
 /// ```
 /// use achronyme_eval::Environment;
-/// use achronyme_types::Value;
+/// use achronyme_types::value::Value;
 ///
 /// let mut env = Environment::new();
 /// env.define("x".to_string(), Value::Number(5.0));

@@ -11,6 +11,7 @@ pub enum TypeError {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Number(f64),
+    Boolean(bool),
     Complex(Complex),
     Vector(Vector),
     Matrix(Matrix),

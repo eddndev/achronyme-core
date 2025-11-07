@@ -92,6 +92,8 @@ fn build_ast_from_expr(pair: Pair<Rule>) -> Result<AstNode, String> {
                 .ok_or("Empty expression")?;
             build_ast_from_expr(inner)
         }
+        Rule::logical_or => build_binary_op(pair),
+        Rule::logical_and => build_binary_op(pair),
         Rule::comparison => build_comparison(pair),
         Rule::additive => build_binary_op(pair),
         Rule::multiplicative => build_binary_op(pair),
@@ -159,7 +161,7 @@ fn build_binary_op(pair: Pair<Rule>) -> Result<AstNode, String> {
     for p in pairs.iter() {
         // Check if this is an operator rule
         match p.as_rule() {
-            Rule::add_op | Rule::mult_op => {
+            Rule::add_op | Rule::mult_op | Rule::logical_and_op | Rule::logical_or_op => {
                 let s = p.as_str();
                 let op = match s {
                     "+" => BinaryOp::Add,
@@ -167,6 +169,8 @@ fn build_binary_op(pair: Pair<Rule>) -> Result<AstNode, String> {
                     "*" => BinaryOp::Multiply,
                     "/" => BinaryOp::Divide,
                     "%" => BinaryOp::Modulo,
+                    "&&" => BinaryOp::And,
+                    "||" => BinaryOp::Or,
                     _ => unreachable!()
                 };
                 operators.push(op);
@@ -198,14 +202,24 @@ fn build_binary_op(pair: Pair<Rule>) -> Result<AstNode, String> {
 }
 
 fn build_unary(pair: Pair<Rule>) -> Result<AstNode, String> {
+    let pair_str = pair.as_str();
     let mut inner = pair.into_inner();
     let first = inner.next().ok_or("Empty unary expression")?;
 
     match first.as_rule() {
         Rule::unary => {
-            // This is a negation: -<expr>
+            // This is either - or ! operator
+            // Check what operator we have by looking at the string
+            let op = if pair_str.trim_start().starts_with('-') {
+                UnaryOp::Negate
+            } else if pair_str.trim_start().starts_with('!') {
+                UnaryOp::Not
+            } else {
+                return Err(format!("Unknown unary operator in: {}", pair_str));
+            };
+
             Ok(AstNode::UnaryOp {
-                op: UnaryOp::Negate,
+                op,
                 operand: Box::new(build_unary(first)?),
             })
         }
@@ -236,6 +250,10 @@ fn build_primary(pair: Pair<Rule>) -> Result<AstNode, String> {
         .ok_or("Empty primary expression")?;
 
     match inner.as_rule() {
+        Rule::boolean => {
+            let value = inner.as_str() == "true";
+            Ok(AstNode::Boolean(value))
+        }
         Rule::number => {
             let num = inner.as_str().parse::<f64>()
                 .map_err(|e| format!("Failed to parse number: {}", e))?;
@@ -323,9 +341,67 @@ fn build_function_call(pair: Pair<Rule>) -> Result<AstNode, String> {
         .map(|p| build_ast_from_expr(p))
         .collect();
 
+    let args = args?;
+
+    // Special handling for if() function
+    if name == "if" {
+        if args.len() != 3 {
+            return Err(format!("if() requires exactly 3 arguments (condition, then, else), got {}", args.len()));
+        }
+
+        return Ok(AstNode::If {
+            condition: Box::new(args[0].clone()),
+            then_expr: Box::new(args[1].clone()),
+            else_expr: Box::new(args[2].clone()),
+        });
+    }
+
+    // Special handling for piecewise() function
+    if name == "piecewise" {
+        if args.is_empty() {
+            return Err("piecewise() requires at least one argument".to_string());
+        }
+
+        let mut cases = Vec::new();
+        let mut default = None;
+
+        for (i, arg) in args.iter().enumerate() {
+            match arg {
+                AstNode::VectorLiteral(elems) => {
+                    // This is a [condition, value] case
+                    if elems.len() != 2 {
+                        return Err(format!(
+                            "piecewise() case must have exactly 2 elements [condition, value], got {}",
+                            elems.len()
+                        ));
+                    }
+                    cases.push((
+                        Box::new(elems[0].clone()),
+                        Box::new(elems[1].clone()),
+                    ));
+                }
+                _ => {
+                    // This is the default value (must be the last argument)
+                    if i != args.len() - 1 {
+                        return Err(format!(
+                            "piecewise() default value must be the last argument (argument {} is not a case)",
+                            i + 1
+                        ));
+                    }
+                    default = Some(Box::new(arg.clone()));
+                }
+            }
+        }
+
+        return Ok(AstNode::Piecewise {
+            cases,
+            default,
+        });
+    }
+
     Ok(AstNode::FunctionCall {
         name,
-        args: args?,
+        args,
     })
 }
 

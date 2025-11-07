@@ -15,16 +15,22 @@ pub enum BinaryOp {
     Lte, // <=
     Eq,  // ==
     Neq, // !=
+
+    // Logical
+    And, // &&
+    Or,  // ||
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum UnaryOp {
-    Negate,
+    Negate, // -x
+    Not,    // !x
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum AstNode {
     Number(f64),
+    Boolean(bool),
     BinaryOp {
         op: BinaryOp,
         left: Box<AstNode>,
@@ -33,6 +39,15 @@ pub enum AstNode {
     UnaryOp {
         op: UnaryOp,
         operand: Box<AstNode>,
+    },
+    If {
+        condition: Box<AstNode>,
+        then_expr: Box<AstNode>,
+        else_expr: Box<AstNode>,
+    },
+    Piecewise {
+        cases: Vec<(Box<AstNode>, Box<AstNode>)>,
+        default: Option<Box<AstNode>>,
     },
     FunctionCall {
         name: String,

@@ -79,13 +79,15 @@ impl Evaluator {
     ///
     /// Example:
     /// ```rust
+    /// use achronyme_eval::Evaluator;
+    ///
     /// let mut evaluator = Evaluator::new();
     /// let result = evaluator.eval_str("2 + 3 * 4").unwrap();
     /// ```
     pub fn eval_str(&mut self, source: &str) -> Result<Value, String> {
-        use achronyme_parser::parse_pest;
+        use achronyme_parser::parse;
 
-        let statements = parse_pest(source)?;
+        let statements = parse(source)?;
 
         if statements.is_empty() {
             return Err("No statements to evaluate".to_string());
@@ -104,8 +106,15 @@ impl Evaluator {
     pub fn evaluate(&mut self, node: &AstNode) -> Result<Value, String> {
         match node {
             AstNode::Number(n) => self.evaluate_number(*n),
+            AstNode::Boolean(b) => self.evaluate_boolean(*b),
             AstNode::BinaryOp { op, left, right } => self.evaluate_binary_op(op, left, right),
             AstNode::UnaryOp { op, operand } => self.evaluate_unary_op(op, operand),
+            AstNode::If { condition, then_expr, else_expr } => {
+                self.evaluate_if(condition, then_expr, else_expr)
+            }
+            AstNode::Piecewise { cases, default } => {
+                self.evaluate_piecewise(cases, default)
+            }
             AstNode::FunctionCall { name, args } => self.evaluate_function_call(name, args),
             AstNode::ComplexLiteral { re, im } => self.evaluate_complex_literal(*re, *im),
             AstNode::VectorLiteral(elements) => self.evaluate_vector_literal(elements),
@@ -124,6 +133,64 @@ impl Evaluator {
 
     fn evaluate_number(&self, n: f64) -> Result<Value, String> {
         Ok(Value::Number(n))
+    }
+
+    fn evaluate_boolean(&self, b: bool) -> Result<Value, String> {
+        Ok(Value::Boolean(b))
+    }
+
+    fn evaluate_if(
+        &mut self,
+        condition: &AstNode,
+        then_expr: &AstNode,
+        else_expr: &AstNode,
+    ) -> Result<Value, String> {
+        // Evaluate condition
+        let cond_val = self.evaluate(condition)?;
+
+        // Convert to boolean
+        let cond_bool = Self::value_to_bool(&cond_val)?;
+
+        // Evaluate appropriate branch (short-circuit)
+        if cond_bool {
+            self.evaluate(then_expr)
+        } else {
+            self.evaluate(else_expr)
+        }
+    }
+
+    fn evaluate_piecewise(
+        &mut self,
+        cases: &[(Box<AstNode>, Box<AstNode>)],
+        default: &Option<Box<AstNode>>,
+    ) -> Result<Value, String> {
+        // Evaluate cases in order (short-circuit)
+        for (condition, expression) in cases {
+            let cond_val = self.evaluate(condition)?;
+            let cond_bool = Self::value_to_bool(&cond_val)?;
+
+            if cond_bool {
+                return self.evaluate(expression);
+            }
+        }
+
+        // If no condition was true, evaluate default if present
+        if let Some(default_expr) = default {
+            return self.evaluate(default_expr);
+        }
+
+        // No condition was true and no default provided
+        Err("piecewise: no condition was true and no default value provided".to_string())
+    }
+
+    /// Helper to convert Value to bool
+    /// Boolean values map directly, numbers: 0 = false, != 0 = true
+    fn value_to_bool(value: &Value) -> Result<bool, String> {
+        match value {
+            Value::Boolean(b) => Ok(*b),
+            Value::Number(n) => Ok(*n != 0.0),
+            _ => Err(format!("Cannot convert {:?} to boolean", value)),
+        }
     }
 
     fn evaluate_binary_op(
@@ -335,16 +402,32 @@ impl Default for Evaluator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use achronyme_parser::lexer::Lexer;
-    use achronyme_parser::parser::Parser;
+    use achronyme_parser::parse;
 
     fn eval(source: &str) -> Result<Value, String> {
-        let mut lexer = Lexer::new(source);
-        let tokens = lexer.tokenize()?;
-        let mut parser = Parser::new(tokens);
-        let ast = parser.parse()?;
+        let statements = parse(source)?;
         let mut evaluator = Evaluator::new();
-        evaluator.evaluate(&ast)
+
+        // Evaluate all statements, return the last result
+        let mut result = Value::Number(0.0);
+        for stmt in &statements {
+            result = evaluator.evaluate(stmt)?;
+        }
+
+        Ok(result)
+    }
+
+    /// Helper function for tests that need to maintain state across multiple eval calls
+    fn eval_with_evaluator(evaluator: &mut Evaluator, source: &str) -> Result<Value, String> {
+        let statements = parse(source)?;
+
+        // Evaluate all statements, return the last result
+        let mut result = Value::Number(0.0);
+        for stmt in &statements {
+            result = evaluator.evaluate(stmt)?;
+        }
+
+        Ok(result)
     }
 
     #[test]
@@ -413,9 +496,9 @@ mod tests {
     #[test]
     fn test_comparison() {
         let result = eval("5 > 3").unwrap();
-        assert_eq!(result, Value::Number(1.0)); // true
+        assert_eq!(result, Value::Boolean(true));
         let result = eval("5 < 3").unwrap();
-        assert_eq!(result, Value::Number(0.0)); // false
+        assert_eq!(result, Value::Boolean(false));
     }
 
     // ========================================================================
@@ -425,12 +508,7 @@ mod tests {
     #[test]
     fn test_lambda_creation() {
         // Create a lambda
-        let mut lexer = Lexer::new("x => x * 2");
-        let tokens = lexer.tokenize().unwrap();
-        let mut parser = Parser::new(tokens);
-        let ast = parser.parse().unwrap();
-        let mut evaluator = Evaluator::new();
-        let result = evaluator.evaluate(&ast).unwrap();
+        let result = eval("x => x * 2").unwrap();
 
         // Should be a function value
         match result {
@@ -442,19 +520,11 @@ mod tests {
     #[test]
     fn test_lambda_call() {
         // Define lambda and call it
-        let mut lexer = Lexer::new("let f = x => x * 2");
-        let tokens = lexer.tokenize().unwrap();
-        let mut parser = Parser::new(tokens);
-        let ast = parser.parse().unwrap();
         let mut evaluator = Evaluator::new();
-        evaluator.evaluate(&ast).unwrap();
+        eval_with_evaluator(&mut evaluator, "let f = x => x * 2").unwrap();
 
         // Now call it
-        let mut lexer = Lexer::new("f(5)");
-        let tokens = lexer.tokenize().unwrap();
-        let mut parser = Parser::new(tokens);
-        let ast = parser.parse().unwrap();
-        let result = evaluator.evaluate(&ast).unwrap();
+        let result = eval_with_evaluator(&mut evaluator, "f(5)").unwrap();
 
         assert_eq!(result, Value::Number(10.0));
     }
@@ -462,29 +532,14 @@ mod tests {
     #[test]
     fn test_lambda_closure() {
         // Lambda captures variable from outer scope
-        let source = "let x = 10";
-        let mut lexer = Lexer::new(source);
-        let tokens = lexer.tokenize().unwrap();
-        let mut parser = Parser::new(tokens);
-        let ast = parser.parse().unwrap();
         let mut evaluator = Evaluator::new();
-        evaluator.evaluate(&ast).unwrap();
+        eval_with_evaluator(&mut evaluator, "let x = 10").unwrap();
 
         // Create lambda that uses x
-        let source = "let f = y => x + y";
-        let mut lexer = Lexer::new(source);
-        let tokens = lexer.tokenize().unwrap();
-        let mut parser = Parser::new(tokens);
-        let ast = parser.parse().unwrap();
-        evaluator.evaluate(&ast).unwrap();
+        eval_with_evaluator(&mut evaluator, "let f = y => x + y").unwrap();
 
         // Call lambda
-        let source = "f(5)";
-        let mut lexer = Lexer::new(source);
-        let tokens = lexer.tokenize().unwrap();
-        let mut parser = Parser::new(tokens);
-        let ast = parser.parse().unwrap();
-        let result = evaluator.evaluate(&ast).unwrap();
+        let result = eval_with_evaluator(&mut evaluator, "f(5)").unwrap();
 
         assert_eq!(result, Value::Number(15.0)); // 10 + 5
     }
@@ -492,21 +547,11 @@ mod tests {
     #[test]
     fn test_lambda_multi_param() {
         // Lambda with multiple parameters
-        let source = "let add = (x, y) => x + y";
-        let mut lexer = Lexer::new(source);
-        let tokens = lexer.tokenize().unwrap();
-        let mut parser = Parser::new(tokens);
-        let ast = parser.parse().unwrap();
         let mut evaluator = Evaluator::new();
-        evaluator.evaluate(&ast).unwrap();
+        eval_with_evaluator(&mut evaluator, "let add = (x, y) => x + y").unwrap();
 
         // Call it
-        let source = "add(3, 4)";
-        let mut lexer = Lexer::new(source);
-        let tokens = lexer.tokenize().unwrap();
-        let mut parser = Parser::new(tokens);
-        let ast = parser.parse().unwrap();
-        let result = evaluator.evaluate(&ast).unwrap();
+        let result = eval_with_evaluator(&mut evaluator, "add(3, 4)").unwrap();
 
         assert_eq!(result, Value::Number(7.0));
     }
@@ -514,21 +559,11 @@ mod tests {
     #[test]
     fn test_lambda_arity_check() {
         // Lambda arity mismatch should fail
-        let source = "let f = x => x * 2";
-        let mut lexer = Lexer::new(source);
-        let tokens = lexer.tokenize().unwrap();
-        let mut parser = Parser::new(tokens);
-        let ast = parser.parse().unwrap();
         let mut evaluator = Evaluator::new();
-        evaluator.evaluate(&ast).unwrap();
+        eval_with_evaluator(&mut evaluator, "let f = x => x * 2").unwrap();
 
         // Call with wrong number of args
-        let source = "f(1, 2)";
-        let mut lexer = Lexer::new(source);
-        let tokens = lexer.tokenize().unwrap();
-        let mut parser = Parser::new(tokens);
-        let ast = parser.parse().unwrap();
-        let result = evaluator.evaluate(&ast);
+        let result = eval_with_evaluator(&mut evaluator, "f(1, 2)");
 
         assert!(result.is_err());
     }
@@ -536,29 +571,14 @@ mod tests {
     #[test]
     fn test_lambda_nested() {
         // Nested lambda (higher-order function)
-        let source = "let makeAdder = x => (y => x + y)";
-        let mut lexer = Lexer::new(source);
-        let tokens = lexer.tokenize().unwrap();
-        let mut parser = Parser::new(tokens);
-        let ast = parser.parse().unwrap();
         let mut evaluator = Evaluator::new();
-        evaluator.evaluate(&ast).unwrap();
+        eval_with_evaluator(&mut evaluator, "let makeAdder = x => (y => x + y)").unwrap();
 
         // Get an adder function
-        let source = "let add5 = makeAdder(5)";
-        let mut lexer = Lexer::new(source);
-        let tokens = lexer.tokenize().unwrap();
-        let mut parser = Parser::new(tokens);
-        let ast = parser.parse().unwrap();
-        evaluator.evaluate(&ast).unwrap();
+        eval_with_evaluator(&mut evaluator, "let add5 = makeAdder(5)").unwrap();
 
         // Use it
-        let source = "add5(3)";
-        let mut lexer = Lexer::new(source);
-        let tokens = lexer.tokenize().unwrap();
-        let mut parser = Parser::new(tokens);
-        let ast = parser.parse().unwrap();
-        let result = evaluator.evaluate(&ast).unwrap();
+        let result = eval_with_evaluator(&mut evaluator, "add5(3)").unwrap();
 
         assert_eq!(result, Value::Number(8.0)); // 5 + 3
     }
@@ -682,20 +702,11 @@ mod tests {
     fn test_hof_composition() {
         // Test combining HOFs
         // Get squares of even numbers: filter(even) then map(square)
-        let mut lexer = Lexer::new("let evens = filter(x => (x % 2) == 0,[1,2,3,4,5,6])");
-        let tokens = lexer.tokenize().unwrap();
-        let mut parser = Parser::new(tokens);
-        let ast = parser.parse().unwrap();
         let mut evaluator = Evaluator::new();
-        evaluator.evaluate(&ast).unwrap();
+        eval_with_evaluator(&mut evaluator, "let evens = filter(x => (x % 2) == 0,[1,2,3,4,5,6])").unwrap();
 
         // Now map square over evens
-        let source = "map(x => x ^ 2,evens)";
-        let mut lexer = Lexer::new(source);
-        let tokens = lexer.tokenize().unwrap();
-        let mut parser = Parser::new(tokens);
-        let ast = parser.parse().unwrap();
-        let result = evaluator.evaluate(&ast).unwrap();
+        let result = eval_with_evaluator(&mut evaluator, "map(x => x ^ 2,evens)").unwrap();
 
         match result {
             Value::Vector(v) => {
@@ -813,7 +824,7 @@ mod tests {
     fn test_pest_comparison() {
         let mut evaluator = Evaluator::new();
         let result = evaluator.eval_str("5 > 3").unwrap();
-        assert_eq!(result, Value::Number(1.0)); // true = 1.0
+        assert_eq!(result, Value::Boolean(true));
     }
 
     #[test]
@@ -843,4 +854,295 @@ x + y
         let result = evaluator.eval_str(source).unwrap();
         assert_eq!(result, Value::Number(30.0));
     }
+
+    // ========================================================================
+    // Conditional Tests (if, boolean, logical operators)
+    // ========================================================================
+
+    #[test]
+    fn test_boolean_literals() {
+        assert_eq!(eval("true").unwrap(), Value::Boolean(true));
+        assert_eq!(eval("false").unwrap(), Value::Boolean(false));
+    }
+
+    #[test]
+    fn test_logical_and() {
+        assert_eq!(eval("true && true").unwrap(), Value::Boolean(true));
+        assert_eq!(eval("true && false").unwrap(), Value::Boolean(false));
+        assert_eq!(eval("false && true").unwrap(), Value::Boolean(false));
+        assert_eq!(eval("false && false").unwrap(), Value::Boolean(false));
+    }
+
+    #[test]
+    fn test_logical_or() {
+        assert_eq!(eval("true || true").unwrap(), Value::Boolean(true));
+        assert_eq!(eval("true || false").unwrap(), Value::Boolean(true));
+        assert_eq!(eval("false || true").unwrap(), Value::Boolean(true));
+        assert_eq!(eval("false || false").unwrap(), Value::Boolean(false));
+    }
+
+    #[test]
+    fn test_logical_not() {
+        assert_eq!(eval("!true").unwrap(), Value::Boolean(false));
+        assert_eq!(eval("!false").unwrap(), Value::Boolean(true));
+        assert_eq!(eval("!!true").unwrap(), Value::Boolean(true));
+        assert_eq!(eval("!!false").unwrap(), Value::Boolean(false));
+    }
+
+    #[test]
+    fn test_comparison_returns_boolean() {
+        assert_eq!(eval("5 > 3").unwrap(), Value::Boolean(true));
+        assert_eq!(eval("5 < 3").unwrap(), Value::Boolean(false));
+        assert_eq!(eval("5 >= 5").unwrap(), Value::Boolean(true));
+        assert_eq!(eval("5 <= 3").unwrap(), Value::Boolean(false));
+        assert_eq!(eval("5 == 5").unwrap(), Value::Boolean(true));
+        assert_eq!(eval("5 != 3").unwrap(), Value::Boolean(true));
+    }
+
+    #[test]
+    fn test_if_simple() {
+        assert_eq!(eval("if(true, 1, 2)").unwrap(), Value::Number(1.0));
+        assert_eq!(eval("if(false, 1, 2)").unwrap(), Value::Number(2.0));
+    }
+
+    #[test]
+    fn test_if_with_comparison() {
+        assert_eq!(eval("if(5 > 3, 100, 200)").unwrap(), Value::Number(100.0));
+        assert_eq!(eval("if(2 > 10, 100, 200)").unwrap(), Value::Number(200.0));
+    }
+
+    #[test]
+    fn test_if_with_logical_ops() {
+        assert_eq!(eval("if(true && true, 1, 0)").unwrap(), Value::Number(1.0));
+        assert_eq!(eval("if(true && false, 1, 0)").unwrap(), Value::Number(0.0));
+        assert_eq!(eval("if(false || true, 1, 0)").unwrap(), Value::Number(1.0));
+    }
+
+    #[test]
+    fn test_if_nested() {
+        // if(x > 0, if(x > 10, 2, 1), 0)
+        let mut evaluator = Evaluator::new();
+        eval_with_evaluator(&mut evaluator, "let x = 15").unwrap();
+        let result = eval_with_evaluator(&mut evaluator, "if(x > 0, if(x > 10, 2, 1), 0)").unwrap();
+        assert_eq!(result, Value::Number(2.0));
+
+        let mut evaluator = Evaluator::new();
+        eval_with_evaluator(&mut evaluator, "let x = 5").unwrap();
+        let result = eval_with_evaluator(&mut evaluator, "if(x > 0, if(x > 10, 2, 1), 0)").unwrap();
+        assert_eq!(result, Value::Number(1.0));
+
+        let mut evaluator = Evaluator::new();
+        eval_with_evaluator(&mut evaluator, "let x = -5").unwrap();
+        let result = eval_with_evaluator(&mut evaluator, "if(x > 0, if(x > 10, 2, 1), 0)").unwrap();
+        assert_eq!(result, Value::Number(0.0));
+    }
+
+    #[test]
+    fn test_if_in_lambda() {
+        // abs function: x => if(x < 0, -x, x)
+        let mut evaluator = Evaluator::new();
+        eval_with_evaluator(&mut evaluator, "let abs = x => if(x < 0, -x, x)").unwrap();
+
+        let result = eval_with_evaluator(&mut evaluator, "abs(-5)").unwrap();
+        assert_eq!(result, Value::Number(5.0));
+
+        let result = eval_with_evaluator(&mut evaluator, "abs(3)").unwrap();
+        assert_eq!(result, Value::Number(3.0));
+    }
+
+    #[test]
+    fn test_relu_activation() {
+        // ReLU: x => if(x > 0, x, 0)
+        let mut evaluator = Evaluator::new();
+        eval_with_evaluator(&mut evaluator, "let relu = x => if(x > 0, x, 0)").unwrap();
+
+        let result = eval_with_evaluator(&mut evaluator, "relu(5)").unwrap();
+        assert_eq!(result, Value::Number(5.0));
+
+        let result = eval_with_evaluator(&mut evaluator, "relu(-3)").unwrap();
+        assert_eq!(result, Value::Number(0.0));
+
+        let result = eval_with_evaluator(&mut evaluator, "relu(0)").unwrap();
+        assert_eq!(result, Value::Number(0.0));
+    }
+
+    #[test]
+    fn test_sign_function() {
+        // sign: x => if(x < 0, -1, if(x > 0, 1, 0))
+        let mut evaluator = Evaluator::new();
+        eval_with_evaluator(&mut evaluator, "let sign = x => if(x < 0, -1, if(x > 0, 1, 0))").unwrap();
+
+        let result = eval_with_evaluator(&mut evaluator, "sign(-10)").unwrap();
+        assert_eq!(result, Value::Number(-1.0));
+
+        let result = eval_with_evaluator(&mut evaluator, "sign(10)").unwrap();
+        assert_eq!(result, Value::Number(1.0));
+
+        let result = eval_with_evaluator(&mut evaluator, "sign(0)").unwrap();
+        assert_eq!(result, Value::Number(0.0));
+    }
+
+    // ========================================================================
+    // Piecewise Tests
+    // ========================================================================
+
+    #[test]
+    fn test_piecewise_simple() {
+        // piecewise([x < 0, -1], [x > 0, 1], 0)
+        let mut evaluator = Evaluator::new();
+        eval_with_evaluator(&mut evaluator, "let x = -5").unwrap();
+        let result = eval_with_evaluator(&mut evaluator, "piecewise([x < 0, -1], [x > 0, 1], 0)").unwrap();
+        assert_eq!(result, Value::Number(-1.0));
+
+        let mut evaluator = Evaluator::new();
+        eval_with_evaluator(&mut evaluator, "let x = 5").unwrap();
+        let result = eval_with_evaluator(&mut evaluator, "piecewise([x < 0, -1], [x > 0, 1], 0)").unwrap();
+        assert_eq!(result, Value::Number(1.0));
+
+        let mut evaluator = Evaluator::new();
+        eval_with_evaluator(&mut evaluator, "let x = 0").unwrap();
+        let result = eval_with_evaluator(&mut evaluator, "piecewise([x < 0, -1], [x > 0, 1], 0)").unwrap();
+        assert_eq!(result, Value::Number(0.0));
+    }
+
+    #[test]
+    fn test_piecewise_no_default_error() {
+        // piecewise without default should error if no condition is true
+        let result = eval("piecewise([false, 1], [false, 2])");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("no condition was true"));
+    }
+
+    #[test]
+    fn test_piecewise_abs() {
+        // abs using piecewise: x => piecewise([x < 0, -x], x)
+        let mut evaluator = Evaluator::new();
+        eval_with_evaluator(&mut evaluator, "let abs = x => piecewise([x < 0, -x], x)").unwrap();
+
+        let result = eval_with_evaluator(&mut evaluator, "abs(-5)").unwrap();
+        assert_eq!(result, Value::Number(5.0));
+
+        let result = eval_with_evaluator(&mut evaluator, "abs(3)").unwrap();
+        assert_eq!(result, Value::Number(3.0));
+
+        let result = eval_with_evaluator(&mut evaluator, "abs(0)").unwrap();
+        assert_eq!(result, Value::Number(0.0));
+    }
+
+    #[test]
+    fn test_piecewise_tax_bracket() {
+        // Progressive tax:
+        // income <= 10000: 10%
+        // income <= 50000: 20%
+        // else: 30%
+        let mut evaluator = Evaluator::new();
+        eval_with_evaluator(&mut evaluator, "let tax = income => piecewise([income <= 10000, income * 0.1], [income <= 50000, income * 0.2], income * 0.3)").unwrap();
+
+        let result = eval_with_evaluator(&mut evaluator, "tax(5000)").unwrap();
+        assert_eq!(result, Value::Number(500.0)); // 10%
+
+        let result = eval_with_evaluator(&mut evaluator, "tax(30000)").unwrap();
+        assert_eq!(result, Value::Number(6000.0)); // 20%
+
+        let result = eval_with_evaluator(&mut evaluator, "tax(100000)").unwrap();
+        assert_eq!(result, Value::Number(30000.0)); // 30%
+    }
+
+    #[test]
+    fn test_piecewise_math_function() {
+        // f(x) = { x^2    if x < -1
+        //        { 2x+1   if -1 <= x < 1
+        //        { x^3    if x >= 1
+        let mut evaluator = Evaluator::new();
+        eval_with_evaluator(&mut evaluator, "let f = x => piecewise([x < -1, x^2], [x < 1, 2*x + 1], x^3)").unwrap();
+
+        // x < -1: x^2
+        let result = eval_with_evaluator(&mut evaluator, "f(-2)").unwrap();
+        assert_eq!(result, Value::Number(4.0));
+
+        // -1 <= x < 1: 2x+1
+        let result = eval_with_evaluator(&mut evaluator, "f(0)").unwrap();
+        assert_eq!(result, Value::Number(1.0));
+
+        let result = eval_with_evaluator(&mut evaluator, "f(-1)").unwrap();
+        assert_eq!(result, Value::Number(-1.0)); // 2*(-1) + 1
+
+        // x >= 1: x^3
+        let result = eval_with_evaluator(&mut evaluator, "f(2)").unwrap();
+        assert_eq!(result, Value::Number(8.0));
+    }
+
+    #[test]
+    fn test_piecewise_heaviside() {
+        // Heaviside step function: H(x) = { 0 if x < 0, 1 if x >= 0 }
+        let mut evaluator = Evaluator::new();
+        eval_with_evaluator(&mut evaluator, "let H = x => piecewise([x < 0, 0], 1)").unwrap();
+
+        let result = eval_with_evaluator(&mut evaluator, "H(-5)").unwrap();
+        assert_eq!(result, Value::Number(0.0));
+
+        let result = eval_with_evaluator(&mut evaluator, "H(0)").unwrap();
+        assert_eq!(result, Value::Number(1.0));
+
+        let result = eval_with_evaluator(&mut evaluator, "H(5)").unwrap();
+        assert_eq!(result, Value::Number(1.0));
+    }
+
+    #[test]
+    fn test_piecewise_with_hof() {
+        // Use piecewise in map
+        let mut evaluator = Evaluator::new();
+        eval_with_evaluator(&mut evaluator, "let classify = x => piecewise([x < 0, -1], [x > 0, 1], 0)").unwrap();
+        let result = eval_with_evaluator(&mut evaluator, "map(classify, [-5, -2, 0, 3, 7])").unwrap();
+
+        match result {
+            Value::Vector(v) => {
+                assert_eq!(v.data(), &[-1.0, -1.0, 0.0, 1.0, 1.0]);
+            }
+            _ => panic!("Expected vector"),
+        }
+    }
+
+    #[test]
+    fn test_piecewise_multivariable() {
+        // Region classifier in 2D plane: inside circle (1), in square (2), outside (0)
+        let mut evaluator = Evaluator::new();
+        eval_with_evaluator(&mut evaluator, "let region = (x, y) => piecewise([x^2 + y^2 < 1, 1], [abs(x) < 2 && abs(y) < 2, 2], 0)").unwrap();
+
+        // Inside circle
+        let result = eval_with_evaluator(&mut evaluator, "region(0, 0)").unwrap();
+        assert_eq!(result, Value::Number(1.0));
+
+        // In square but outside circle
+        let result = eval_with_evaluator(&mut evaluator, "region(1.5, 0)").unwrap();
+        assert_eq!(result, Value::Number(2.0));
+
+        // Outside both
+        let result = eval_with_evaluator(&mut evaluator, "region(3, 3)").unwrap();
+        assert_eq!(result, Value::Number(0.0));
+    }
+
+    #[test]
+    fn test_piecewise_sequential_evaluation() {
+        // Verify short-circuit: first true condition wins
+        let mut evaluator = Evaluator::new();
+        eval_with_evaluator(&mut evaluator, "let x = 5").unwrap();
+        // x > 0 is true, so should return 100 (not 200)
+        let result = eval_with_evaluator(&mut evaluator, "piecewise([x > 0, 100], [x > 3, 200], 0)").unwrap();
+        assert_eq!(result, Value::Number(100.0));
+    }
+
+    #[test]
+    fn test_piecewise_leaky_relu() {
+        // Leaky ReLU: x > 0 ? x : 0.01*x
+        let mut evaluator = Evaluator::new();
+        eval_with_evaluator(&mut evaluator, "let leaky_relu = x => piecewise([x > 0, x], 0.01 * x)").unwrap();
+
+        let result = eval_with_evaluator(&mut evaluator, "leaky_relu(10)").unwrap();
+        assert_eq!(result, Value::Number(10.0));
+
+        let result = eval_with_evaluator(&mut evaluator, "leaky_relu(-10)").unwrap();
+        assert_eq!(result, Value::Number(-0.1));
+    }
 }
+

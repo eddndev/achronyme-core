@@ -6,6 +6,9 @@
 //
 // Features:
 // - Arithmetic expressions with proper precedence
+// - Boolean literals and logical operators (&&, ||, !)
+// - Comparison operators (>, <, >=, <=, ==, !=)
+// - Conditional expressions (if function)
 // - Function calls (sin, cos, map, etc.)
 // - Vectors and matrices
 // - Lambda functions with closures
@@ -24,6 +27,9 @@ COMMENT = _{ "//" ~ (!"\n" ~ ANY)* }
 // ============================================================================
 // Literals
 // ============================================================================
+
+// Boolean literals: true, false
+boolean = { "true" | "false" }
 
 // Numbers: 123, 3.14, -42, 1.5e-10, 2.5E+3
 number = @{
@@ -83,7 +89,8 @@ function_call = {
 
 // Primary expressions (highest precedence)
 primary = {
-    complex     // Must come before number (3i contains number)
+    boolean     // Boolean literals
+  | complex     // Must come before number (3i contains number)
   | number
   | matrix      // Must come before vector (matrix starts with [)
   | vector
@@ -98,9 +105,10 @@ power = {
     primary ~ ("^" ~ power)?
 }
 
-// Unary operators: -x, -sin(x)
+// Unary operators: -x, !x
 unary = {
     "-" ~ unary
+  | "!" ~ unary
   | power
 }
 
@@ -108,6 +116,8 @@ unary = {
 mult_op = { "*" | "/" | "%" }
 add_op = { "+" | "-" }
 cmp_op = { "==" | "!=" | ">=" | "<=" | ">" | "<" }
+logical_and_op = { "&&" }
+logical_or_op = { "||" }
 
 // Multiplicative: *, /, %
 multiplicative = {
@@ -124,8 +134,18 @@ comparison = {
     additive ~ (cmp_op ~ additive)?
 }
 
+// Logical AND: &&
+logical_and = {
+    comparison ~ (logical_and_op ~ comparison)*
+}
+
+// Logical OR: ||
+logical_or = {
+    logical_and ~ (logical_or_op ~ logical_and)*
+}
+
 // Expression (entry point for expressions)
-expr = { comparison }
+expr = { logical_or }
 
 // ============================================================================
 // Statements

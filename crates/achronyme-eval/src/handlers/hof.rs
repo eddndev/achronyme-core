@@ -108,14 +108,15 @@ pub fn handle_filter(evaluator: &mut Evaluator, args: &[AstNode]) -> Result<Valu
         // Apply predicate
         let result = evaluator.apply_lambda(&predicate, vec![elem])?;
 
-        // Check result (non-zero = true)
-        match result {
-            Value::Number(n) => {
-                if n != 0.0 {
-                    results.push(collection.data()[i]);
-                }
-            }
-            _ => return Err("filter predicate must return a number".to_string()),
+        // Check result (boolean or non-zero number = true)
+        let should_include = match result {
+            Value::Boolean(b) => b,
+            Value::Number(n) => n != 0.0,
+            _ => return Err("filter predicate must return a boolean or number".to_string()),
+        };
+
+        if should_include {
+            results.push(collection.data()[i]);
         }
     }
 

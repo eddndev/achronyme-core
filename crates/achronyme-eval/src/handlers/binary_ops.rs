@@ -17,6 +17,8 @@ pub fn apply(op: &BinaryOp, left: Value, right: Value) -> Result<Value, String> 
         BinaryOp::Lte => apply_lte(left, right),
         BinaryOp::Eq => apply_eq(left, right),
         BinaryOp::Neq => apply_neq(left, right),
+        BinaryOp::And => apply_and(left, right),
+        BinaryOp::Or => apply_or(left, right),
     }
 }
 
@@ -132,57 +134,75 @@ fn apply_modulo(left: Value, right: Value) -> Result<Value, String> {
     }
 }
 
-// Comparison operators (return 1.0 for true, 0.0 for false)
+// Comparison operators (return boolean values)
 fn apply_gt(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
-        (Value::Number(a), Value::Number(b)) => {
-            Ok(Value::Number(if a > b { 1.0 } else { 0.0 }))
-        }
+        (Value::Number(a), Value::Number(b)) => Ok(Value::Boolean(a > b)),
         _ => Err("Comparison operators currently only support numbers".to_string()),
     }
 }
 
 fn apply_lt(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
-        (Value::Number(a), Value::Number(b)) => {
-            Ok(Value::Number(if a < b { 1.0 } else { 0.0 }))
-        }
+        (Value::Number(a), Value::Number(b)) => Ok(Value::Boolean(a < b)),
         _ => Err("Comparison operators currently only support numbers".to_string()),
     }
 }
 
 fn apply_gte(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
-        (Value::Number(a), Value::Number(b)) => {
-            Ok(Value::Number(if a >= b { 1.0 } else { 0.0 }))
-        }
+        (Value::Number(a), Value::Number(b)) => Ok(Value::Boolean(a >= b)),
         _ => Err("Comparison operators currently only support numbers".to_string()),
     }
 }
 
 fn apply_lte(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
-        (Value::Number(a), Value::Number(b)) => {
-            Ok(Value::Number(if a <= b { 1.0 } else { 0.0 }))
-        }
+        (Value::Number(a), Value::Number(b)) => Ok(Value::Boolean(a <= b)),
         _ => Err("Comparison operators currently only support numbers".to_string()),
     }
 }
 
 fn apply_eq(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
-        (Value::Number(a), Value::Number(b)) => {
-            Ok(Value::Number(if a == b { 1.0 } else { 0.0 }))
-        }
-        _ => Err("Comparison operators currently only support numbers".to_string()),
+        (Value::Number(a), Value::Number(b)) => Ok(Value::Boolean(a == b)),
+        (Value::Boolean(a), Value::Boolean(b)) => Ok(Value::Boolean(a == b)),
+        _ => Err("Comparison operators currently only support numbers and booleans".to_string()),
     }
 }
 
 fn apply_neq(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
-        (Value::Number(a), Value::Number(b)) => {
-            Ok(Value::Number(if a != b { 1.0 } else { 0.0 }))
-        }
-        _ => Err("Comparison operators currently only support numbers".to_string()),
+        (Value::Number(a), Value::Number(b)) => Ok(Value::Boolean(a != b)),
+        (Value::Boolean(a), Value::Boolean(b)) => Ok(Value::Boolean(a != b)),
+        _ => Err("Comparison operators currently only support numbers and booleans".to_string()),
     }
+}
+
+fn apply_and(left: Value, right: Value) -> Result<Value, String> {
+    let left_bool = match left {
+        Value::Boolean(b) => b,
+        Value::Number(n) => n != 0.0,
+        _ => return Err("Logical AND operator requires boolean or number values".to_string()),
+    };
+    let right_bool = match right {
+        Value::Boolean(b) => b,
+        Value::Number(n) => n != 0.0,
+        _ => return Err("Logical AND operator requires boolean or number values".to_string()),
+    };
+    Ok(Value::Boolean(left_bool && right_bool))
+}
+
+fn apply_or(left: Value, right: Value) -> Result<Value, String> {
+    let left_bool = match left {
+        Value::Boolean(b) => b,
+        Value::Number(n) => n != 0.0,
+        _ => return Err("Logical OR operator requires boolean or number values".to_string()),
+    };
+    let right_bool = match right {
+        Value::Boolean(b) => b,
+        Value::Number(n) => n != 0.0,
+        _ => return Err("Logical OR operator requires boolean or number values".to_string()),
+    };
+    Ok(Value::Boolean(left_bool || right_bool))
 }
