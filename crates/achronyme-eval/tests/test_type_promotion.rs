@@ -36,13 +36,13 @@ fn test_mixed_number_complex_literal() {
     let result = eval("[1+i, 2, 3]").unwrap();
 
     match result {
-        Value::ComplexVector(cv) => {
-            assert_eq!(cv.data().len(), 3);
-            assert_eq!(cv.data()[0], Complex::new(1.0, 1.0));
-            assert_eq!(cv.data()[1], Complex::new(2.0, 0.0)); // Promoted
-            assert_eq!(cv.data()[2], Complex::new(3.0, 0.0)); // Promoted
+        Value::Vector(v) => {
+            assert_eq!(v.len(), 3);
+            assert_eq!(v[0], Value::Complex(Complex::new(1.0, 1.0)));
+            assert_eq!(v[1], Value::Complex(Complex::new(2.0, 0.0))); // Promoted
+            assert_eq!(v[2], Value::Complex(Complex::new(3.0, 0.0))); // Promoted
         }
-        _ => panic!("Expected ComplexVector, got {:?}", result),
+        _ => panic!("Expected Vector, got {:?}", result),
     }
 }
 
@@ -52,13 +52,13 @@ fn test_mixed_number_complex_middle() {
     let result = eval("[1, 2+i, 3]").unwrap();
 
     match result {
-        Value::ComplexVector(cv) => {
-            assert_eq!(cv.data().len(), 3);
-            assert_eq!(cv.data()[0], Complex::new(1.0, 0.0)); // Promoted
-            assert_eq!(cv.data()[1], Complex::new(2.0, 1.0));
-            assert_eq!(cv.data()[2], Complex::new(3.0, 0.0)); // Promoted
+        Value::Vector(v) => {
+            assert_eq!(v.len(), 3);
+            assert_eq!(v[0], Value::Complex(Complex::new(1.0, 0.0))); // Promoted
+            assert_eq!(v[1], Value::Complex(Complex::new(2.0, 1.0)));
+            assert_eq!(v[2], Value::Complex(Complex::new(3.0, 0.0))); // Promoted
         }
-        _ => panic!("Expected ComplexVector, got {:?}", result),
+        _ => panic!("Expected Vector, got {:?}", result),
     }
 }
 
@@ -68,13 +68,13 @@ fn test_mixed_number_complex_end() {
     let result = eval("[1, 2, 3+i]").unwrap();
 
     match result {
-        Value::ComplexVector(cv) => {
-            assert_eq!(cv.data().len(), 3);
-            assert_eq!(cv.data()[0], Complex::new(1.0, 0.0)); // Promoted
-            assert_eq!(cv.data()[1], Complex::new(2.0, 0.0)); // Promoted
-            assert_eq!(cv.data()[2], Complex::new(3.0, 1.0));
+        Value::Vector(v) => {
+            assert_eq!(v.len(), 3);
+            assert_eq!(v[0], Value::Complex(Complex::new(1.0, 0.0))); // Promoted
+            assert_eq!(v[1], Value::Complex(Complex::new(2.0, 0.0))); // Promoted
+            assert_eq!(v[2], Value::Complex(Complex::new(3.0, 1.0)));
         }
-        _ => panic!("Expected ComplexVector, got {:?}", result),
+        _ => panic!("Expected Vector, got {:?}", result),
     }
 }
 
@@ -88,12 +88,12 @@ fn test_mixed_with_variables() {
     let result = eval_with_evaluator(&mut evaluator, "let v = [a, b]").unwrap();
 
     match result {
-        Value::ComplexVector(cv) => {
-            assert_eq!(cv.data().len(), 2);
-            assert_eq!(cv.data()[0], Complex::new(3.0, 0.0)); // a promoted
-            assert_eq!(cv.data()[1], Complex::new(4.0, 1.0)); // b
+        Value::Vector(v) => {
+            assert_eq!(v.len(), 2);
+            assert_eq!(v[0], Value::Complex(Complex::new(3.0, 0.0))); // a promoted
+            assert_eq!(v[1], Value::Complex(Complex::new(4.0, 1.0))); // b
         }
-        _ => panic!("Expected ComplexVector, got {:?}", result),
+        _ => panic!("Expected Vector, got {:?}", result),
     }
 }
 
@@ -103,24 +103,24 @@ fn test_mixed_with_imaginary_unit() {
     let result = eval("[1, i, 2+i]").unwrap();
 
     match result {
-        Value::ComplexVector(cv) => {
-            assert_eq!(cv.data().len(), 3);
-            assert_eq!(cv.data()[0], Complex::new(1.0, 0.0)); // Promoted
-            assert_eq!(cv.data()[1], Complex::new(0.0, 1.0)); // i
-            assert_eq!(cv.data()[2], Complex::new(2.0, 1.0));
+        Value::Vector(v) => {
+            assert_eq!(v.len(), 3);
+            assert_eq!(v[0], Value::Complex(Complex::new(1.0, 0.0))); // Promoted
+            assert_eq!(v[1], Value::Complex(Complex::new(0.0, 1.0))); // i
+            assert_eq!(v[2], Value::Complex(Complex::new(2.0, 1.0)));
         }
-        _ => panic!("Expected ComplexVector, got {:?}", result),
+        _ => panic!("Expected Vector, got {:?}", result),
     }
 }
 
 #[test]
 fn test_all_real_numbers() {
-    // Sin complejos, debería seguir siendo Vector
+    // Sin complejos, debería seguir siendo Vector de Numbers
     let result = eval("[1, 2, 3, 4]").unwrap();
 
     match result {
         Value::Vector(v) => {
-            assert_eq!(v.data(), &[1.0, 2.0, 3.0, 4.0]);
+            assert_eq!(v, vec![Value::Number(1.0), Value::Number(2.0), Value::Number(3.0), Value::Number(4.0)]);
         }
         _ => panic!("Expected Vector, got {:?}", result),
     }
@@ -132,13 +132,13 @@ fn test_all_complex_numbers() {
     let result = eval("[1+i, 2+2i, 3+3i]").unwrap();
 
     match result {
-        Value::ComplexVector(cv) => {
-            assert_eq!(cv.data().len(), 3);
-            assert_eq!(cv.data()[0], Complex::new(1.0, 1.0));
-            assert_eq!(cv.data()[1], Complex::new(2.0, 2.0));
-            assert_eq!(cv.data()[2], Complex::new(3.0, 3.0));
+        Value::Vector(v) => {
+            assert_eq!(v.len(), 3);
+            assert_eq!(v[0], Value::Complex(Complex::new(1.0, 1.0)));
+            assert_eq!(v[1], Value::Complex(Complex::new(2.0, 2.0)));
+            assert_eq!(v[2], Value::Complex(Complex::new(3.0, 3.0)));
         }
-        _ => panic!("Expected ComplexVector, got {:?}", result),
+        _ => panic!("Expected Vector, got {:?}", result),
     }
 }
 
@@ -148,13 +148,13 @@ fn test_mixed_with_expressions() {
     let result = eval("[2*3, 1+i, 4/2]").unwrap();
 
     match result {
-        Value::ComplexVector(cv) => {
-            assert_eq!(cv.data().len(), 3);
-            assert_eq!(cv.data()[0], Complex::new(6.0, 0.0));  // 2*3 promoted
-            assert_eq!(cv.data()[1], Complex::new(1.0, 1.0));
-            assert_eq!(cv.data()[2], Complex::new(2.0, 0.0));  // 4/2 promoted
+        Value::Vector(v) => {
+            assert_eq!(v.len(), 3);
+            assert_eq!(v[0], Value::Complex(Complex::new(6.0, 0.0)));  // 2*3 promoted
+            assert_eq!(v[1], Value::Complex(Complex::new(1.0, 1.0)));
+            assert_eq!(v[2], Value::Complex(Complex::new(2.0, 0.0)));  // 4/2 promoted
         }
-        _ => panic!("Expected ComplexVector, got {:?}", result),
+        _ => panic!("Expected Vector, got {:?}", result),
     }
 }
 
@@ -164,33 +164,20 @@ fn test_mixed_complex_operations() {
     let result = eval("[i^2, 2, (1+i)^2]").unwrap();
 
     match result {
-        Value::ComplexVector(cv) => {
-            assert_eq!(cv.data().len(), 3);
+        Value::Vector(v) => {
+            assert_eq!(v.len(), 3);
             // i^2 = -1
-            assert!((cv.data()[0].re - (-1.0)).abs() < 1e-10);
-            assert!(cv.data()[0].im.abs() < 1e-10);
+            assert_eq!(v[0], Value::Complex(Complex::new(-1.0, 0.0)));
             // 2 promoted to complex
-            assert_eq!(cv.data()[1], Complex::new(2.0, 0.0));
+            assert_eq!(v[1], Value::Complex(Complex::new(2.0, 0.0)));
             // (1+i)^2 = 0 + 2i
-            assert!(cv.data()[2].re.abs() < 1e-10);
-            assert!((cv.data()[2].im - 2.0).abs() < 1e-10);
+            let c = v[2].as_complex().unwrap();
+            assert!(c.re.abs() < 1e-10);
+            assert!((c.im - 2.0).abs() < 1e-10);
         }
-        _ => panic!("Expected ComplexVector, got {:?}", result),
+        _ => panic!("Expected Vector, got {:?}", result),
     }
 }
-
-// Note: Empty vector literals [] are not currently supported by the parser
-// This is a known parser limitation, not an evaluator issue
-// #[test]
-// fn test_empty_vector() {
-//     let result = eval("[]").unwrap();
-//     match result {
-//         Value::Vector(v) => {
-//             assert_eq!(v.len(), 0);
-//         }
-//         _ => panic!("Expected empty Vector, got {:?}", result),
-//     }
-// }
 
 #[test]
 fn test_single_element_real() {
@@ -199,7 +186,7 @@ fn test_single_element_real() {
 
     match result {
         Value::Vector(v) => {
-            assert_eq!(v.data(), &[42.0]);
+            assert_eq!(v, vec![Value::Number(42.0)]);
         }
         _ => panic!("Expected Vector, got {:?}", result),
     }
@@ -211,11 +198,11 @@ fn test_single_element_complex() {
     let result = eval("[3+4i]").unwrap();
 
     match result {
-        Value::ComplexVector(cv) => {
-            assert_eq!(cv.data().len(), 1);
-            assert_eq!(cv.data()[0], Complex::new(3.0, 4.0));
+        Value::Vector(v) => {
+            assert_eq!(v.len(), 1);
+            assert_eq!(v[0], Value::Complex(Complex::new(3.0, 4.0)));
         }
-        _ => panic!("Expected ComplexVector, got {:?}", result),
+        _ => panic!("Expected Vector, got {:?}", result),
     }
 }
 
@@ -232,15 +219,16 @@ fn test_mixed_in_pipeline() {
     let result = eval_with_evaluator(&mut evaluator, "map(z => z^2, v)").unwrap();
 
     match result {
-        Value::ComplexVector(cv) => {
-            assert_eq!(cv.data().len(), 2);
+        Value::Vector(v) => {
+            assert_eq!(v.len(), 2);
             // 2^2 = 4+0i
-            assert_eq!(cv.data()[0], Complex::new(4.0, 0.0));
+            assert_eq!(v[0], Value::Complex(Complex::new(4.0, 0.0)));
             // (3+i)^2 = 8+6i (using epsilon for floating point comparison)
-            assert!((cv.data()[1].re - 8.0).abs() < 1e-10);
-            assert!((cv.data()[1].im - 6.0).abs() < 1e-10);
+            let c = v[1].as_complex().unwrap();
+            assert!((c.re - 8.0).abs() < 1e-10);
+            assert!((c.im - 6.0).abs() < 1e-10);
         }
-        _ => panic!("Expected ComplexVector, got {:?}", result),
+        _ => panic!("Expected Vector, got {:?}", result),
     }
 }
 
@@ -250,14 +238,14 @@ fn test_type_promotion_preserves_order() {
     let result = eval("[5, 1+i, 10, 2+2i, 15]").unwrap();
 
     match result {
-        Value::ComplexVector(cv) => {
-            assert_eq!(cv.data().len(), 5);
-            assert_eq!(cv.data()[0], Complex::new(5.0, 0.0));
-            assert_eq!(cv.data()[1], Complex::new(1.0, 1.0));
-            assert_eq!(cv.data()[2], Complex::new(10.0, 0.0));
-            assert_eq!(cv.data()[3], Complex::new(2.0, 2.0));
-            assert_eq!(cv.data()[4], Complex::new(15.0, 0.0));
+        Value::Vector(v) => {
+            assert_eq!(v.len(), 5);
+            assert_eq!(v[0], Value::Complex(Complex::new(5.0, 0.0)));
+            assert_eq!(v[1], Value::Complex(Complex::new(1.0, 1.0)));
+            assert_eq!(v[2], Value::Complex(Complex::new(10.0, 0.0)));
+            assert_eq!(v[3], Value::Complex(Complex::new(2.0, 2.0)));
+            assert_eq!(v[4], Value::Complex(Complex::new(15.0, 0.0)));
         }
-        _ => panic!("Expected ComplexVector, got {:?}", result),
+        _ => panic!("Expected Vector, got {:?}", result),
     }
 }

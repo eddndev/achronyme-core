@@ -1,5 +1,4 @@
 use achronyme_types::value::Value;
-use achronyme_types::vector::Vector;
 
 use super::super::functions::FunctionRegistry;
 
@@ -9,8 +8,15 @@ macro_rules! unary_math_fn {
         match $arg {
             Value::Number(x) => Ok(Value::Number($f(*x))),
             Value::Vector(v) => {
-                let result: Vec<f64> = v.data().iter().map(|&x| $f(x)).collect();
-                Ok(Value::Vector(Vector::new(result)))
+                let mut result = Vec::new();
+                for val in v {
+                    if let Value::Number(n) = val {
+                        result.push(Value::Number($f(*n)));
+                    } else {
+                        return Err(format!("{}() can only be applied to numeric vectors", $name));
+                    }
+                }
+                Ok(Value::Vector(result))
             }
             _ => Err(format!("{}() requires a number or vector", $name)),
         }

@@ -1,9 +1,7 @@
 use wasm_bindgen::prelude::*;
 use crate::state::{HANDLES, Handle};
 use achronyme_types::value::Value;
-use achronyme_types::vector::Vector;
 use achronyme_types::complex::Complex;
-use achronyme_types::complex_vector::ComplexVector;
 use achronyme_types::matrix::Matrix;
 
 // ============================================================================
@@ -13,17 +11,19 @@ use achronyme_types::matrix::Matrix;
 #[wasm_bindgen(js_name = createVectorFromBuffer)]
 pub fn create_vector_from_buffer(data_ptr: *const f64, len: usize) -> Handle {
     unsafe {
-        let data = std::slice::from_raw_parts(data_ptr, len).to_vec();
-        let vector = Vector::new(data);
-        HANDLES.with(|h| h.borrow_mut().create(Value::Vector(vector)))
+        let data: Vec<Value> = std::slice::from_raw_parts(data_ptr, len)
+            .iter()
+            .map(|&n| Value::Number(n))
+            .collect();
+        HANDLES.with(|h| h.borrow_mut().create(Value::Vector(data)))
     }
 }
 
 /// Create vector from JavaScript array (easier for testing)
 #[wasm_bindgen(js_name = createVector)]
 pub fn create_vector(data: Vec<f64>) -> Handle {
-    let vector = Vector::new(data);
-    HANDLES.with(|h| h.borrow_mut().create(Value::Vector(vector)))
+    let vector_data: Vec<Value> = data.into_iter().map(Value::Number).collect();
+    HANDLES.with(|h| h.borrow_mut().create(Value::Vector(vector_data)))
 }
 
 /// Get vector data from handle (for verification/extraction)
@@ -32,7 +32,16 @@ pub fn get_vector(handle: Handle) -> Result<Vec<f64>, JsValue> {
     HANDLES.with(|handles| {
         let h = handles.borrow();
         match h.get(handle) {
-            Some(Value::Vector(v)) => Ok(v.data().to_vec()),
+            Some(Value::Vector(v)) => {
+                let mut result = Vec::new();
+                for val in v {
+                    match val {
+                        Value::Number(n) => result.push(*n),
+                        _ => return Err(JsValue::from_str("Vector contains non-numeric values")),
+                    }
+                }
+                Ok(result)
+            }
             Some(Value::Matrix(m)) => {
                 // También permitir obtener datos de matrices (aplanados)
                 Ok(m.data.clone())
@@ -131,13 +140,12 @@ pub fn create_complex_vector(data: Vec<f64>) -> Result<Handle, JsValue> {
         return Err(JsValue::from_str("Complex vector data must have even length (re, im pairs)"));
     }
 
-    let complex_data: Vec<Complex> = data
+    let complex_data: Vec<Value> = data
         .chunks(2)
-        .map(|chunk| Complex::new(chunk[0], chunk[1]))
+        .map(|chunk| Value::Complex(Complex::new(chunk[0], chunk[1])))
         .collect();
 
-    let vector = ComplexVector::new(complex_data);
-    Ok(HANDLES.with(|h| h.borrow_mut().create(Value::ComplexVector(vector))))
+    Ok(HANDLES.with(|h| h.borrow_mut().create(Value::Vector(complex_data))))
 }
 
 /// Get complex vector data as interleaved real/imaginary components
@@ -147,11 +155,21 @@ pub fn get_complex_vector(handle: Handle) -> Result<Vec<f64>, JsValue> {
     HANDLES.with(|handles| {
         let h = handles.borrow();
         match h.get(handle) {
-            Some(Value::ComplexVector(cv)) => {
-                let data: Vec<f64> = cv.data()
-                    .iter()
-                    .flat_map(|c| vec![c.re, c.im])
-                    .collect();
+            Some(Value::Vector(v)) => {
+                let mut data: Vec<f64> = Vec::new();
+                for val in v {
+                    match val {
+                        Value::Complex(c) => {
+                            data.push(c.re);
+                            data.push(c.im);
+                        },
+                        Value::Number(n) => {
+                            data.push(*n);
+                            data.push(0.0);
+                        }
+                        _ => return Err(JsValue::from_str("Vector contains non-numeric values")),
+                    }
+                }
                 Ok(data)
             }
             Some(_) => Err(JsValue::from_str("Handle does not reference a complex vector")),

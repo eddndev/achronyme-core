@@ -1,8 +1,56 @@
 # Plan de Implementación: Grafos y Redes en Achronyme
 
 **Fecha:** 2025-01-07
-**Versión:** 2.0
-**Estado:** Diseño Refinado - Sintaxis con Identificadores
+**Versión:** 3.1
+**Estado:** Diseño Final Aprobado - Identificadores Puros + Sintaxis `:` + Sin Campo `id`
+
+---
+
+## 0. Diseño Final v3.0 - Resumen Rápido ⭐
+
+### **Sintaxis Elegante y Consistente**
+
+```soc
+// 1. Preparar datos de nodos (opcional)
+let madrid = { lat: 40.4168, lon: -3.7038 }
+let barcelona = { lat: 41.3851, lon: 2.1734 }
+
+// 2. Construir red
+let mapa = {
+    nodes: {
+        Madrid: madrid,      // Clave 'Madrid' (ID), valor madrid (datos)
+        Barcelona: barcelona
+    },
+    edges: [
+        Madrid -> Barcelona: { km: 620, tiempo_h: 6.5 }
+        //  ↑      ↑       ↑
+        // IDs puros    Metadata (evaluada)
+        // (no evaluar)
+    ]
+}
+
+// 3. Acceso directo
+mapa.nodes.Madrid.lat     // 40.4168
+mapa.edges[0].km          // 620 (cuando tengamos indexing)
+```
+
+### **Principios Clave:**
+
+| Aspecto | Comportamiento |
+|---------|----------------|
+| **Identificadores en edges** | `A -> B` → IDs "A" y "B" (NUNCA evalúan variables) |
+| **Separador `:`** | `A -> B: metadata` → metadata SÍ se evalúa |
+| **Nodos como Record** | `nodes: { A: {...}, B: {...} }` → field access directo |
+| **Type promotion** | Record → Network si contiene Edges |
+| **Sin strings** | Solo identificadores válidos (no `"New York"`) |
+
+### **Ventajas del Diseño:**
+
+✅ **100% consistente con records:** Identificadores = claves, nunca se evalúan
+✅ **Sin ambigüedad:** Separación clara entre IDs y metadata
+✅ **Máxima simplicidad:** Sintaxis limpia y predecible
+✅ **Field access natural:** `red.nodes.A.color` funciona perfectamente
+✅ **Construcción dinámica:** Metadata puede ser variable o expresión
 
 ---
 
@@ -11,14 +59,20 @@
 Este documento define el diseño completo para el soporte de grafos/redes en el lenguaje SOC de Achronyme. El diseño sigue los principios de **minimalismo sintáctico**, **type promotion automática**, y **consistencia con tipos existentes** (especialmente Records).
 
 ### Objetivos:
-- ✅ Sintaxis declarativa simple y consistente con records
-- ✅ **Identificadores en edges** (no strings por defecto) para máxima limpieza
-- ✅ **Nodos como Record de Records** (field access directo)
-- ✅ Soporte para grafos dirigidos y no dirigidos
-- ✅ Propiedades en nodos y aristas
+- ✅ Sintaxis declarativa simple y **100% consistente con records**
+- ✅ **Identificadores puros en edges** (NUNCA evaluados como variables)
+- ✅ **Separador `:` para metadata** de edges (evaluada)
+- ✅ **Nodos como Record de Records** (field access directo O(1))
+- ✅ Soporte para grafos dirigidos (`->`) y no dirigidos (`--`)
 - ✅ Type promotion automática (Record → Network cuando contiene Edges)
 - ✅ Funciones built-in para consultas y algoritmos básicos
 - ✅ Extensibilidad para algoritmos futuros (BFS, DFS, PERT, etc.)
+
+### Principios de Diseño Clave:
+- **Consistencia total:** Edges usan identificadores como records usan claves
+- **Sin ambigüedad:** Identificadores antes de `->` nunca se evalúan
+- **Evaluación explícita:** Metadata después de `:` siempre se evalúa
+- **Minimalismo:** Sintaxis limpia sin verbosidad innecesaria
 
 ---
 
@@ -59,23 +113,24 @@ pub enum Value {
 
 **Sintaxis:**
 ```soc
-// Con IDENTIFICADORES (preferido - sintaxis limpia)
-A -> B                    // Edge dirigido simple
-A -> B { peso: 5 }        // Edge dirigido con propiedades
-A -- C                    // Edge no dirigido simple
-A -- C { distancia: 10 }  // Edge no dirigido con propiedades
+// Con IDENTIFICADORES PUROS (única forma permitida)
+A -> B                      // Edge dirigido simple (sin metadata)
+A -> B: { peso: 5 }         // Edge dirigido con metadata
+A -- C                      // Edge no dirigido simple
+A -- C: { distancia: 10 }   // Edge no dirigido con metadata
 
-// Con STRINGS (fallback para nombres con espacios/especiales)
-"New York" -> "Los Angeles"           // Edge con strings
-"Node 1" -> "Node 2" { distancia: 5 } // Edge con propiedades
+// Metadata puede ser variable o record literal
+let meta = { peso: 10, color: "red" }
+A -> B: meta                // Variable evaluada
+A -> C: { tipo: "directo" } // Record literal
 ```
 
 **Características:**
 - ✅ Los operadores `->` (dirigido) y `--` (no dirigido) crean valores `Value::Edge`
-- ✅ **Sintaxis dual:** identificadores (preferido) o strings (casos especiales)
-- ✅ Las propiedades son opcionales y se representan como un record literal
+- ✅ **SOLO identificadores permitidos** (no strings, no números, no expresiones)
+- ✅ **Identificadores NUNCA se evalúan** como variables (son IDs puros de nodo)
+- ✅ **Metadata después de `:` SÍ se evalúa** (puede ser variable o record literal)
 - ✅ Soporta field access: `e.from`, `e.to`, `e.directed`, `e.peso`
-- ✅ Los identificadores en edges NO pueden ser variables existentes (evita ambigüedad)
 
 ---
 
@@ -113,8 +168,8 @@ pub enum Value {
 ### 3.1. Nodos como Record de Records
 
 **Los nodos se declaran como un Record donde:**
-- **Clave:** Identificador del nodo (sin comillas)
-- **Valor:** Record con propiedades (campo `id` es opcional si coincide con la clave)
+- **Clave:** Identificador del nodo (es el ID)
+- **Valor:** Record con propiedades (SIN campo `id`)
 
 ```soc
 // Usuario escribe:
@@ -127,34 +182,30 @@ let red = {
     edges: [A -> B, B -> C]
 }
 
-// Internamente se valida/agrega campo 'id' si no existe:
+// Se almacena EXACTAMENTE así (sin campo 'id'):
 // nodes: {
-//     "A": { id: "A", peso: 1, color: "red" },
-//     "B": { id: "B", peso: 2, color: "blue" },
-//     "C": { id: "C", peso: 3, color: "green" }
+//     "A": { peso: 1, color: "red" },
+//     "B": { peso: 2, color: "blue" },
+//     "C": { peso: 3, color: "green" }
 // }
 ```
 
-**Validación:**
-- ✅ Campo `id` es **opcional** si coincide con la clave
-- ✅ Si `id` existe, DEBE coincidir con la clave
-- ❌ Error si `id` no coincide con la clave
+**Reglas:**
+- ✅ **NO hay campo `id`** en los records de nodos
+- ✅ La **clave del HashMap ES el ID** del nodo
+- ✅ **No hay validación** de `id` (no puede haber inconsistencia)
+- ✅ **Acceso por clave:** El ID se conoce por la clave usada en el acceso
 
 ```soc
-// ✅ Válido (id se infiere)
+// ✅ Sintaxis limpia (sin duplicación)
 nodes: {
-    A: { x: 10, color: "red" }  // id: "A" se agrega automáticamente
+    A: { x: 10, color: "red" }
 }
 
-// ✅ Válido (id explícito coincide)
-nodes: {
-    A: { id: "A", x: 10 }
-}
-
-// ❌ Error: "Node id 'B' does not match key 'A'"
-nodes: {
-    A: { id: "B", x: 10 }
-}
+// Acceso:
+red.nodes.A         // → { x: 10, color: "red" }
+red.nodes.A.color   // → "red"
+// El ID es "A" (se conoce por la clave de acceso)
 ```
 
 ---
@@ -222,11 +273,11 @@ let red = {
     edges: [A -> B, B -> C]
 }
 
-// Nodos inferidos (identificador → string ID):
+// Nodos inferidos (identificador → record vacío):
 nodes: {
-    "A": { id: "A" },
-    "B": { id: "B" },
-    "C": { id: "C" }
+    "A": {},
+    "B": {},
+    "C": {}
 }
 ```
 
@@ -241,23 +292,9 @@ let red = {
 
 // Resultado:
 nodes: {
-    "A": { id: "A", color: "red", x: 0 },  // ← Declarado
-    "B": { id: "B" },                       // ← Inferido de edge
-    "C": { id: "C" }                        // ← Inferido de edge
-}
-```
-
-**Con strings en edges:**
-```soc
-let red = {
-    edges: ["New York" -> "Boston", Boston -> "Miami"]
-}
-
-// Nodos inferidos:
-nodes: {
-    "New York": { id: "New York" },  // ← De string literal
-    "Boston": { id: "Boston" },      // ← De identificador
-    "Miami": { id: "Miami" }         // ← De identificador
+    "A": { color: "red", x: 0 },  // ← Declarado explícitamente
+    "B": {},                       // ← Inferido de edge (vacío)
+    "C": {}                        // ← Inferido de edge (vacío)
 }
 ```
 
@@ -267,15 +304,30 @@ nodes: {
 
 ### 4.1. Formas de Crear Networks
 
-#### **Forma A: Minimalista (Solo Edges con Identificadores)**
+#### **Forma A: Minimalista (Solo Edges)**
 ```soc
 // Nodos inferidos automáticamente de identificadores
 let red = {
-    edges: [A -> B, B -> C, C -> A]
+    edges: [
+        A -> B,
+        B -> C,
+        C -> A
+    ]
 }
 ```
 
-#### **Forma B: Con Nodos Explícitos (Record de Records)**
+#### **Forma B: Con Metadata en Edges**
+```soc
+let red = {
+    edges: [
+        A -> B: { peso: 5, tipo: "directo" },
+        B -> C: { peso: 3, tipo: "indirecto" },
+        C -> A: { peso: 2, tipo: "directo" }
+    ]
+}
+```
+
+#### **Forma C: Con Nodos Explícitos (Record de Records)**
 ```soc
 let red = {
     nodes: {
@@ -284,17 +336,38 @@ let red = {
         C: { x: 5, y: 10, color: "green" }
     },
     edges: [
-        A -> B { peso: 5 },
-        B -> C { peso: 3 },
-        C -> A { peso: 2 }
+        A -> B: { peso: 5 },
+        B -> C: { peso: 3 },
+        C -> A: { peso: 2 }
     ]
 }
 
 // Acceso directo a nodos:
-red.nodes.A  // → { id: "A", x: 0, y: 0, color: "red" }
+red.nodes.A         // → { x: 0, y: 0, color: "red" }
+red.nodes.A.color   // → "red"
 ```
 
-#### **Forma C: Con Metadata**
+#### **Forma D: Patrón con Variables del Mismo Nombre**
+```soc
+// Preparar datos de nodos (patrón común)
+let A = { color: "red", peso: 1 }
+let B = { color: "blue", peso: 2 }
+let C = { color: "green", peso: 3 }
+
+let red = {
+    nodes: {
+        A: A,  // ← Clave 'A' (ID), valor 'A' (variable con datos)
+        B: B,
+        C: C
+    },
+    edges: [
+        A -> B: { fuerza: 5 },  // ← 'A' y 'B' son IDs (no se evalúan)
+        B -> C: { fuerza: 3 }
+    ]
+}
+```
+
+#### **Forma E: Con Metadata del Grafo**
 ```soc
 let red = {
     autor: "Alice",
@@ -304,65 +377,88 @@ let red = {
         A: { peso: 1 },
         B: { peso: 2 }
     },
-    edges: [A -> B]
+    edges: [A -> B: { relacion: "conecta" }]
 }
 // metadata: { autor: "Alice", version: 2, fecha: "2025-01-07" }
 ```
 
-#### **Forma D: Mixto (Identificadores + Strings)**
-```soc
-let red_metro = {
-    edges: [
-        GranVia -> Sol { linea: 1 },
-        "Gran Vía" -> "Tirso de Molina" { linea: 1 },  // Con espacios
-        Sol -> Callao
-    ]
-}
-```
-
 ---
 
-### 4.2. Operadores de Edges
+### 4.2. Operadores de Edges y Sintaxis con `:`
 
 #### **Operador `->` (Dirigido)**
 ```soc
-// Con identificadores (preferido)
-A -> B              // Edge simple
-A -> B { peso: 5 }  // Edge con propiedades
-Madrid -> Barcelona { km: 620 }
+// Edge simple (sin metadata)
+A -> B
 
-// Con strings (casos especiales)
-"New York" -> "Boston"           // Nombres con espacios
-"Node 1" -> "Node 2" { peso: 5 } // Nombres con números/especiales
+// Edge con metadata (usando ':')
+A -> B: { peso: 5 }
+Madrid -> Barcelona: { km: 620, tiempo_h: 6.5 }
 ```
 
 #### **Operador `--` (No Dirigido)**
 ```soc
-// Con identificadores
-A -- B                    // Edge simple
-A -- B { distancia: 10 }  // Edge con propiedades
+// Edge simple
+A -- B
 
-// Con strings
-"Alice" -- "Bob" { relacion: "amigos" }
+// Edge con metadata
+A -- B: { distancia: 10 }
+Alice -- Bob: { relacion: "amigos", desde: 2020 }
 ```
 
-#### **Restricciones Importantes**
+#### **Metadata: Variable o Record Literal**
 ```soc
-// ❌ NO PERMITIDO: Números puros como identificadores
-1 -> 2  // Error: número no es identificador válido
+// Record literal
+A -> B: { peso: 5, color: "red" }
 
-// ✅ ALTERNATIVA: Usar prefijo
-N1 -> N2
-node_1 -> node_2
+// Variable (se evalúa)
+let meta_carretera = { tipo: "carretera", peajes: 2 }
+Madrid -> Barcelona: meta_carretera
 
-// ❌ NO PERMITIDO: Variables existentes como nodos
-let x = 10
-x -> B  // Error: 'x' es una variable, no puede ser nodo
+// Expresión
+A -> B: { peso: calcular_peso(), urgente: true }
+```
 
-// ✅ ALTERNATIVA: Usar strings para casos dinámicos
-let origen = "Madrid"
-let destino = "Barcelona"
-let e = origen -> destino { km: 620 }  // origen/destino evalúan a strings
+#### **Reglas Importantes**
+
+✅ **PERMITIDO:**
+```soc
+A -> B                // Identificadores simples
+Madrid -> Barcelona   // CamelCase
+node_1 -> node_2      // snake_case con números
+Start -> End          // Nombres descriptivos
+A -> B: meta          // Metadata como variable
+```
+
+❌ **NO PERMITIDO:**
+```soc
+// Números puros
+1 -> 2  // ❌ Error: número no es identificador
+
+// Strings (ni siquiera con espacios)
+"New York" -> "Boston"  // ❌ Error: solo identificadores permitidos
+
+// Variables como nodos (no se evalúan)
+let x = "Madrid"
+x -> B  // ❌ Crea nodo "x", NO "Madrid"
+```
+
+#### **Solución para Nombres con Espacios**
+```soc
+// Usar identificador corto + campo con nombre completo
+let mapa = {
+    nodes: {
+        NY: { nombre: "New York", poblacion: 8000000 },
+        LA: { nombre: "Los Angeles", poblacion: 4000000 }
+    },
+    edges: [
+        NY -> LA: { km: 4500 }
+    ]
+}
+
+// Acceso:
+mapa.nodes.NY.nombre  // "New York"
+// El ID es "NY" (por la clave), el nombre completo está en metadata
 ```
 
 ---
@@ -374,16 +470,16 @@ let e = origen -> destino { km: 620 }  // origen/destino evalúan a strings
 Los Edges soportan acceso a campos como Records.
 
 ```soc
-let e = A -> B { peso: 5, color: "red" }
+let e = A -> B: { peso: 5, color: "red" }
 
 // Campos especiales (built-in)
-let origen = e.from      // "A" (String - ID del nodo)
-let destino = e.to       // "B" (String - ID del nodo)
+let origen = e.from       // "A" (String - ID del nodo)
+let destino = e.to        // "B" (String - ID del nodo)
 let dirigido = e.directed // true (Boolean)
 
-// Propiedades custom
-let p = e.peso           // 5 (Number)
-let c = e.color          // "red" (String)
+// Propiedades de metadata
+let p = e.peso            // 5 (Number)
+let c = e.color           // "red" (String)
 ```
 
 **Implementación:**
@@ -423,7 +519,7 @@ let mis_nodos = red.nodes      // Record de nodos
 let autor = red.autor          // "Alice" (metadata)
 
 // ✅ Acceso directo a nodo específico
-let nodo_a = red.nodes.A       // { id: "A", color: "red", x: 0 }
+let nodo_a = red.nodes.A        // { color: "red", x: 0 }
 let color_a = red.nodes.A.color // "red"
 
 // Acceso a edges individuales (requiere indexing - futuro)
@@ -469,8 +565,8 @@ has_edge(network, from, to) → Boolean
 #### **Acceso a Datos**
 ```soc
 get_node(network, id) → Record
-// Retorna propiedades de un nodo
-// Ejemplo: get_node(red, "A") → { id: "A", color: "red" }
+// Retorna propiedades de un nodo (sin campo 'id')
+// Ejemplo: get_node(red, "A") → { color: "red", peso: 1 }
 
 get_edge(network, from, to) → Edge
 // Retorna edge específico
@@ -613,7 +709,7 @@ let popularidad_alice = degree(red_social, "alice")  // 2
 
 // Datos de un usuario
 let datos_alice = get_node(red_social, "alice")
-// → { id: "alice", nombre: "Alice", edad: 30, ciudad: "Madrid" }
+// → { nombre: "Alice", edad: 30, ciudad: "Madrid" }
 ```
 
 ---
@@ -754,28 +850,72 @@ edge_op_directed = { "->" }
 edge_op_undirected = { "--" }
 edge_op = { edge_op_directed | edge_op_undirected }
 
-// Nodos de edge: pueden ser identificadores o strings
-edge_node = { identifier | string_literal }
+// Nodos de edge: SOLO identificadores (no strings, no expresiones)
+edge_node = { identifier }
 
-// Edge literal: edge_node op edge_node [record]
+// Edge literal: node op node [":" metadata]
+// Metadata es opcional y puede ser cualquier expresión que evalúe a Record
 edge = {
-    edge_node ~ edge_op ~ edge_node ~ record?
+    edge_node ~ edge_op ~ edge_node ~ (":" ~ expr)?
 }
 
-// Integración en expresiones
+// Integración en la jerarquía de precedencia
 // Los edges tienen precedencia baja (después de field_access, antes de comparaciones)
-edge_expr = {
-    field_access ~ (edge_op ~ field_access ~ record?)?
+
+// Nivel 1: Field access (más alta)
+field_access = {
+    primary ~ ("." ~ identifier)*
 }
 
-// Actualizar jerarquía de precedencia
+// Nivel 2: Power
+power = {
+    field_access ~ ("^" ~ power)?
+}
+
+// Nivel 3: Unary
+unary = {
+    "-" ~ unary
+  | "!" ~ unary
+  | power
+}
+
+// Nivel 4: Multiplicative
+multiplicative = {
+    unary ~ (mult_op ~ unary)*
+}
+
+// Nivel 5: Additive
+additive = {
+    multiplicative ~ (add_op ~ multiplicative)*
+}
+
+// Nivel 6: EDGES (nueva precedencia)
+edge_expr = {
+    additive ~ (edge_op ~ additive ~ (":" ~ expr)?)?
+}
+
+// Nivel 7: Comparison
 comparison = {
     edge_expr ~ (cmp_op ~ edge_expr)?
 }
+
+// Nivel 8+: Logical operators
+logical_and = {
+    comparison ~ (logical_and_op ~ comparison)*
+}
+
+logical_or = {
+    logical_and ~ (logical_or_op ~ logical_and)*
+}
+
+// Expression entry point
+expr = { logical_or }
 ```
 
-**Nota:** Esta gramática requiere ajustes en la jerarquía de precedencia para evitar conflictos.
-El operador `->` debe tener menor precedencia que `.` (field access) pero mayor que operadores de comparación.
+**Notas importantes:**
+- Edge tiene precedencia **baja** (después de aritmética, antes de comparaciones)
+- Permite: `a + b -> c + d` evalúa como `(a+b) -> (c+d)`
+- El `:` separa el edge de su metadata (que puede ser expresión compleja)
 
 ---
 
@@ -786,76 +926,46 @@ pub enum AstNode {
     // ... existentes ...
 
     Edge {
-        from: Box<AstNode>,              // Debe evaluar a String
-        to: Box<AstNode>,                // Debe evaluar a String
+        from: String,                    // ID del nodo (identificador, NO evaluar)
+        to: String,                      // ID del nodo (identificador, NO evaluar)
         directed: bool,                  // true = ->, false = --
-        properties: Option<Box<AstNode>>, // Record opcional
+        metadata: Option<Box<AstNode>>,  // Expresión de metadata (evaluar)
     },
 }
 ```
+
+**Cambio clave:** `from` y `to` son **Strings directos** (no `Box<AstNode>`), porque los identificadores nunca se evalúan.
 
 ---
 
 ### 9.3. Evaluador
 
 #### **Evaluación de Edge:**
+
 ```rust
 fn evaluate_edge(
     &mut self,
-    from_node: &AstNode,
-    to_node: &AstNode,
+    from: &str,              // Identificador directo (ya parseado)
+    to: &str,                // Identificador directo (ya parseado)
     directed: bool,
-    properties: &Option<Box<AstNode>>
+    metadata_expr: &Option<Box<AstNode>>
 ) -> Result<Value, String> {
-    // Evaluar 'from' (puede ser Identifier o StringLiteral)
-    let from_id = match from_node {
-        AstNode::VariableRef(name) => {
-            // Si es un identificador, verificar si es variable
-            if self.scope.has_variable(name) {
-                // ERROR: no permitir variables como nodos (ambigüedad)
-                return Err(format!(
-                    "Cannot use variable '{}' as node ID. Use a string literal instead.",
-                    name
-                ));
-            }
-            // No es variable → es ID de nodo (identificador directo)
-            name.clone()
-        },
-        AstNode::StringLiteral(s) => s.clone(),
-        _ => {
-            // Intentar evaluar como expresión (para casos como let x = "A"; x -> B)
-            match self.evaluate(from_node)? {
-                Value::String(s) => s,
-                _ => return Err("Edge node must be identifier or string".to_string()),
-            }
-        }
-    };
+    // Los identificadores YA vienen como strings desde el parser
+    // NO necesitamos verificar variables, porque nunca se evalúan
+    let from_id = from.to_string();
+    let to_id = to.to_string();
 
-    // Mismo proceso para 'to'
-    let to_id = match to_node {
-        AstNode::VariableRef(name) => {
-            if self.scope.has_variable(name) {
-                return Err(format!(
-                    "Cannot use variable '{}' as node ID. Use a string literal instead.",
-                    name
-                ));
+    // Evaluar metadata (SÍ se evalúa, puede ser variable o expresión)
+    let properties = match metadata_expr {
+        Some(expr) => {
+            let value = self.evaluate(expr)?;
+            match value {
+                Value::Record(map) => map,
+                _ => return Err(format!(
+                    "Edge metadata must be a record, got {:?}",
+                    value
+                )),
             }
-            name.clone()
-        },
-        AstNode::StringLiteral(s) => s.clone(),
-        _ => {
-            match self.evaluate(to_node)? {
-                Value::String(s) => s,
-                _ => return Err("Edge node must be identifier or string".to_string()),
-            }
-        }
-    };
-
-    // Evaluar propiedades opcionales
-    let props = match properties {
-        Some(p) => match self.evaluate(p)? {
-            Value::Record(map) => map,
-            _ => return Err("Edge properties must be a record".to_string()),
         },
         None => HashMap::new(),
     };
@@ -864,10 +974,12 @@ fn evaluate_edge(
         from: from_id,
         to: to_id,
         directed,
-        properties: props,
+        properties,
     })
 }
 ```
+
+**Simplificación clave:** Como los identificadores ya vienen como `String` del AST (no como `AstNode`), el evaluador es mucho más simple. No hay verificación de variables porque el parser ya los convirtió a strings puros.
 
 #### **Type Promotion: Record → Network:**
 ```rust
@@ -1122,19 +1234,22 @@ assert(ruta.path == ["A", "B", "C"])
 
 ---
 
-## 13. Decisiones de Diseño Finales
+## 13. Decisiones de Diseño Finales (v3.0)
 
 | Aspecto | Decisión | Razón |
 |---------|----------|-------|
 | **Nodo como tipo** | NO es tipo separado, siempre Record | Simplicidad, consistencia |
-| **Nodos en sintaxis** | Record de Records: `{ A: {...}, B: {...} }` | Field access directo, O(1) búsqueda |
-| **Campo `id` en nodos** | Opcional si coincide con clave | Evita duplicación, validado automáticamente |
+| **Nodos en sintaxis** | Record de Records: `{ A: {...}, B: {...} }` | Field access directo O(1), consistente |
+| **Campo `id` en nodos** | ❌ NO existe (clave del HashMap es el ID) | Sin duplicación, sin validación necesaria |
 | **Edge como tipo** | SÍ es tipo primitivo | Primera clase, operadores binarios |
-| **Sintaxis de edges** | **Identificadores** (preferido) + strings (fallback) | Limpieza sintáctica, menos verbosidad |
-| **Identificadores vs variables** | No permitir variables como nodos | Evita ambigüedad, solo IDs directos |
+| **Sintaxis de edges** | **SOLO identificadores** (no strings, no variables) | Máxima consistencia con records |
+| **Separador metadata** | **`:` entre edge y metadata** | Distingue IDs (no evaluar) de metadata (evaluar) |
+| **Identificadores en edges** | **NUNCA se evalúan** como variables | Sin ambigüedad, IDs puros |
+| **Metadata de edges** | **SÍ se evalúa** (puede ser variable o literal) | Flexibilidad, construcción dinámica |
 | **Network como tipo** | SÍ es tipo contenedor | Agrupa nodos + edges + metadata |
 | **Type promotion** | Record → Network **solo si contiene Edges** | Edges son el distintivo, no campo `nodes` |
 | **Nodos no declarados** | Auto-inferir desde identificadores en edges | Flexibilidad, menos boilerplate |
+| **Nombres con espacios** | ❌ No permitidos, usar metadata en nodo | Mantiene field access funcional |
 | **Edges duplicados** | Permitir (multigrafo) | Útil para rutas múltiples |
 | **Self-loops** | Permitir | Válido en teoría de grafos |
 | **Grafos mixtos** | Permitir (dirigidos + no dirigidos) | Máxima flexibilidad |
@@ -1159,6 +1274,8 @@ assert(ruta.path == ["A", "B", "C"])
 |---------|-------|---------|
 | 1.0 | 2025-01-07 | Diseño inicial completo aprobado |
 | 2.0 | 2025-01-07 | **CAMBIOS MAYORES:** Sintaxis con identificadores en edges (no strings por defecto), nodos como Record de Records (no vector), validación de identificadores vs variables |
+| 3.0 | 2025-01-07 | **DISEÑO FINAL:** Identificadores NUNCA se evalúan (IDs puros), sintaxis `:` para metadata (evaluada), eliminación total de strings en edges, máxima consistencia con records |
+| 3.1 | 2025-01-07 | **Simplificación:** Eliminación del campo `id` en nodos (clave del HashMap ES el ID), sin duplicación ni validación |
 
 ---
 

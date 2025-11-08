@@ -20,19 +20,15 @@ pub fn format_value(value: &Value) -> String {
             }
         }
         Value::Vector(v) => {
-            let elements: Vec<String> = v.data().iter()
-                .map(|x| format!("{:.6}", x))
-                .collect();
-            format!("[{}]", elements.join(", "))
-        }
-        Value::ComplexVector(cv) => {
-            let elements: Vec<String> = cv.data().iter()
-                .map(|c| {
-                    if c.im >= 0.0 {
+            let elements: Vec<String> = v.iter()
+                .filter_map(|val| match val {
+                    Value::Number(n) => Some(format!("{:.6}", n)),
+                    Value::Complex(c) => Some(if c.im >= 0.0 {
                         format!("{}+{}i", c.re, c.im)
                     } else {
                         format!("{}{}i", c.re, c.im)
-                    }
+                    }),
+                    _ => None,
                 })
                 .collect();
             format!("[{}]", elements.join(", "))
@@ -57,6 +53,17 @@ pub fn format_value(value: &Value) -> String {
             fields.sort(); // Sort for consistent output
             format!("{{ {} }}", fields.join(", "))
         }
+        Value::Edge { from, to, directed, properties } => {
+            let arrow = if *directed { "->" } else { "--" };
+            if properties.is_empty() {
+                format!("{} {} {}", from, arrow, to)
+            } else {
+                let props: Vec<String> = properties.iter()
+                    .map(|(k, v)| format!("{}: {}", k, format_value(v)))
+                    .collect();
+                format!("{} {} {}: {{ {} }}", from, arrow, to, props.join(", "))
+            }
+        }
         Value::Function(_) => "x => <function>".to_string(),
     }
 }
@@ -70,7 +77,15 @@ where
     let data_copy = HANDLES.with(|h| {
         let handles = h.borrow();
         match handles.get(handle) {
-            Some(Value::Vector(v)) => Ok(v.data().to_vec()),
+            Some(Value::Vector(v)) => {
+                // Convert Vec<Value> to Vec<f64>
+                v.iter()
+                    .map(|val| match val {
+                        Value::Number(n) => Ok(*n),
+                        _ => Err(JsValue::from_str(&format!("{} requires numeric vector", op_name))),
+                    })
+                    .collect()
+            }
             Some(Value::Number(n)) => Ok(vec![*n]),
             Some(_) => Err(JsValue::from_str(&format!("{} requires a vector or number handle", op_name))),
             None => Err(JsValue::from_str(&format!("Invalid handle for {}", op_name))),
@@ -78,41 +93,33 @@ where
     })?;
 
     // Step 2: Perform calculation. No borrows are held.
-    let result_data: Vec<f64> = data_copy.iter().map(|&x| f(x)).collect();
-    let result_vector = Vector::new(result_data);
+    let result_data: Vec<Value> = data_copy.iter()
+        .map(|&x| Value::Number(f(x)))
+        .collect();
 
     // Step 3: Create a new handle. This is a mutable borrow.
     Ok(HANDLES.with(|h| {
-        h.borrow_mut().create(Value::Vector(result_vector))
+        h.borrow_mut().create(Value::Vector(result_data))
     }))
 }
 
 /// Generic helper for safe binary operations on handles.
 pub fn apply_binary_op<F>(handle1: Handle, handle2: Handle, f: F) -> Result<Handle, JsValue>
 where
-    F: Fn(&Vector, &Vector) -> Result<Vector, String>,
+    F: Fn(&Value, &Value) -> Result<Value, JsValue>,
 {
-    // Step 1: Read and copy data for both handles
-    let (data1, data2) = HANDLES.with(|h| {
+    // Step 1: Borrow handles and obtain references to values
+    let result = HANDLES.with(|h| {
         let handles = h.borrow();
-        let v1 = match handles.get(handle1) {
-            Some(Value::Vector(v)) => Ok(v.data().to_vec()),
-            _ => Err(JsValue::from_str("Handle 1 is not a vector")),
-        };
-        let v2 = match handles.get(handle2) {
-            Some(Value::Vector(v)) => Ok(v.data().to_vec()),
-            _ => Err(JsValue::from_str("Handle 2 is not a vector")),
-        };
-        v1.and_then(|d1| v2.map(|d2| (d1, d2)))
+        let val1 = handles.get(handle1)
+            .ok_or_else(|| JsValue::from_str("Handle 1 is invalid"))?;
+        let val2 = handles.get(handle2)
+            .ok_or_else(|| JsValue::from_str("Handle 2 is invalid"))?;
+
+        // Execute the operation
+        f(val1, val2)
     })?;
 
-    // Step 2: Perform computation with no borrows held
-    let vec1 = Vector::new(data1);
-    let vec2 = Vector::new(data2);
-    let result_vec = f(&vec1, &vec2).map_err(|e| JsValue::from_str(&e))?;
-
-    // Step 3: Write result with a new mutable borrow
-    Ok(HANDLES.with(|h| {
-        h.borrow_mut().create(Value::Vector(result_vec))
-    }))
+    // Step 2: Create new handle with the result
+    Ok(HANDLES.with(|h| h.borrow_mut().create(result)))
 }

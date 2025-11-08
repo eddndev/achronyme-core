@@ -40,13 +40,13 @@ fn test_complex_vector_literal() {
     let result = evaluator.eval_str("[i, 2+3i, 4]").unwrap();
 
     match result {
-        Value::ComplexVector(cv) => {
-            assert_eq!(cv.len(), 3);
-            assert_eq!(cv.data()[0], Complex::new(0.0, 1.0));
-            assert_eq!(cv.data()[1], Complex::new(2.0, 3.0));
-            assert_eq!(cv.data()[2], Complex::new(4.0, 0.0));
+        Value::Vector(v) => {
+            assert_eq!(v.len(), 3);
+            assert_eq!(v[0], Value::Complex(Complex::new(0.0, 1.0)));
+            assert_eq!(v[1], Value::Complex(Complex::new(2.0, 3.0)));
+            assert_eq!(v[2], Value::Number(4.0));
         }
-        _ => panic!("Expected complex vector, got {:?}", result),
+        _ => panic!("Expected vector, got {:?}", result),
     }
 }
 
@@ -57,12 +57,12 @@ fn test_complex_vector_addition() {
     let result = evaluator.eval_str("[1+2i, 3+4i] + [5+6i, 7+8i]").unwrap();
 
     match result {
-        Value::ComplexVector(cv) => {
-            assert_eq!(cv.len(), 2);
-            assert_eq!(cv.data()[0], Complex::new(6.0, 8.0));
-            assert_eq!(cv.data()[1], Complex::new(10.0, 12.0));
+        Value::Vector(v) => {
+            assert_eq!(v.len(), 2);
+            assert_eq!(v[0], Value::Complex(Complex::new(6.0, 8.0)));
+            assert_eq!(v[1], Value::Complex(Complex::new(10.0, 12.0)));
         }
-        _ => panic!("Expected complex vector"),
+        _ => panic!("Expected vector"),
     }
 }
 
@@ -74,14 +74,14 @@ fn test_complex_vector_multiplication() {
     let result = evaluator.eval_str("[1+i, 2+2i] * [1-i, 1+i]").unwrap();
 
     match result {
-        Value::ComplexVector(cv) => {
-            assert_eq!(cv.len(), 2);
+        Value::Vector(v) => {
+            assert_eq!(v.len(), 2);
             // (1+i)(1-i) = 1 - i + i - i^2 = 1 - (-1) = 2
-            assert_eq!(cv.data()[0], Complex::new(2.0, 0.0));
+            assert_eq!(v[0], Value::Complex(Complex::new(2.0, 0.0)));
             // (2+2i)(1+i) = 2 + 2i + 2i + 2i^2 = 2 + 4i - 2 = 0 + 4i
-            assert_eq!(cv.data()[1], Complex::new(0.0, 4.0));
+            assert_eq!(v[1], Value::Complex(Complex::new(0.0, 4.0)));
         }
-        _ => panic!("Expected complex vector"),
+        _ => panic!("Expected vector"),
     }
 }
 

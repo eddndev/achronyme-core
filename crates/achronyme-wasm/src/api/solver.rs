@@ -31,7 +31,14 @@ pub fn simplex(
             let handles = h.borrow();
 
             let c = match handles.get(c_handle) {
-                Some(Value::Vector(v)) => Ok(v.data().to_vec()),
+                Some(Value::Vector(v)) => {
+                    v.iter()
+                        .map(|val| match val {
+                            Value::Number(n) => Ok(*n),
+                            _ => Err(JsValue::from_str("Vector must contain only numbers")),
+                        })
+                        .collect::<Result<Vec<f64>, _>>()
+                },
                 _ => Err(JsValue::from_str("simplex: c must be a vector")),
             }?;
 
@@ -41,7 +48,14 @@ pub fn simplex(
             }?;
 
             let b = match handles.get(b_handle) {
-                Some(Value::Vector(v)) => Ok(v.data().to_vec()),
+                Some(Value::Vector(v)) => {
+                    v.iter()
+                        .map(|val| match val {
+                            Value::Number(n) => Ok(*n),
+                            _ => Err(JsValue::from_str("Vector must contain only numbers")),
+                        })
+                        .collect::<Result<Vec<f64>, _>>()
+                },
                 _ => Err(JsValue::from_str("simplex: b must be a vector")),
             }?;
 
@@ -54,7 +68,7 @@ pub fn simplex(
             .map_err(|e| JsValue::from_str(&e))?;
 
         // Create handle for solution
-        Ok(h.borrow_mut().create(Value::Vector(Vector::new(solution))))
+        Ok(h.borrow_mut().create(Value::Vector(solution.iter().map(|&n| Value::Number(n)).collect())))
     })
 }
 
@@ -72,7 +86,14 @@ pub fn linprog(
             let handles = h.borrow();
 
             let c = match handles.get(c_handle) {
-                Some(Value::Vector(v)) => Ok(v.data().to_vec()),
+                Some(Value::Vector(v)) => {
+                    v.iter()
+                        .map(|val| match val {
+                            Value::Number(n) => Ok(*n),
+                            _ => Err(JsValue::from_str("Vector must contain only numbers")),
+                        })
+                        .collect::<Result<Vec<f64>, _>>()
+                },
                 _ => Err(JsValue::from_str("linprog: c must be a vector")),
             }?;
 
@@ -82,7 +103,14 @@ pub fn linprog(
             }?;
 
             let b = match handles.get(b_handle) {
-                Some(Value::Vector(v)) => Ok(v.data().to_vec()),
+                Some(Value::Vector(v)) => {
+                    v.iter()
+                        .map(|val| match val {
+                            Value::Number(n) => Ok(*n),
+                            _ => Err(JsValue::from_str("Vector must contain only numbers")),
+                        })
+                        .collect::<Result<Vec<f64>, _>>()
+                },
                 _ => Err(JsValue::from_str("linprog: b must be a vector")),
             }?;
 
@@ -93,7 +121,7 @@ pub fn linprog(
         let solution = linprog_solve(&c_vec, &a_mat, &b_vec, sense)
             .map_err(|e| JsValue::from_str(&e))?;
 
-        Ok(h.borrow_mut().create(Value::Vector(Vector::new(solution))))
+        Ok(h.borrow_mut().create(Value::Vector(solution.iter().map(|&n| Value::Number(n)).collect())))
     })
 }
 
@@ -111,7 +139,14 @@ pub fn dual_simplex(
             let handles = h.borrow();
 
             let c = match handles.get(c_handle) {
-                Some(Value::Vector(v)) => Ok(v.data().to_vec()),
+                Some(Value::Vector(v)) => {
+                    v.iter()
+                        .map(|val| match val {
+                            Value::Number(n) => Ok(*n),
+                            _ => Err(JsValue::from_str("Vector must contain only numbers")),
+                        })
+                        .collect::<Result<Vec<f64>, _>>()
+                },
                 _ => Err(JsValue::from_str("dualSimplex: c must be a vector")),
             }?;
 
@@ -121,7 +156,14 @@ pub fn dual_simplex(
             }?;
 
             let b = match handles.get(b_handle) {
-                Some(Value::Vector(v)) => Ok(v.data().to_vec()),
+                Some(Value::Vector(v)) => {
+                    v.iter()
+                        .map(|val| match val {
+                            Value::Number(n) => Ok(*n),
+                            _ => Err(JsValue::from_str("Vector must contain only numbers")),
+                        })
+                        .collect::<Result<Vec<f64>, _>>()
+                },
                 _ => Err(JsValue::from_str("dualSimplex: b must be a vector")),
             }?;
 
@@ -132,7 +174,7 @@ pub fn dual_simplex(
         let solution = dual_simplex_solve(&c_vec, &a_mat, &b_vec, sense)
             .map_err(|e| JsValue::from_str(&e))?;
 
-        Ok(h.borrow_mut().create(Value::Vector(Vector::new(solution))))
+        Ok(h.borrow_mut().create(Value::Vector(solution.iter().map(|&n| Value::Number(n)).collect())))
     })
 }
 
@@ -150,7 +192,14 @@ pub fn two_phase_simplex(
             let handles = h.borrow();
 
             let c = match handles.get(c_handle) {
-                Some(Value::Vector(v)) => Ok(v.data().to_vec()),
+                Some(Value::Vector(v)) => {
+                    v.iter()
+                        .map(|val| match val {
+                            Value::Number(n) => Ok(*n),
+                            _ => Err(JsValue::from_str("Vector must contain only numbers")),
+                        })
+                        .collect::<Result<Vec<f64>, _>>()
+                },
                 _ => Err(JsValue::from_str("twoPhaseSimplex: c must be a vector")),
             }?;
 
@@ -160,7 +209,14 @@ pub fn two_phase_simplex(
             }?;
 
             let b = match handles.get(b_handle) {
-                Some(Value::Vector(v)) => Ok(v.data().to_vec()),
+                Some(Value::Vector(v)) => {
+                    v.iter()
+                        .map(|val| match val {
+                            Value::Number(n) => Ok(*n),
+                            _ => Err(JsValue::from_str("Vector must contain only numbers")),
+                        })
+                        .collect::<Result<Vec<f64>, _>>()
+                },
                 _ => Err(JsValue::from_str("twoPhaseSimplex: b must be a vector")),
             }?;
 
@@ -171,7 +227,7 @@ pub fn two_phase_simplex(
         let solution = two_phase_solve(&c_vec, &a_mat, &b_vec, sense)
             .map_err(|e| JsValue::from_str(&e))?;
 
-        Ok(h.borrow_mut().create(Value::Vector(Vector::new(solution))))
+        Ok(h.borrow_mut().create(Value::Vector(solution.iter().map(|&n| Value::Number(n)).collect())))
     })
 }
 
@@ -189,7 +245,14 @@ pub fn revised_simplex(
             let handles = h.borrow();
 
             let c = match handles.get(c_handle) {
-                Some(Value::Vector(v)) => Ok(v.data().to_vec()),
+                Some(Value::Vector(v)) => {
+                    v.iter()
+                        .map(|val| match val {
+                            Value::Number(n) => Ok(*n),
+                            _ => Err(JsValue::from_str("Vector must contain only numbers")),
+                        })
+                        .collect::<Result<Vec<f64>, _>>()
+                },
                 _ => Err(JsValue::from_str("revisedSimplex: c must be a vector")),
             }?;
 
@@ -199,7 +262,14 @@ pub fn revised_simplex(
             }?;
 
             let b = match handles.get(b_handle) {
-                Some(Value::Vector(v)) => Ok(v.data().to_vec()),
+                Some(Value::Vector(v)) => {
+                    v.iter()
+                        .map(|val| match val {
+                            Value::Number(n) => Ok(*n),
+                            _ => Err(JsValue::from_str("Vector must contain only numbers")),
+                        })
+                        .collect::<Result<Vec<f64>, _>>()
+                },
                 _ => Err(JsValue::from_str("revisedSimplex: b must be a vector")),
             }?;
 
@@ -210,7 +280,7 @@ pub fn revised_simplex(
         let solution = revised_simplex_solve(&c_vec, &a_mat, &b_vec, sense)
             .map_err(|e| JsValue::from_str(&e))?;
 
-        Ok(h.borrow_mut().create(Value::Vector(Vector::new(solution))))
+        Ok(h.borrow_mut().create(Value::Vector(solution.iter().map(|&n| Value::Number(n)).collect())))
     })
 }
 
@@ -226,12 +296,26 @@ pub fn objective_value(
             let handles = h.borrow();
 
             let c = match handles.get(c_handle) {
-                Some(Value::Vector(v)) => Ok(v.data().to_vec()),
+                Some(Value::Vector(v)) => {
+                    v.iter()
+                        .map(|val| match val {
+                            Value::Number(n) => Ok(*n),
+                            _ => Err(JsValue::from_str("Vector must contain only numbers")),
+                        })
+                        .collect::<Result<Vec<f64>, _>>()
+                },
                 _ => Err(JsValue::from_str("objectiveValue: c must be a vector")),
             }?;
 
             let x = match handles.get(x_handle) {
-                Some(Value::Vector(v)) => Ok(v.data().to_vec()),
+                Some(Value::Vector(v)) => {
+                    v.iter()
+                        .map(|val| match val {
+                            Value::Number(n) => Ok(*n),
+                            _ => Err(JsValue::from_str("Vector must contain only numbers")),
+                        })
+                        .collect::<Result<Vec<f64>, _>>()
+                },
                 _ => Err(JsValue::from_str("objectiveValue: x must be a vector")),
             }?;
 
@@ -261,7 +345,14 @@ pub fn shadow_price(
             let handles = h.borrow();
 
             let c = match handles.get(c_handle) {
-                Some(Value::Vector(v)) => Ok(v.data().to_vec()),
+                Some(Value::Vector(v)) => {
+                    v.iter()
+                        .map(|val| match val {
+                            Value::Number(n) => Ok(*n),
+                            _ => Err(JsValue::from_str("Vector must contain only numbers")),
+                        })
+                        .collect::<Result<Vec<f64>, _>>()
+                },
                 _ => Err(JsValue::from_str("shadowPrice: c must be a vector")),
             }?;
 
@@ -271,7 +362,14 @@ pub fn shadow_price(
             }?;
 
             let b = match handles.get(b_handle) {
-                Some(Value::Vector(v)) => Ok(v.data().to_vec()),
+                Some(Value::Vector(v)) => {
+                    v.iter()
+                        .map(|val| match val {
+                            Value::Number(n) => Ok(*n),
+                            _ => Err(JsValue::from_str("Vector must contain only numbers")),
+                        })
+                        .collect::<Result<Vec<f64>, _>>()
+                },
                 _ => Err(JsValue::from_str("shadowPrice: b must be a vector")),
             }?;
 
@@ -282,7 +380,7 @@ pub fn shadow_price(
         let prices = shadow_price(&c_vec, &a_mat, &b_vec, sense)
             .map_err(|e| JsValue::from_str(&e))?;
 
-        Ok(h.borrow_mut().create(Value::Vector(Vector::new(prices))))
+        Ok(h.borrow_mut().create(Value::Vector(prices.iter().map(|&n| Value::Number(n)).collect())))
     })
 }
 
@@ -303,7 +401,14 @@ pub fn sensitivity_c(
             let handles = h.borrow();
 
             let c = match handles.get(c_handle) {
-                Some(Value::Vector(v)) => Ok(v.data().to_vec()),
+                Some(Value::Vector(v)) => {
+                    v.iter()
+                        .map(|val| match val {
+                            Value::Number(n) => Ok(*n),
+                            _ => Err(JsValue::from_str("Vector must contain only numbers")),
+                        })
+                        .collect::<Result<Vec<f64>, _>>()
+                },
                 _ => Err(JsValue::from_str("sensitivityC: c must be a vector")),
             }?;
 
@@ -313,7 +418,14 @@ pub fn sensitivity_c(
             }?;
 
             let b = match handles.get(b_handle) {
-                Some(Value::Vector(v)) => Ok(v.data().to_vec()),
+                Some(Value::Vector(v)) => {
+                    v.iter()
+                        .map(|val| match val {
+                            Value::Number(n) => Ok(*n),
+                            _ => Err(JsValue::from_str("Vector must contain only numbers")),
+                        })
+                        .collect::<Result<Vec<f64>, _>>()
+                },
                 _ => Err(JsValue::from_str("sensitivityC: b must be a vector")),
             }?;
 
@@ -324,7 +436,7 @@ pub fn sensitivity_c(
         let range = sensitivity_c(&c_vec, &a_mat, &b_vec, index)
             .map_err(|e| JsValue::from_str(&e))?;
 
-        Ok(h.borrow_mut().create(Value::Vector(Vector::new(range))))
+        Ok(h.borrow_mut().create(Value::Vector(range.iter().map(|&n| Value::Number(n)).collect())))
     })
 }
 
@@ -345,7 +457,14 @@ pub fn sensitivity_b(
             let handles = h.borrow();
 
             let c = match handles.get(c_handle) {
-                Some(Value::Vector(v)) => Ok(v.data().to_vec()),
+                Some(Value::Vector(v)) => {
+                    v.iter()
+                        .map(|val| match val {
+                            Value::Number(n) => Ok(*n),
+                            _ => Err(JsValue::from_str("Vector must contain only numbers")),
+                        })
+                        .collect::<Result<Vec<f64>, _>>()
+                },
                 _ => Err(JsValue::from_str("sensitivityB: c must be a vector")),
             }?;
 
@@ -355,7 +474,14 @@ pub fn sensitivity_b(
             }?;
 
             let b = match handles.get(b_handle) {
-                Some(Value::Vector(v)) => Ok(v.data().to_vec()),
+                Some(Value::Vector(v)) => {
+                    v.iter()
+                        .map(|val| match val {
+                            Value::Number(n) => Ok(*n),
+                            _ => Err(JsValue::from_str("Vector must contain only numbers")),
+                        })
+                        .collect::<Result<Vec<f64>, _>>()
+                },
                 _ => Err(JsValue::from_str("sensitivityB: b must be a vector")),
             }?;
 
@@ -366,7 +492,7 @@ pub fn sensitivity_b(
         let range = sensitivity_b(&c_vec, &a_mat, &b_vec, index)
             .map_err(|e| JsValue::from_str(&e))?;
 
-        Ok(h.borrow_mut().create(Value::Vector(Vector::new(range))))
+        Ok(h.borrow_mut().create(Value::Vector(range.iter().map(|&n| Value::Number(n)).collect())))
     })
 }
 
@@ -413,7 +539,14 @@ pub fn intlinprog(
             let handles = h.borrow();
 
             let c = match handles.get(c_handle) {
-                Some(Value::Vector(v)) => Ok(v.data().to_vec()),
+                Some(Value::Vector(v)) => {
+                    v.iter()
+                        .map(|val| match val {
+                            Value::Number(n) => Ok(*n),
+                            _ => Err(JsValue::from_str("Vector must contain only numbers")),
+                        })
+                        .collect::<Result<Vec<f64>, _>>()
+                },
                 _ => Err(JsValue::from_str("intlinprog: c must be a vector")),
             }?;
 
@@ -423,15 +556,26 @@ pub fn intlinprog(
             }?;
 
             let b = match handles.get(b_handle) {
-                Some(Value::Vector(v)) => Ok(v.data().to_vec()),
+                Some(Value::Vector(v)) => {
+                    v.iter()
+                        .map(|val| match val {
+                            Value::Number(n) => Ok(*n),
+                            _ => Err(JsValue::from_str("Vector must contain only numbers")),
+                        })
+                        .collect::<Result<Vec<f64>, _>>()
+                },
                 _ => Err(JsValue::from_str("intlinprog: b must be a vector")),
             }?;
 
             let integer_vars_vec = match handles.get(integer_vars_handle) {
                 Some(Value::Vector(v)) => {
-                    // Convert f64 to usize
-                    let vars: Vec<usize> = v.data().iter().map(|&val| val as usize).collect();
-                    Ok(vars)
+                    // Convert Vec<Value> to Vec<usize>
+                    v.iter()
+                        .map(|val| match val {
+                            Value::Number(n) => Ok(*n as usize),
+                            _ => Err(JsValue::from_str("Vector must contain only numbers")),
+                        })
+                        .collect::<Result<Vec<usize>, _>>()
                 }
                 _ => Err(JsValue::from_str("intlinprog: integer_vars must be a vector")),
             }?;
@@ -443,7 +587,7 @@ pub fn intlinprog(
         let solution = intlinprog(&c_vec, &a_mat, &b_vec, sense, &int_vars)
             .map_err(|e| JsValue::from_str(e.as_str()))?;
 
-        Ok(h.borrow_mut().create(Value::Vector(Vector::new(solution))))
+        Ok(h.borrow_mut().create(Value::Vector(solution.iter().map(|&n| Value::Number(n)).collect())))
     })
 }
 
@@ -486,7 +630,14 @@ pub fn binary_linprog(
             let handles = h.borrow();
 
             let c = match handles.get(c_handle) {
-                Some(Value::Vector(v)) => Ok(v.data().to_vec()),
+                Some(Value::Vector(v)) => {
+                    v.iter()
+                        .map(|val| match val {
+                            Value::Number(n) => Ok(*n),
+                            _ => Err(JsValue::from_str("Vector must contain only numbers")),
+                        })
+                        .collect::<Result<Vec<f64>, _>>()
+                },
                 _ => Err(JsValue::from_str("binaryLinprog: c must be a vector")),
             }?;
 
@@ -496,15 +647,26 @@ pub fn binary_linprog(
             }?;
 
             let b = match handles.get(b_handle) {
-                Some(Value::Vector(v)) => Ok(v.data().to_vec()),
+                Some(Value::Vector(v)) => {
+                    v.iter()
+                        .map(|val| match val {
+                            Value::Number(n) => Ok(*n),
+                            _ => Err(JsValue::from_str("Vector must contain only numbers")),
+                        })
+                        .collect::<Result<Vec<f64>, _>>()
+                },
                 _ => Err(JsValue::from_str("binaryLinprog: b must be a vector")),
             }?;
 
             let binary_vars_vec = match handles.get(binary_vars_handle) {
                 Some(Value::Vector(v)) => {
-                    // Convert f64 to usize
-                    let vars: Vec<usize> = v.data().iter().map(|&val| val as usize).collect();
-                    Ok(vars)
+                    // Convert Vec<Value> to Vec<usize>
+                    v.iter()
+                        .map(|val| match val {
+                            Value::Number(n) => Ok(*n as usize),
+                            _ => Err(JsValue::from_str("Vector must contain only numbers")),
+                        })
+                        .collect::<Result<Vec<usize>, _>>()
                 }
                 _ => Err(JsValue::from_str("binaryLinprog: binary_vars must be a vector")),
             }?;
@@ -516,6 +678,6 @@ pub fn binary_linprog(
         let solution = binary_linprog(&c_vec, &a_mat, &b_vec, sense, &bin_vars)
             .map_err(|e| JsValue::from_str(e.as_str()))?;
 
-        Ok(h.borrow_mut().create(Value::Vector(Vector::new(solution))))
+        Ok(h.borrow_mut().create(Value::Vector(solution.iter().map(|&n| Value::Number(n)).collect())))
     })
 }

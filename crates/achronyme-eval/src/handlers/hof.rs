@@ -1,8 +1,5 @@
 use achronyme_parser::ast::AstNode;
 use achronyme_types::value::Value;
-use achronyme_types::vector::Vector;
-use achronyme_types::complex::Complex;
-use achronyme_types::complex_vector::ComplexVector;
 
 use crate::evaluator::Evaluator;
 
@@ -30,29 +27,15 @@ pub fn handle_map(evaluator: &mut Evaluator, args: &[AstNode]) -> Result<Value, 
         _ => return Err("First argument to map must be a function".to_string()),
     };
 
-    // Evaluate all collection arguments (must be vectors - real or complex)
-    enum Collection {
-        Real(Vector),
-        Complex(ComplexVector),
-    }
-
-    let mut collections: Vec<Collection> = Vec::new();
-    let mut min_length = usize::MAX;
-    let mut has_complex = false;
-
+    // Evaluate all collection arguments (must be vectors)
+    let mut collections: Vec<Vec<Value>> = Vec::new();
     for arg in &args[1..] {
         let coll_value = evaluator.evaluate(arg)?;
         match coll_value {
             Value::Vector(v) => {
-                min_length = min_length.min(v.len());
-                collections.push(Collection::Real(v));
+                collections.push(v);
             }
-            Value::ComplexVector(cv) => {
-                min_length = min_length.min(cv.len());
-                collections.push(Collection::Complex(cv));
-                has_complex = true;
-            }
-            _ => return Err("map arguments must be vectors (real or complex)".to_string()),
+            _ => return Err("map arguments must be vectors".to_string()),
         }
     }
 
@@ -65,48 +48,24 @@ pub fn handle_map(evaluator: &mut Evaluator, args: &[AstNode]) -> Result<Value, 
         ));
     }
 
-    // Apply function to each element
-    let mut real_results = Vec::new();
-    let mut complex_results = Vec::new();
-    let mut result_is_complex = false;
+    // Determine minimum length
+    let min_length = collections.iter().map(|v| v.len()).min().unwrap_or(0);
 
+    // Apply function to each element
+    let mut results = Vec::new();
     for i in 0..min_length {
         // Gather arguments for this iteration
         let mut func_args = Vec::new();
         for coll in &collections {
-            match coll {
-                Collection::Real(v) => {
-                    func_args.push(Value::Number(v.data()[i]));
-                }
-                Collection::Complex(cv) => {
-                    func_args.push(Value::Complex(cv.data()[i]));
-                }
-            }
+            func_args.push(coll[i].clone());
         }
 
         // Apply function
         let result = evaluator.apply_lambda(&func, func_args)?;
-
-        // Store result
-        match result {
-            Value::Number(n) => {
-                real_results.push(n);
-                complex_results.push(Complex::new(n, 0.0));
-            }
-            Value::Complex(c) => {
-                complex_results.push(c);
-                result_is_complex = true;
-            }
-            _ => return Err("map function must return numbers or complex numbers".to_string()),
-        }
+        results.push(result);
     }
 
-    // Return complex vector if any input was complex or result is complex
-    if has_complex || result_is_complex {
-        Ok(Value::ComplexVector(ComplexVector::new(complex_results)))
-    } else {
-        Ok(Value::Vector(Vector::new(real_results)))
-    }
+    Ok(Value::Vector(results))
 }
 
 /// filter(predicate, collection) - Filter elements
@@ -130,18 +89,15 @@ pub fn handle_filter(evaluator: &mut Evaluator, args: &[AstNode]) -> Result<Valu
         return Err("filter predicate must take exactly 1 argument".to_string());
     }
 
-    // Evaluate second argument (must be a vector - real or complex)
+    // Evaluate second argument (must be a vector)
     let collection_value = evaluator.evaluate(&args[1])?;
 
     match collection_value {
         Value::Vector(collection) => {
-            // Filter real vector
             let mut results = Vec::new();
-            for i in 0..collection.len() {
-                let elem = Value::Number(collection.data()[i]);
-
+            for elem in collection {
                 // Apply predicate
-                let result = evaluator.apply_lambda(&predicate, vec![elem])?;
+                let result = evaluator.apply_lambda(&predicate, vec![elem.clone()])?;
 
                 // Check result (boolean or non-zero number = true)
                 let should_include = match result {
@@ -151,36 +107,12 @@ pub fn handle_filter(evaluator: &mut Evaluator, args: &[AstNode]) -> Result<Valu
                 };
 
                 if should_include {
-                    results.push(collection.data()[i]);
+                    results.push(elem);
                 }
             }
-
-            Ok(Value::Vector(Vector::new(results)))
+            Ok(Value::Vector(results))
         }
-        Value::ComplexVector(collection) => {
-            // Filter complex vector
-            let mut results = Vec::new();
-            for i in 0..collection.len() {
-                let elem = Value::Complex(collection.data()[i]);
-
-                // Apply predicate
-                let result = evaluator.apply_lambda(&predicate, vec![elem])?;
-
-                // Check result (boolean or non-zero number = true)
-                let should_include = match result {
-                    Value::Boolean(b) => b,
-                    Value::Number(n) => n != 0.0,
-                    _ => return Err("filter predicate must return a boolean or number".to_string()),
-                };
-
-                if should_include {
-                    results.push(collection.data()[i]);
-                }
-            }
-
-            Ok(Value::ComplexVector(ComplexVector::new(results)))
-        }
-        _ => Err("Second argument to filter must be a vector (real or complex)".to_string()),
+        _ => Err("Second argument to filter must be a vector".to_string()),
     }
 }
 
@@ -207,77 +139,20 @@ pub fn handle_reduce(evaluator: &mut Evaluator, args: &[AstNode]) -> Result<Valu
     }
 
     // Evaluate second argument (initial value)
-    let init_value = evaluator.evaluate(&args[1])?;
+    let mut accumulator = evaluator.evaluate(&args[1])?;
 
     // Evaluate third argument (collection)
     let collection_value = evaluator.evaluate(&args[2])?;
 
-    match (init_value, collection_value) {
-        // Number accumulator, real vector
-        (Value::Number(mut accumulator), Value::Vector(collection)) => {
-            for i in 0..collection.len() {
-                let acc_val = Value::Number(accumulator);
-                let elem_val = Value::Number(collection.data()[i]);
-
-                let result = evaluator.apply_lambda(&func, vec![acc_val, elem_val])?;
-
-                match result {
-                    Value::Number(n) => accumulator = n,
-                    _ => return Err("reduce function must return a number when accumulator is a number".to_string()),
-                }
+    match collection_value {
+        Value::Vector(collection) => {
+            for elem in collection {
+                let result = evaluator.apply_lambda(&func, vec![accumulator, elem])?;
+                accumulator = result;
             }
-            Ok(Value::Number(accumulator))
+            Ok(accumulator)
         }
-        // Complex accumulator, real vector (promotes to complex)
-        (Value::Complex(mut accumulator), Value::Vector(collection)) => {
-            for i in 0..collection.len() {
-                let acc_val = Value::Complex(accumulator);
-                let elem_val = Value::Number(collection.data()[i]);
-
-                let result = evaluator.apply_lambda(&func, vec![acc_val, elem_val])?;
-
-                match result {
-                    Value::Complex(c) => accumulator = c,
-                    Value::Number(n) => accumulator = Complex::new(n, 0.0),
-                    _ => return Err("reduce function must return a number or complex".to_string()),
-                }
-            }
-            Ok(Value::Complex(accumulator))
-        }
-        // Number accumulator, complex vector (promotes to complex)
-        (Value::Number(n), Value::ComplexVector(collection)) => {
-            let mut accumulator = Complex::new(n, 0.0);
-            for i in 0..collection.len() {
-                let acc_val = Value::Complex(accumulator);
-                let elem_val = Value::Complex(collection.data()[i]);
-
-                let result = evaluator.apply_lambda(&func, vec![acc_val, elem_val])?;
-
-                match result {
-                    Value::Complex(c) => accumulator = c,
-                    Value::Number(n) => accumulator = Complex::new(n, 0.0),
-                    _ => return Err("reduce function must return a number or complex".to_string()),
-                }
-            }
-            Ok(Value::Complex(accumulator))
-        }
-        // Complex accumulator, complex vector
-        (Value::Complex(mut accumulator), Value::ComplexVector(collection)) => {
-            for i in 0..collection.len() {
-                let acc_val = Value::Complex(accumulator);
-                let elem_val = Value::Complex(collection.data()[i]);
-
-                let result = evaluator.apply_lambda(&func, vec![acc_val, elem_val])?;
-
-                match result {
-                    Value::Complex(c) => accumulator = c,
-                    Value::Number(n) => accumulator = Complex::new(n, 0.0),
-                    _ => return Err("reduce function must return a number or complex".to_string()),
-                }
-            }
-            Ok(Value::Complex(accumulator))
-        }
-        _ => Err("reduce requires initial value (number or complex) and collection (vector or complex vector)".to_string()),
+        _ => Err("Third argument to reduce must be a vector".to_string()),
     }
 }
 

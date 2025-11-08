@@ -1,8 +1,6 @@
 use crate::functions::FunctionRegistry;
-use achronyme_types::complex::Complex as AchronymeComplex;
-use achronyme_types::complex_vector::ComplexVector;
 use achronyme_types::value::Value;
-use achronyme_types::vector::Vector;
+use achronyme_types::complex_vector::ComplexVector;
 
 pub fn register_functions(registry: &mut FunctionRegistry) {
     // FFT functions
@@ -29,10 +27,13 @@ pub fn register_functions(registry: &mut FunctionRegistry) {
 
 fn fft(args: &[Value]) -> Result<Value, String> {
     match &args[0] {
-        Value::Vector(v) => {
-            let spectrum = achronyme_dsp::fft_real(v);
-            let complex_vector = ComplexVector::new(spectrum);
-            Ok(Value::ComplexVector(complex_vector))
+        Value::Vector(vec) => {
+            if !Value::is_numeric_vector(vec) {
+                return Err("fft() requires a numeric vector".to_string());
+            }
+            let real_vec = Value::to_real_vector(vec).map_err(|e| e.to_string())?;
+            let spectrum = achronyme_dsp::fft::fft_real(&real_vec);
+            Ok(Value::from_complex_vector(ComplexVector::new(spectrum)))
         }
         _ => Err("fft() requires a vector".to_string()),
     }
@@ -40,10 +41,13 @@ fn fft(args: &[Value]) -> Result<Value, String> {
 
 fn ifft(args: &[Value]) -> Result<Value, String> {
     match &args[0] {
-        Value::ComplexVector(cv) => {
-            let spectrum: Vec<AchronymeComplex> = cv.data().to_vec();
-            let result = achronyme_dsp::ifft_real(&spectrum);
-            Ok(Value::Vector(result))
+        Value::Vector(vec) => {
+            if !Value::is_numeric_vector(vec) {
+                return Err("ifft() requires a numeric vector".to_string());
+            }
+            let complex_vec = Value::to_complex_vector(vec).map_err(|e| e.to_string())?;
+            let result = achronyme_dsp::fft::ifft_real(complex_vec.data());
+            Ok(Value::from_real_vector(result))
         }
         _ => Err("ifft() requires a ComplexVector".to_string()),
     }
@@ -51,15 +55,22 @@ fn ifft(args: &[Value]) -> Result<Value, String> {
 
 fn fft_mag(args: &[Value]) -> Result<Value, String> {
     match &args[0] {
-        Value::Vector(v) => {
-            let spectrum = achronyme_dsp::fft_real(v);
-            let magnitudes: Vec<f64> = spectrum.iter().map(|c| c.magnitude()).collect();
-            Ok(Value::Vector(Vector::new(magnitudes)))
-        }
-        Value::ComplexVector(cv) => {
-            // Direct magnitude calculation from ComplexVector
-            let magnitudes: Vec<f64> = cv.data().iter().map(|c| c.magnitude()).collect();
-            Ok(Value::Vector(Vector::new(magnitudes)))
+        Value::Vector(vec) => {
+            if !Value::is_numeric_vector(vec) {
+                return Err("fft_mag() requires a numeric vector".to_string());
+            }
+            if vec.iter().any(|v| matches!(v, Value::Complex(_))) {
+                let complex_vec = Value::to_complex_vector(vec).map_err(|e| e.to_string())?;
+                let magnitudes: Vec<f64> = complex_vec.data().iter().map(|c| c.norm()).collect();
+                let values: Vec<Value> = magnitudes.into_iter().map(Value::Number).collect();
+                Ok(Value::Vector(values))
+            } else {
+                let real_vec = Value::to_real_vector(vec).map_err(|e| e.to_string())?;
+                let spectrum = achronyme_dsp::fft::fft_real(&real_vec);
+                let magnitudes: Vec<f64> = spectrum.iter().map(|c| c.norm()).collect();
+                let values: Vec<Value> = magnitudes.into_iter().map(Value::Number).collect();
+                Ok(Value::Vector(values))
+            }
         }
         _ => Err("fft_mag() requires a vector or complex vector".to_string()),
     }
@@ -67,15 +78,22 @@ fn fft_mag(args: &[Value]) -> Result<Value, String> {
 
 fn fft_phase(args: &[Value]) -> Result<Value, String> {
     match &args[0] {
-        Value::Vector(v) => {
-            let spectrum = achronyme_dsp::fft_real(v);
-            let phases: Vec<f64> = spectrum.iter().map(|c| c.im.atan2(c.re)).collect();
-            Ok(Value::Vector(Vector::new(phases)))
-        }
-        Value::ComplexVector(cv) => {
-            // Direct phase calculation from ComplexVector
-            let phases: Vec<f64> = cv.data().iter().map(|c| c.im.atan2(c.re)).collect();
-            Ok(Value::Vector(Vector::new(phases)))
+        Value::Vector(vec) => {
+            if !Value::is_numeric_vector(vec) {
+                return Err("fft_phase() requires a numeric vector".to_string());
+            }
+            if vec.iter().any(|v| matches!(v, Value::Complex(_))) {
+                let complex_vec = Value::to_complex_vector(vec).map_err(|e| e.to_string())?;
+                let phases: Vec<f64> = complex_vec.data().iter().map(|c| c.arg()).collect();
+                let values: Vec<Value> = phases.into_iter().map(Value::Number).collect();
+                Ok(Value::Vector(values))
+            } else {
+                let real_vec = Value::to_real_vector(vec).map_err(|e| e.to_string())?;
+                let spectrum = achronyme_dsp::fft::fft_real(&real_vec);
+                let phases: Vec<f64> = spectrum.iter().map(|c| c.arg()).collect();
+                let values: Vec<Value> = phases.into_iter().map(Value::Number).collect();
+                Ok(Value::Vector(values))
+            }
         }
         _ => Err("fft_phase() requires a vector or complex vector".to_string()),
     }
@@ -83,9 +101,14 @@ fn fft_phase(args: &[Value]) -> Result<Value, String> {
 
 fn conv(args: &[Value]) -> Result<Value, String> {
     match (&args[0], &args[1]) {
-        (Value::Vector(signal), Value::Vector(kernel)) => {
-            let result = achronyme_dsp::convolve(signal, kernel);
-            Ok(Value::Vector(result))
+        (Value::Vector(signal_vec), Value::Vector(kernel_vec)) => {
+            if !Value::is_numeric_vector(signal_vec) || !Value::is_numeric_vector(kernel_vec) {
+                return Err("conv() requires numeric vectors".to_string());
+            }
+            let signal = Value::to_real_vector(signal_vec).map_err(|e| e.to_string())?;
+            let kernel = Value::to_real_vector(kernel_vec).map_err(|e| e.to_string())?;
+            let result = achronyme_dsp::convolution::convolve(&signal, &kernel);
+            Ok(Value::from_real_vector(result))
         }
         _ => Err("conv() requires two vectors".to_string()),
     }
@@ -93,9 +116,14 @@ fn conv(args: &[Value]) -> Result<Value, String> {
 
 fn conv_fft(args: &[Value]) -> Result<Value, String> {
     match (&args[0], &args[1]) {
-        (Value::Vector(signal), Value::Vector(kernel)) => {
-            let result = achronyme_dsp::convolve_fft(signal, kernel);
-            Ok(Value::Vector(result))
+        (Value::Vector(signal_vec), Value::Vector(kernel_vec)) => {
+            if !Value::is_numeric_vector(signal_vec) || !Value::is_numeric_vector(kernel_vec) {
+                return Err("conv_fft() requires numeric vectors".to_string());
+            }
+            let signal = Value::to_real_vector(signal_vec).map_err(|e| e.to_string())?;
+            let kernel = Value::to_real_vector(kernel_vec).map_err(|e| e.to_string())?;
+            let result = achronyme_dsp::convolution::convolve_fft(&signal, &kernel);
+            Ok(Value::from_real_vector(result))
         }
         _ => Err("conv_fft() requires two vectors".to_string()),
     }
@@ -107,8 +135,8 @@ fn hanning(args: &[Value]) -> Result<Value, String> {
             if *n < 0.0 || n.fract() != 0.0 {
                 return Err("hanning() requires a non-negative integer".to_string());
             }
-            let window = achronyme_dsp::hanning_window(*n as usize);
-            Ok(Value::Vector(window))
+            let window = achronyme_dsp::windows::hanning_window(*n as usize);
+            Ok(Value::from_real_vector(window))
         }
         _ => Err("hanning() requires a number (window size)".to_string()),
     }
@@ -120,8 +148,8 @@ fn hamming(args: &[Value]) -> Result<Value, String> {
             if *n < 0.0 || n.fract() != 0.0 {
                 return Err("hamming() requires a non-negative integer".to_string());
             }
-            let window = achronyme_dsp::hamming_window(*n as usize);
-            Ok(Value::Vector(window))
+            let window = achronyme_dsp::windows::hamming_window(*n as usize);
+            Ok(Value::from_real_vector(window))
         }
         _ => Err("hamming() requires a number (window size)".to_string()),
     }
@@ -133,8 +161,8 @@ fn blackman(args: &[Value]) -> Result<Value, String> {
             if *n < 0.0 || n.fract() != 0.0 {
                 return Err("blackman() requires a non-negative integer".to_string());
             }
-            let window = achronyme_dsp::blackman_window(*n as usize);
-            Ok(Value::Vector(window))
+            let window = achronyme_dsp::windows::blackman_window(*n as usize);
+            Ok(Value::from_real_vector(window))
         }
         _ => Err("blackman() requires a number (window size)".to_string()),
     }
@@ -146,8 +174,8 @@ fn rectangular(args: &[Value]) -> Result<Value, String> {
             if *n < 0.0 || n.fract() != 0.0 {
                 return Err("rectangular() requires a non-negative integer".to_string());
             }
-            let window = achronyme_dsp::rectangular_window(*n as usize);
-            Ok(Value::Vector(window))
+            let window = achronyme_dsp::windows::rectangular_window(*n as usize);
+            Ok(Value::from_real_vector(window))
         }
         _ => Err("rectangular() requires a number (window size)".to_string()),
     }
@@ -161,11 +189,10 @@ fn linspace(args: &[Value]) -> Result<Value, String> {
             }
             let count = *n as usize;
             let step = (end - start) / (*n - 1.0);
-            let mut result = Vec::with_capacity(count);
-            for i in 0..count {
-                result.push(start + step * i as f64);
-            }
-            Ok(Value::Vector(Vector::new(result)))
+            let result: Vec<Value> = (0..count)
+                .map(|i| Value::Number(start + step * i as f64))
+                .collect();
+            Ok(Value::Vector(result))
         }
         _ => Err("linspace() requires three numbers (start, end, count)".to_string()),
     }

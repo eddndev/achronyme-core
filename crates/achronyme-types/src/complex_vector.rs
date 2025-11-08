@@ -135,6 +135,21 @@ impl ComplexVector {
 
         Ok(sum)
     }
+
+    /// Euclidean norm (L2 norm)
+    pub fn norm(&self) -> f64 {
+        self.0.iter().map(|c| c.re * c.re + c.im * c.im).sum::<f64>().sqrt()
+    }
+
+    /// Normalize the vector to unit length
+    pub fn normalize(&self) -> Result<Self, ComplexVectorError> {
+        let norm = self.norm();
+        if norm < 1e-10 {
+            return Err(ComplexVectorError::EmptyVector); // Or a more specific error
+        }
+        let data = self.0.iter().map(|c| *c / Complex::new(norm, 0.0)).collect();
+        Ok(Self(data))
+    }
 }
 
 impl fmt::Display for ComplexVector {

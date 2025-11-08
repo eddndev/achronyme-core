@@ -1,7 +1,6 @@
 use wasm_bindgen::prelude::*;
 use crate::state::{Handle, HANDLES};
 use achronyme_types::value::Value;
-use achronyme_types::vector::Vector;
 use achronyme_types::matrix::Matrix;
 
 // ============================================================================
@@ -180,7 +179,7 @@ pub fn svd_decomposition(handle: Handle) -> Result<SvdResult, JsValue> {
         // Now borrow mutably to create handles
         let mut handles_mut = h.borrow_mut();
         let u_handle = handles_mut.create(Value::Matrix(u_mat));
-        let s_handle = handles_mut.create(Value::Vector(Vector::new(s_vec)));
+        let s_handle = handles_mut.create(Value::Vector(s_vec.into_iter().map(Value::Number).collect()));
         let v_handle = handles_mut.create(Value::Matrix(v_mat));
 
         Ok(SvdResult { u: u_handle, s: s_handle, v: v_handle })
@@ -254,7 +253,7 @@ pub fn qr_eigenvalues(
         }?; // Immutable borrow is dropped here
 
         // Now borrow mutably to create handle
-        Ok(h.borrow_mut().create(Value::Vector(Vector::new(eigenvalues_vec))))
+        Ok(h.borrow_mut().create(Value::Vector(eigenvalues_vec.into_iter().map(Value::Number).collect())))
     })
 }
 
@@ -290,7 +289,7 @@ pub fn eigen_symmetric(
 
         // Now borrow mutably to create handles
         let mut handles_mut = h.borrow_mut();
-        let eigenvalues_handle = handles_mut.create(Value::Vector(Vector::new(eigenvalues_vec)));
+        let eigenvalues_handle = handles_mut.create(Value::Vector(eigenvalues_vec.into_iter().map(Value::Number).collect()));
         let eigenvectors_handle = handles_mut.create(Value::Matrix(eigenvectors_mat));
 
         Ok(EigenResult {

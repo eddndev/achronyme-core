@@ -14,7 +14,17 @@ fn apply_negate(operand: Value) -> Result<Value, String> {
     match operand {
         Value::Number(n) => Ok(Value::Number(-n)),
         Value::Complex(c) => Ok(Value::Complex(Complex::new(-c.re, -c.im))),
-        Value::Vector(v) => Ok(Value::Vector(v.negate())),
+        Value::Vector(vec) => {
+            if !Value::is_numeric_vector(&vec) {
+                return Err("Cannot negate a non-numeric vector".to_string());
+            }
+            let result: Vec<Value> = vec.iter().map(|v| match v {
+                Value::Number(n) => Value::Number(-n),
+                Value::Complex(c) => Value::Complex(Complex::new(-c.re, -c.im)),
+                _ => unreachable!(),
+            }).collect();
+            Ok(Value::Vector(result))
+        }
         Value::Matrix(m) => Ok(Value::Matrix(m.negate())),
         _ => Err("Cannot negate this type".to_string()),
     }

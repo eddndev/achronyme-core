@@ -74,4 +74,10 @@ pub enum AstNode {
         params: Vec<String>,
         body: Box<AstNode>,
     },
+    Edge {
+        from: String,
+        to: String,
+        directed: bool,
+        metadata: Option<Box<AstNode>>,
+    },
 }

@@ -1,12 +1,27 @@
 use achronyme_parser::ast::AstNode;
 use achronyme_types::value::Value;
-use achronyme_types::vector::Vector;
 
 use crate::evaluator::Evaluator;
 
 /// Optimization Functions Handler
 ///
 /// This module contains implementations of linear programming solvers.
+
+fn value_to_f64_vec(value: &Value) -> Result<Vec<f64>, String> {
+    if let Value::Vector(v) = value {
+        let mut result = Vec::new();
+        for val in v {
+            if let Value::Number(n) = val {
+                result.push(*n);
+            } else {
+                return Err("Vector must contain only numbers".to_string());
+            }
+        }
+        Ok(result)
+    } else {
+        Err("Expected a vector".to_string())
+    }
+}
 
 /// Simplex method: simplex(c, A, b, sense)
 ///
@@ -25,10 +40,7 @@ pub fn handle_simplex(evaluator: &mut Evaluator, args: &[AstNode]) -> Result<Val
     }
 
     // Evaluate c (objective vector)
-    let c_vec = match evaluator.evaluate(&args[0])? {
-        Value::Vector(v) => v.data().to_vec(),
-        _ => return Err("simplex: c must be a vector".to_string()),
-    };
+    let c_vec = value_to_f64_vec(&evaluator.evaluate(&args[0])?)?;
 
     // Evaluate A (constraint matrix)
     let a_mat = match evaluator.evaluate(&args[1])? {
@@ -37,10 +49,7 @@ pub fn handle_simplex(evaluator: &mut Evaluator, args: &[AstNode]) -> Result<Val
     };
 
     // Evaluate b (bounds vector)
-    let b_vec = match evaluator.evaluate(&args[2])? {
-        Value::Vector(v) => v.data().to_vec(),
-        _ => return Err("simplex: b must be a vector".to_string()),
-    };
+    let b_vec = value_to_f64_vec(&evaluator.evaluate(&args[2])?)?;
 
     // Evaluate sense (1 or -1)
     let sense = match evaluator.evaluate(&args[3])? {
@@ -71,7 +80,7 @@ pub fn handle_simplex(evaluator: &mut Evaluator, args: &[AstNode]) -> Result<Val
     use achronyme_solver::simplex_solve;
     let solution = simplex_solve(&c_vec, &a_mat, &b_vec, sense)?;
 
-    Ok(Value::Vector(Vector::new(solution)))
+    Ok(Value::Vector(solution.into_iter().map(Value::Number).collect()))
 }
 
 /// Linear programming with auto-selection: linprog(c, A, b, sense)
@@ -85,10 +94,7 @@ pub fn handle_linprog(evaluator: &mut Evaluator, args: &[AstNode]) -> Result<Val
     }
 
     // Evaluate c (objective vector)
-    let c_vec = match evaluator.evaluate(&args[0])? {
-        Value::Vector(v) => v.data().to_vec(),
-        _ => return Err("linprog: c must be a vector".to_string()),
-    };
+    let c_vec = value_to_f64_vec(&evaluator.evaluate(&args[0])?)?;
 
     // Evaluate A (constraint matrix)
     let a_mat = match evaluator.evaluate(&args[1])? {
@@ -97,10 +103,7 @@ pub fn handle_linprog(evaluator: &mut Evaluator, args: &[AstNode]) -> Result<Val
     };
 
     // Evaluate b (bounds vector)
-    let b_vec = match evaluator.evaluate(&args[2])? {
-        Value::Vector(v) => v.data().to_vec(),
-        _ => return Err("linprog: b must be a vector".to_string()),
-    };
+    let b_vec = value_to_f64_vec(&evaluator.evaluate(&args[2])?)?;
 
     // Evaluate sense (1 or -1)
     let sense = match evaluator.evaluate(&args[3])? {
@@ -131,7 +134,7 @@ pub fn handle_linprog(evaluator: &mut Evaluator, args: &[AstNode]) -> Result<Val
     use achronyme_solver::linprog_solve;
     let solution = linprog_solve(&c_vec, &a_mat, &b_vec, sense)?;
 
-    Ok(Value::Vector(Vector::new(solution)))
+    Ok(Value::Vector(solution.into_iter().map(Value::Number).collect()))
 }
 
 /// Calculate objective value: objective_value(c, x)
@@ -143,16 +146,10 @@ pub fn handle_objective_value(evaluator: &mut Evaluator, args: &[AstNode]) -> Re
     }
 
     // Evaluate c
-    let c_vec = match evaluator.evaluate(&args[0])? {
-        Value::Vector(v) => v.data().to_vec(),
-        _ => return Err("objective_value: c must be a vector".to_string()),
-    };
+    let c_vec = value_to_f64_vec(&evaluator.evaluate(&args[0])?)?;
 
     // Evaluate x
-    let x_vec = match evaluator.evaluate(&args[1])? {
-        Value::Vector(v) => v.data().to_vec(),
-        _ => return Err("objective_value: x must be a vector".to_string()),
-    };
+    let x_vec = value_to_f64_vec(&evaluator.evaluate(&args[1])?)?;
 
     // Calculate z = c^T * x
     use achronyme_solver::objective_value;
@@ -174,20 +171,14 @@ pub fn handle_dual_simplex(evaluator: &mut Evaluator, args: &[AstNode]) -> Resul
     }
 
     // Evaluate arguments (same as simplex)
-    let c_vec = match evaluator.evaluate(&args[0])? {
-        Value::Vector(v) => v.data().to_vec(),
-        _ => return Err("dual_simplex: c must be a vector".to_string()),
-    };
+    let c_vec = value_to_f64_vec(&evaluator.evaluate(&args[0])?)?;
 
     let a_mat = match evaluator.evaluate(&args[1])? {
         Value::Matrix(m) => m,
         _ => return Err("dual_simplex: A must be a matrix".to_string()),
     };
 
-    let b_vec = match evaluator.evaluate(&args[2])? {
-        Value::Vector(v) => v.data().to_vec(),
-        _ => return Err("dual_simplex: b must be a vector".to_string()),
-    };
+    let b_vec = value_to_f64_vec(&evaluator.evaluate(&args[2])?)?;
 
     let sense = match evaluator.evaluate(&args[3])? {
         Value::Number(n) => {
@@ -217,7 +208,7 @@ pub fn handle_dual_simplex(evaluator: &mut Evaluator, args: &[AstNode]) -> Resul
     use achronyme_solver::dual_simplex_solve;
     let solution = dual_simplex_solve(&c_vec, &a_mat, &b_vec, sense)?;
 
-    Ok(Value::Vector(Vector::new(solution)))
+    Ok(Value::Vector(solution.into_iter().map(Value::Number).collect()))
 }
 
 /// Two-Phase Simplex method: two_phase_simplex(c, A, b, sense)
@@ -232,20 +223,14 @@ pub fn handle_two_phase_simplex(evaluator: &mut Evaluator, args: &[AstNode]) -> 
         return Err("two_phase_simplex() requires 4 arguments: c, A, b, sense".to_string());
     }
 
-    let c_vec = match evaluator.evaluate(&args[0])? {
-        Value::Vector(v) => v.data().to_vec(),
-        _ => return Err("two_phase_simplex: c must be a vector".to_string()),
-    };
+    let c_vec = value_to_f64_vec(&evaluator.evaluate(&args[0])?)?;
 
     let a_mat = match evaluator.evaluate(&args[1])? {
         Value::Matrix(m) => m,
         _ => return Err("two_phase_simplex: A must be a matrix".to_string()),
     };
 
-    let b_vec = match evaluator.evaluate(&args[2])? {
-        Value::Vector(v) => v.data().to_vec(),
-        _ => return Err("two_phase_simplex: b must be a vector".to_string()),
-    };
+    let b_vec = value_to_f64_vec(&evaluator.evaluate(&args[2])?)?;
 
     let sense = match evaluator.evaluate(&args[3])? {
         Value::Number(n) => {
@@ -275,7 +260,7 @@ pub fn handle_two_phase_simplex(evaluator: &mut Evaluator, args: &[AstNode]) -> 
     use achronyme_solver::two_phase_solve;
     let solution = two_phase_solve(&c_vec, &a_mat, &b_vec, sense)?;
 
-    Ok(Value::Vector(Vector::new(solution)))
+    Ok(Value::Vector(solution.into_iter().map(Value::Number).collect()))
 }
 
 /// Revised Simplex method: revised_simplex(c, A, b, sense)
@@ -291,20 +276,14 @@ pub fn handle_revised_simplex(evaluator: &mut Evaluator, args: &[AstNode]) -> Re
         return Err("revised_simplex() requires 4 arguments: c, A, b, sense".to_string());
     }
 
-    let c_vec = match evaluator.evaluate(&args[0])? {
-        Value::Vector(v) => v.data().to_vec(),
-        _ => return Err("revised_simplex: c must be a vector".to_string()),
-    };
+    let c_vec = value_to_f64_vec(&evaluator.evaluate(&args[0])?)?;
 
     let a_mat = match evaluator.evaluate(&args[1])? {
         Value::Matrix(m) => m,
         _ => return Err("revised_simplex: A must be a matrix".to_string()),
     };
 
-    let b_vec = match evaluator.evaluate(&args[2])? {
-        Value::Vector(v) => v.data().to_vec(),
-        _ => return Err("revised_simplex: b must be a vector".to_string()),
-    };
+    let b_vec = value_to_f64_vec(&evaluator.evaluate(&args[2])?)?;
 
     let sense = match evaluator.evaluate(&args[3])? {
         Value::Number(n) => {
@@ -334,7 +313,7 @@ pub fn handle_revised_simplex(evaluator: &mut Evaluator, args: &[AstNode]) -> Re
     use achronyme_solver::revised_simplex_solve;
     let solution = revised_simplex_solve(&c_vec, &a_mat, &b_vec, sense)?;
 
-    Ok(Value::Vector(Vector::new(solution)))
+    Ok(Value::Vector(solution.into_iter().map(Value::Number).collect()))
 }
 
 // ============================================================================
@@ -350,20 +329,14 @@ pub fn handle_shadow_price(evaluator: &mut Evaluator, args: &[AstNode]) -> Resul
         return Err("shadow_price() requires 4 arguments: c, A, b, sense".to_string());
     }
 
-    let c_vec = match evaluator.evaluate(&args[0])? {
-        Value::Vector(v) => v.data().to_vec(),
-        _ => return Err("shadow_price: c must be a vector".to_string()),
-    };
+    let c_vec = value_to_f64_vec(&evaluator.evaluate(&args[0])?)?;
 
     let a_mat = match evaluator.evaluate(&args[1])? {
         Value::Matrix(m) => m,
         _ => return Err("shadow_price: A must be a matrix".to_string()),
     };
 
-    let b_vec = match evaluator.evaluate(&args[2])? {
-        Value::Vector(v) => v.data().to_vec(),
-        _ => return Err("shadow_price: b must be a vector".to_string()),
-    };
+    let b_vec = value_to_f64_vec(&evaluator.evaluate(&args[2])?)?;
 
     let sense = match evaluator.evaluate(&args[3])? {
         Value::Number(n) => {
@@ -378,7 +351,7 @@ pub fn handle_shadow_price(evaluator: &mut Evaluator, args: &[AstNode]) -> Resul
     use achronyme_solver::shadow_price;
     let prices = shadow_price(&c_vec, &a_mat, &b_vec, sense)?;
 
-    Ok(Value::Vector(Vector::new(prices)))
+    Ok(Value::Vector(prices.into_iter().map(Value::Number).collect()))
 }
 
 /// Sensitivity analysis for c: sensitivity_c(c, A, b, i)
@@ -389,20 +362,14 @@ pub fn handle_sensitivity_c(evaluator: &mut Evaluator, args: &[AstNode]) -> Resu
         return Err("sensitivity_c() requires 4 arguments: c, A, b, index".to_string());
     }
 
-    let c_vec = match evaluator.evaluate(&args[0])? {
-        Value::Vector(v) => v.data().to_vec(),
-        _ => return Err("sensitivity_c: c must be a vector".to_string()),
-    };
+    let c_vec = value_to_f64_vec(&evaluator.evaluate(&args[0])?)?;
 
     let a_mat = match evaluator.evaluate(&args[1])? {
         Value::Matrix(m) => m,
         _ => return Err("sensitivity_c: A must be a matrix".to_string()),
     };
 
-    let b_vec = match evaluator.evaluate(&args[2])? {
-        Value::Vector(v) => v.data().to_vec(),
-        _ => return Err("sensitivity_c: b must be a vector".to_string()),
-    };
+    let b_vec = value_to_f64_vec(&evaluator.evaluate(&args[2])?)?;
 
     let index = match evaluator.evaluate(&args[3])? {
         Value::Number(n) => n as usize,
@@ -412,7 +379,7 @@ pub fn handle_sensitivity_c(evaluator: &mut Evaluator, args: &[AstNode]) -> Resu
     use achronyme_solver::sensitivity_c;
     let range = sensitivity_c(&c_vec, &a_mat, &b_vec, index)?;
 
-    Ok(Value::Vector(Vector::new(range)))
+    Ok(Value::Vector(range.into_iter().map(Value::Number).collect()))
 }
 
 /// Sensitivity analysis for b: sensitivity_b(c, A, b, i)
@@ -423,20 +390,14 @@ pub fn handle_sensitivity_b(evaluator: &mut Evaluator, args: &[AstNode]) -> Resu
         return Err("sensitivity_b() requires 4 arguments: c, A, b, index".to_string());
     }
 
-    let c_vec = match evaluator.evaluate(&args[0])? {
-        Value::Vector(v) => v.data().to_vec(),
-        _ => return Err("sensitivity_b: c must be a vector".to_string()),
-    };
+    let c_vec = value_to_f64_vec(&evaluator.evaluate(&args[0])?)?;
 
     let a_mat = match evaluator.evaluate(&args[1])? {
         Value::Matrix(m) => m,
         _ => return Err("sensitivity_b: A must be a matrix".to_string()),
     };
 
-    let b_vec = match evaluator.evaluate(&args[2])? {
-        Value::Vector(v) => v.data().to_vec(),
-        _ => return Err("sensitivity_b: b must be a vector".to_string()),
-    };
+    let b_vec = value_to_f64_vec(&evaluator.evaluate(&args[2])?)?;
 
     let index = match evaluator.evaluate(&args[3])? {
         Value::Number(n) => n as usize,
@@ -446,5 +407,5 @@ pub fn handle_sensitivity_b(evaluator: &mut Evaluator, args: &[AstNode]) -> Resu
     use achronyme_solver::sensitivity_b;
     let range = sensitivity_b(&c_vec, &a_mat, &b_vec, index)?;
 
-    Ok(Value::Vector(Vector::new(range)))
+    Ok(Value::Vector(range.into_iter().map(Value::Number).collect()))
 }

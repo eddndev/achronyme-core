@@ -1,6 +1,5 @@
 use crate::functions::FunctionRegistry;
 use achronyme_types::value::Value;
-use achronyme_types::vector::Vector;
 
 pub fn register_functions(registry: &mut FunctionRegistry) {
     registry.register("dot", dot, 2);
@@ -13,12 +12,30 @@ pub fn register_functions(registry: &mut FunctionRegistry) {
 
 fn dot(args: &[Value]) -> Result<Value, String> {
     match (&args[0], &args[1]) {
-        (Value::Vector(v1), Value::Vector(v2)) => {
-            if v1.len() != v2.len() {
-                return Err(format!("dot() requires vectors of same length ({} vs {})", v1.len(), v2.len()));
+        (Value::Vector(vec1), Value::Vector(vec2)) => {
+            if !Value::is_numeric_vector(vec1) || !Value::is_numeric_vector(vec2) {
+                return Err("dot() requires numeric vectors".to_string());
             }
-            let result: f64 = v1.data().iter().zip(v2.data().iter()).map(|(a, b)| a * b).sum();
-            Ok(Value::Number(result))
+
+            let has_complex = vec1.iter().any(|v| matches!(v, Value::Complex(_))) || vec2.iter().any(|v| matches!(v, Value::Complex(_)));
+
+            if has_complex {
+                let v1 = Value::to_complex_vector(vec1).map_err(|e| e.to_string())?;
+                let v2 = Value::to_complex_vector(vec2).map_err(|e| e.to_string())?;
+                 if v1.len() != v2.len() {
+                    return Err(format!("dot() requires vectors of same length ({} vs {})", v1.len(), v2.len()));
+                }
+                let result = v1.dot(&v2).map_err(|e| e.to_string())?;
+                Ok(Value::Complex(result))
+            } else {
+                let v1 = Value::to_real_vector(vec1).map_err(|e| e.to_string())?;
+                let v2 = Value::to_real_vector(vec2).map_err(|e| e.to_string())?;
+                 if v1.len() != v2.len() {
+                    return Err(format!("dot() requires vectors of same length ({} vs {})", v1.len(), v2.len()));
+                }
+                let result = v1.dot(&v2).map_err(|e| e.to_string())?;
+                Ok(Value::Number(result))
+            }
         }
         _ => Err("dot() requires two vectors".to_string()),
     }
@@ -26,18 +43,18 @@ fn dot(args: &[Value]) -> Result<Value, String> {
 
 fn cross(args: &[Value]) -> Result<Value, String> {
     match (&args[0], &args[1]) {
-        (Value::Vector(v1), Value::Vector(v2)) => {
+        (Value::Vector(vec1), Value::Vector(vec2)) => {
+            if !Value::is_numeric_vector(vec1) || !Value::is_numeric_vector(vec2) {
+                return Err("cross() requires numeric vectors".to_string());
+            }
+            let v1 = Value::to_real_vector(vec1).map_err(|e| e.to_string())?;
+            let v2 = Value::to_real_vector(vec2).map_err(|e| e.to_string())?;
+
             if v1.len() != 3 || v2.len() != 3 {
                 return Err("cross() requires two 3D vectors".to_string());
             }
-            let a = v1.data();
-            let b = v2.data();
-            let result = vec![
-                a[1] * b[2] - a[2] * b[1],
-                a[2] * b[0] - a[0] * b[2],
-                a[0] * b[1] - a[1] * b[0],
-            ];
-            Ok(Value::Vector(Vector::new(result)))
+            let result = v1.cross(&v2).map_err(|e| e.to_string())?;
+            Ok(Value::from_real_vector(result))
         }
         _ => Err("cross() requires two vectors".to_string()),
     }
@@ -45,9 +62,17 @@ fn cross(args: &[Value]) -> Result<Value, String> {
 
 fn norm(args: &[Value]) -> Result<Value, String> {
     match &args[0] {
-        Value::Vector(v) => {
-            let sum_squares: f64 = v.data().iter().map(|x| x * x).sum();
-            Ok(Value::Number(sum_squares.sqrt()))
+        Value::Vector(vec) => {
+            if !Value::is_numeric_vector(vec) {
+                return Err("norm() requires a numeric vector".to_string());
+            }
+            if vec.iter().any(|v| matches!(v, Value::Complex(_))) {
+                let v = Value::to_complex_vector(vec).map_err(|e| e.to_string())?;
+                Ok(Value::Number(v.norm()))
+            } else {
+                let v = Value::to_real_vector(vec).map_err(|e| e.to_string())?;
+                Ok(Value::Number(v.norm()))
+            }
         }
         _ => Err("norm() requires a vector".to_string()),
     }
@@ -55,14 +80,27 @@ fn norm(args: &[Value]) -> Result<Value, String> {
 
 fn normalize(args: &[Value]) -> Result<Value, String> {
     match &args[0] {
-        Value::Vector(v) => {
-            let sum_squares: f64 = v.data().iter().map(|x| x * x).sum();
-            let magnitude = sum_squares.sqrt();
-            if magnitude < 1e-10 {
-                return Err("normalize() cannot normalize zero vector".to_string());
+        Value::Vector(vec) => {
+            if !Value::is_numeric_vector(vec) {
+                return Err("normalize() requires a numeric vector".to_string());
             }
-            let result: Vec<f64> = v.data().iter().map(|x| x / magnitude).collect();
-            Ok(Value::Vector(Vector::new(result)))
+            if vec.iter().any(|v| matches!(v, Value::Complex(_))) {
+                let v = Value::to_complex_vector(vec).map_err(|e| e.to_string())?;
+                let norm = v.norm();
+                if norm < 1e-10 {
+                    return Err("Cannot normalize a zero vector".to_string());
+                }
+                let result = v.normalize().map_err(|e| e.to_string())?;
+                Ok(Value::from_complex_vector(result))
+            } else {
+                let v = Value::to_real_vector(vec).map_err(|e| e.to_string())?;
+                let norm = v.norm();
+                if norm < 1e-10 {
+                    return Err("Cannot normalize a zero vector".to_string());
+                }
+                let result = v.normalize().map_err(|e| e.to_string())?;
+                Ok(Value::from_real_vector(result))
+            }
         }
         _ => Err("normalize() requires a vector".to_string()),
     }

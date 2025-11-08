@@ -86,7 +86,12 @@ fn test_variable() {
 fn test_vector() {
     let result = eval("[1, 2, 3]").unwrap();
     match result {
-        Value::Vector(v) => assert_eq!(v.len(), 3),
+        Value::Vector(v) => {
+            assert_eq!(v.len(), 3);
+            assert_eq!(v[0], Value::Number(1.0));
+            assert_eq!(v[1], Value::Number(2.0));
+            assert_eq!(v[2], Value::Number(3.0));
+        }
         _ => panic!("Expected vector"),
     }
 }
@@ -192,9 +197,9 @@ fn test_map_single_collection() {
     match result {
         Value::Vector(v) => {
             assert_eq!(v.len(), 3);
-            assert_eq!(v.data()[0], 2.0);
-            assert_eq!(v.data()[1], 4.0);
-            assert_eq!(v.data()[2], 6.0);
+            assert_eq!(v[0], Value::Number(2.0));
+            assert_eq!(v[1], Value::Number(4.0));
+            assert_eq!(v[2], Value::Number(6.0));
         }
         _ => panic!("Expected vector"),
     }
@@ -207,9 +212,9 @@ fn test_map_multi_collection() {
     match result {
         Value::Vector(v) => {
             assert_eq!(v.len(), 3);
-            assert_eq!(v.data()[0], 5.0);
-            assert_eq!(v.data()[1], 7.0);
-            assert_eq!(v.data()[2], 9.0);
+            assert_eq!(v[0], Value::Number(5.0));
+            assert_eq!(v[1], Value::Number(7.0));
+            assert_eq!(v[2], Value::Number(9.0));
         }
         _ => panic!("Expected vector"),
     }
@@ -222,8 +227,8 @@ fn test_map_truncates_to_shortest() {
     match result {
         Value::Vector(v) => {
             assert_eq!(v.len(), 2);
-            assert_eq!(v.data()[0], 4.0);
-            assert_eq!(v.data()[1], 6.0);
+            assert_eq!(v[0], Value::Number(4.0));
+            assert_eq!(v[1], Value::Number(6.0));
         }
         _ => panic!("Expected vector"),
     }
@@ -236,9 +241,9 @@ fn test_filter() {
     match result {
         Value::Vector(v) => {
             assert_eq!(v.len(), 3);
-            assert_eq!(v.data()[0], 3.0);
-            assert_eq!(v.data()[1], 4.0);
-            assert_eq!(v.data()[2], 5.0);
+            assert_eq!(v[0], Value::Number(3.0));
+            assert_eq!(v[1], Value::Number(4.0));
+            assert_eq!(v[2], Value::Number(5.0));
         }
         _ => panic!("Expected vector"),
     }
@@ -247,14 +252,14 @@ fn test_filter() {
 #[test]
 fn test_filter_even_numbers() {
     // filter(x => x % 2 == 0, [1,2,3,4,5,6]) → [2,4,6]
-    // Note: == returns 1.0 for true, 0.0 for false
+    // Note: == returns boolean
     let result = eval("filter(x => (x % 2) == 0,[1,2,3,4,5,6])").unwrap();
     match result {
         Value::Vector(v) => {
             assert_eq!(v.len(), 3);
-            assert_eq!(v.data()[0], 2.0);
-            assert_eq!(v.data()[1], 4.0);
-            assert_eq!(v.data()[2], 6.0);
+            assert_eq!(v[0], Value::Number(2.0));
+            assert_eq!(v[1], Value::Number(4.0));
+            assert_eq!(v[2], Value::Number(6.0));
         }
         _ => panic!("Expected vector"),
     }
@@ -309,9 +314,9 @@ fn test_hof_composition() {
     match result {
         Value::Vector(v) => {
             assert_eq!(v.len(), 3);
-            assert_eq!(v.data()[0], 4.0);  // 2^2
-            assert_eq!(v.data()[1], 16.0); // 4^2
-            assert_eq!(v.data()[2], 36.0); // 6^2
+            assert_eq!(v[0], Value::Number(4.0));  // 2^2
+            assert_eq!(v[1], Value::Number(16.0)); // 4^2
+            assert_eq!(v[2], Value::Number(36.0)); // 6^2
         }
         _ => panic!("Expected vector"),
     }
@@ -369,7 +374,7 @@ fn test_pest_vector() {
     let result = evaluator.eval_str("[1, 2, 3]").unwrap();
     match result {
         Value::Vector(v) => {
-            assert_eq!(v.data(), &[1.0, 2.0, 3.0]);
+            assert_eq!(v, &vec![Value::Number(1.0), Value::Number(2.0), Value::Number(3.0)]);
         }
         _ => panic!("Expected vector"),
     }
@@ -695,7 +700,7 @@ fn test_piecewise_with_hof() {
 
     match result {
         Value::Vector(v) => {
-            assert_eq!(v.data(), &[-1.0, -1.0, 0.0, 1.0, 1.0]);
+            assert_eq!(v, vec![Value::Number(-1.0), Value::Number(-1.0), Value::Number(0.0), Value::Number(1.0), Value::Number(1.0)]);
         }
         _ => panic!("Expected vector"),
     }

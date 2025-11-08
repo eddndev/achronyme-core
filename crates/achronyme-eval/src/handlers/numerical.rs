@@ -1,6 +1,5 @@
 use achronyme_parser::ast::AstNode;
 use achronyme_types::value::Value;
-use achronyme_types::vector::Vector;
 
 use crate::evaluator::Evaluator;
 
@@ -103,7 +102,17 @@ pub fn handle_gradient(evaluator: &mut Evaluator, args: &[AstNode]) -> Result<Va
 
     let point_value = evaluator.evaluate(&args[1])?;
     let point_vec = match &point_value {
-        Value::Vector(v) => v.data().to_vec(),
+        Value::Vector(v) => {
+            let mut points = Vec::new();
+            for val in v {
+                if let Value::Number(n) = val {
+                    points.push(*n);
+                } else {
+                    return Err("gradient() requires a numeric vector for point".to_string());
+                }
+            }
+            points
+        }
         _ => return Err("gradient() requires a vector for point".to_string()),
     };
 
@@ -114,7 +123,7 @@ pub fn handle_gradient(evaluator: &mut Evaluator, args: &[AstNode]) -> Result<Va
 
     use achronyme_numerical::gradient as gradient_calc;
     let result = gradient_calc(evaluator, &func, &point_vec, h)?;
-    Ok(Value::Vector(Vector::new(result)))
+    Ok(Value::Vector(result.into_iter().map(Value::Number).collect()))
 }
 
 /// Numerical integration (trapezoidal): integral(f, a, b, n)

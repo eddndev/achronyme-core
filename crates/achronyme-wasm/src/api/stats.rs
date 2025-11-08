@@ -6,6 +6,16 @@ use achronyme_types::value::Value;
 // Statistics Operations (Optimized WASM implementations)
 // ============================================================================
 
+/// Helper: Extract f64 values from a generic vector
+fn extract_f64_vec(vec: &[Value]) -> Result<Vec<f64>, JsValue> {
+    vec.iter()
+        .map(|val| match val {
+            Value::Number(n) => Ok(*n),
+            _ => Err(JsValue::from_str("Vector must contain only numbers")),
+        })
+        .collect()
+}
+
 /// Sum of vector elements
 #[wasm_bindgen]
 pub fn sum(handle: Handle) -> Result<f64, JsValue> {
@@ -16,7 +26,8 @@ pub fn sum(handle: Handle) -> Result<f64, JsValue> {
 
         match value {
             Value::Vector(vec) => {
-                let result: f64 = vec.data().iter().sum();
+                let data = extract_f64_vec(vec)?;
+                let result: f64 = data.iter().sum();
                 Ok(result)
             }
             _ => Err(JsValue::from_str("Sum requires vector"))
@@ -38,7 +49,8 @@ pub fn mean(handle: Handle) -> Result<f64, JsValue> {
                     return Err(JsValue::from_str("Cannot compute mean of empty vector"));
                 }
 
-                let sum: f64 = vec.data().iter().sum();
+                let data = extract_f64_vec(vec)?;
+                let sum: f64 = data.iter().sum();
                 Ok(sum / vec.len() as f64)
             }
             _ => Err(JsValue::from_str("Mean requires vector"))
@@ -61,7 +73,7 @@ pub fn std(handle: Handle) -> Result<f64, JsValue> {
                 }
 
                 // Compute mean
-                let data = vec.data();
+                let data = extract_f64_vec(vec)?;
                 let n = data.len() as f64;
                 let mean: f64 = data.iter().sum::<f64>() / n;
 
@@ -90,7 +102,8 @@ pub fn min(handle: Handle) -> Result<f64, JsValue> {
 
         match value {
             Value::Vector(vec) => {
-                vec.data().iter()
+                let data = extract_f64_vec(vec)?;
+                data.iter()
                     .fold(None, |min, &x| {
                         Some(match min {
                             None => x,
@@ -114,7 +127,8 @@ pub fn max(handle: Handle) -> Result<f64, JsValue> {
 
         match value {
             Value::Vector(vec) => {
-                vec.data().iter()
+                let data = extract_f64_vec(vec)?;
+                data.iter()
                     .fold(None, |max, &x| {
                         Some(match max {
                             None => x,
@@ -138,7 +152,8 @@ pub fn norm(handle: Handle) -> Result<f64, JsValue> {
 
         match value {
             Value::Vector(vec) => {
-                let sum_squares: f64 = vec.data().iter()
+                let data = extract_f64_vec(vec)?;
+                let sum_squares: f64 = data.iter()
                     .map(|x| x * x)
                     .sum();
                 Ok(sum_squares.sqrt())
@@ -158,7 +173,8 @@ pub fn norm_l1(handle: Handle) -> Result<f64, JsValue> {
 
         match value {
             Value::Vector(vec) => {
-                let sum: f64 = vec.data().iter()
+                let data = extract_f64_vec(vec)?;
+                let sum: f64 = data.iter()
                     .map(|x| x.abs())
                     .sum();
                 Ok(sum)

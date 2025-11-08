@@ -15,6 +15,9 @@
 // - Variable declarations (let)
 // - Higher-order functions
 // - Complex numbers (3i, 2+3i)
+// - String literals with escape sequences
+// - Records (key-value pairs)
+// - Edges and networks (A -> B, A -- B)
 // ============================================================================
 
 // ============================================================================
@@ -142,6 +145,7 @@ unary = {
 // Operators as separate rules (not silent, so they're captured)
 mult_op = { "*" | "/" | "%" }
 add_op = { "+" | "-" }
+edge_op = { "->" | "--" }
 cmp_op = { "==" | "!=" | ">=" | "<=" | ">" | "<" }
 logical_and_op = { "&&" }
 logical_or_op = { "||" }
@@ -156,9 +160,15 @@ additive = {
     multiplicative ~ (add_op ~ multiplicative)*
 }
 
+// Edge: A -> B or A -- B with optional metadata
+// Syntax: identifier edge_op identifier [":" expr]
+edge = {
+    additive ~ (edge_op ~ additive ~ (":" ~ additive)?)?
+}
+
 // Comparison: >, <, >=, <=, ==, !=
 comparison = {
-    additive ~ (cmp_op ~ additive)?
+    edge ~ (cmp_op ~ edge)?
 }
 
 // Logical AND: &&

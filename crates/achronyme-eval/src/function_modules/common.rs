@@ -5,8 +5,15 @@ macro_rules! unary_math_fn {
         match $arg {
             achronyme_types::value::Value::Number(x) => Ok(achronyme_types::value::Value::Number($f(*x))),
             achronyme_types::value::Value::Vector(v) => {
-                let result: Vec<f64> = v.data().iter().map(|&x| $f(x)).collect();
-                Ok(achronyme_types::value::Value::Vector(achronyme_types::vector::Vector::new(result)))
+                let mut result = Vec::new();
+                for val in v {
+                    if let achronyme_types::value::Value::Number(n) = val {
+                        result.push(achronyme_types::value::Value::Number($f(*n)));
+                    } else {
+                        return Err(format!("{}() can only be applied to numeric vectors", $name));
+                    }
+                }
+                Ok(achronyme_types::value::Value::Vector(result))
             }
             _ => Err(format!("{}() requires a number or vector", $name)),
         }

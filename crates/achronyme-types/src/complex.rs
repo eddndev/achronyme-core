@@ -32,6 +32,16 @@ impl Complex {
         self.im.atan2(self.re)
     }
 
+    /// Calculate the magnitude (absolute value)
+    pub fn norm(&self) -> f64 {
+        self.magnitude()
+    }
+
+    /// Calculate the phase (argument) in radians
+    pub fn arg(&self) -> f64 {
+        self.phase()
+    }
+
     /// Complex conjugate
     pub fn conjugate(&self) -> Self {
         Self {

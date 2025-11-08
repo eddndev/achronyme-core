@@ -1,7 +1,6 @@
 use crate::functions::FunctionRegistry;
 use crate::unary_math_fn;
 use achronyme_types::value::Value;
-use achronyme_types::vector::Vector;
 
 pub fn register_functions(registry: &mut FunctionRegistry) {
     registry.register("floor", floor, 1);
@@ -34,19 +33,21 @@ fn abs(args: &[Value]) -> Result<Value, String> {
     match &args[0] {
         Value::Number(x) => Ok(Value::Number(x.abs())),
         Value::Vector(v) => {
-            let result: Vec<f64> = v.data().iter().map(|x| x.abs()).collect();
-            Ok(Value::Vector(Vector::new(result)))
+            let mut result = Vec::new();
+            for val in v {
+                match val {
+                    Value::Number(n) => result.push(Value::Number(n.abs())),
+                    Value::Complex(c) => result.push(Value::Number(c.norm())),
+                    _ => return Err("abs() can only be applied to numeric vectors".to_string()),
+                }
+            }
+            Ok(Value::Vector(result))
         }
         Value::Complex(c) => {
             // For complex numbers, abs returns the magnitude as a real number
-            Ok(Value::Number(c.magnitude()))
+            Ok(Value::Number(c.norm()))
         }
-        Value::ComplexVector(cv) => {
-            // For complex vectors, return vector of magnitudes
-            let magnitudes: Vec<f64> = cv.data().iter().map(|c| c.magnitude()).collect();
-            Ok(Value::Vector(Vector::new(magnitudes)))
-        }
-        _ => Err("abs() requires a number, vector, complex number, or complex vector".to_string()),
+        _ => Err("abs() requires a number, vector, or complex number".to_string()),
     }
 }
 
@@ -78,6 +79,27 @@ fn min(args: &[Value]) -> Result<Value, String> {
     if args.is_empty() {
         return Err("min() requires at least one argument".to_string());
     }
+    if args.len() == 1 {
+        if let Value::Vector(v) = &args[0] {
+            if v.is_empty() {
+                return Err("min() requires a non-empty vector".to_string());
+            }
+            let mut min_val = match &v[0] {
+                Value::Number(n) => *n,
+                _ => return Err("min() on a vector requires numeric values".to_string()),
+            };
+            for val in v.iter().skip(1) {
+                if let Value::Number(n) = val {
+                    if *n < min_val {
+                        min_val = *n;
+                    }
+                } else {
+                    return Err("min() on a vector requires numeric values".to_string());
+                }
+            }
+            return Ok(Value::Number(min_val));
+        }
+    }
     let mut result = match &args[0] {
         Value::Number(x) => *x,
         _ => return Err("min() requires numbers".to_string()),
@@ -98,6 +120,27 @@ fn min(args: &[Value]) -> Result<Value, String> {
 fn max(args: &[Value]) -> Result<Value, String> {
     if args.is_empty() {
         return Err("max() requires at least one argument".to_string());
+    }
+    if args.len() == 1 {
+        if let Value::Vector(v) = &args[0] {
+            if v.is_empty() {
+                return Err("max() requires a non-empty vector".to_string());
+            }
+            let mut max_val = match &v[0] {
+                Value::Number(n) => *n,
+                _ => return Err("max() on a vector requires numeric values".to_string()),
+            };
+            for val in v.iter().skip(1) {
+                if let Value::Number(n) = val {
+                    if *n > max_val {
+                        max_val = *n;
+                    }
+                } else {
+                    return Err("max() on a vector requires numeric values".to_string());
+                }
+            }
+            return Ok(Value::Number(max_val));
+        }
     }
     let mut result = match &args[0] {
         Value::Number(x) => *x,

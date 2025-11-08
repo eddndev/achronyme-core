@@ -1,6 +1,5 @@
 use crate::functions::FunctionRegistry;
 use achronyme_types::value::Value;
-use achronyme_types::vector::Vector;
 
 pub fn register_functions(registry: &mut FunctionRegistry) {
     // Basic record operations
@@ -15,10 +14,8 @@ pub fn register_functions(registry: &mut FunctionRegistry) {
 fn keys(args: &[Value]) -> Result<Value, String> {
     match &args[0] {
         Value::Record(map) => {
-            // Return a vector of strings containing the keys
-            // For now, we'll convert to a vector of numbers representing the count
-            // In a full implementation, we'd need a String vector type
-            Ok(Value::Number(map.len() as f64))
+            let keys: Vec<Value> = map.keys().map(|k| Value::String(k.clone())).collect();
+            Ok(Value::Vector(keys))
         }
         _ => Err("keys() requires a record".to_string()),
     }
@@ -28,19 +25,8 @@ fn keys(args: &[Value]) -> Result<Value, String> {
 fn values(args: &[Value]) -> Result<Value, String> {
     match &args[0] {
         Value::Record(map) => {
-            // Try to extract values as numbers
-            let nums: Result<Vec<f64>, String> = map
-                .values()
-                .map(|v| match v {
-                    Value::Number(n) => Ok(*n),
-                    _ => Err("values() currently only supports records with numeric values".to_string()),
-                })
-                .collect();
-
-            match nums {
-                Ok(data) => Ok(Value::Vector(Vector::new(data))),
-                Err(e) => Err(e),
-            }
+            let values: Vec<Value> = map.values().cloned().collect();
+            Ok(Value::Vector(values))
         }
         _ => Err("values() requires a record".to_string()),
     }

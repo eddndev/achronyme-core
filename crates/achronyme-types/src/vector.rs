@@ -210,6 +210,33 @@ impl Vector {
     pub fn negate(&self) -> Self {
         Self(self.0.iter().map(|x| -x).collect())
     }
+
+    /// Cross product
+    pub fn cross(&self, other: &Self) -> Result<Self, VectorError> {
+        if self.len() != 3 || other.len() != 3 {
+            return Err(VectorError::DimensionMismatch {
+                expected: 3,
+                got: self.len(),
+            });
+        }
+        let a = &self.0;
+        let b = &other.0;
+        let data = vec![
+            a[1] * b[2] - a[2] * b[1],
+            a[2] * b[0] - a[0] * b[2],
+            a[0] * b[1] - a[1] * b[0],
+        ];
+        Ok(Self(data))
+    }
+
+    /// Normalize the vector to unit length
+    pub fn normalize(&self) -> Result<Self, VectorError> {
+        let norm = self.norm();
+        if norm < 1e-10 {
+            return Err(VectorError::EmptyVector); // Or a more specific error
+        }
+        Ok(self.scale(1.0 / norm))
+    }
 }
 
 // Display formatting

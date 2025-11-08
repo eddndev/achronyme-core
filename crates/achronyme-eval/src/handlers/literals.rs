@@ -30,43 +30,74 @@ pub fn evaluate_complex(re: f64, im: f64) -> Result<Value, String> {
 /// Evaluate a vector literal
 pub fn evaluate_vector(evaluator: &mut Evaluator, elements: &[AstNode]) -> Result<Value, String> {
     if elements.is_empty() {
-        return Ok(Value::Vector(Vector::new(vec![])));
+        return Ok(Value::Vector(vec![]));
     }
 
-    // Evaluate ALL elements first to determine if type promotion is needed
+    // Evaluate ALL elements first
     let mut values = Vec::new();
-    let mut has_complex = false;
-
     for element in elements {
         let value = evaluator.evaluate(element)?;
-        match &value {
-            Value::Complex(_) => has_complex = true,
-            Value::Number(_) => {},
-            _ => return Err("Vector elements must be numbers or complex numbers".to_string()),
-        }
         values.push(value);
     }
 
-    // Decide vector type based on ALL elements
-    if has_complex {
-        // Promote entire vector to ComplexVector
-        let complex_data: Vec<Complex> = values.into_iter()
-            .map(|v| match v {
-                Value::Complex(c) => c,
-                Value::Number(n) => Complex::new(n, 0.0),
-                _ => unreachable!(), // Already validated above
-            })
-            .collect();
-        Ok(Value::ComplexVector(ComplexVector::new(complex_data)))
+    // Validate type homogeneity and apply type promotion
+    validate_and_promote_vector(values)
+}
+
+/// Validate that vector elements are type-compatible and apply type promotion
+fn validate_and_promote_vector(values: Vec<Value>) -> Result<Value, String> {
+    if values.is_empty() {
+        return Ok(Value::Vector(vec![]));
+    }
+
+    // Categorize the types in the vector
+    let has_number = values.iter().any(|v| matches!(v, Value::Number(_)));
+    let has_complex = values.iter().any(|v| matches!(v, Value::Complex(_)));
+    let has_edge = values.iter().any(|v| matches!(v, Value::Edge { .. }));
+    let has_record = values.iter().any(|v| matches!(v, Value::Record(_)));
+    let has_string = values.iter().any(|v| matches!(v, Value::String(_)));
+    let has_boolean = values.iter().any(|v| matches!(v, Value::Boolean(_)));
+    let has_function = values.iter().any(|v| matches!(v, Value::Function(_)));
+    let has_matrix = values.iter().any(|v| matches!(v, Value::Matrix(_)));
+    let has_vector = values.iter().any(|v| matches!(v, Value::Vector(_)));
+
+    // Count how many different type categories we have
+    let type_categories = vec![
+        has_edge,
+        has_record,
+        has_string,
+        has_boolean,
+        has_function,
+        has_matrix,
+        has_vector,
+    ];
+    let non_numeric_types = type_categories.iter().filter(|&&x| x).count();
+
+    // Allow Number and Complex to coexist (they can be promoted)
+    let has_numeric = has_number || has_complex;
+
+    if non_numeric_types > 1 || (non_numeric_types > 0 && has_numeric) {
+        return Err("Vector elements must be of compatible types".to_string());
+    }
+
+    // Apply type promotion for numeric types
+    if has_numeric {
+        if has_complex {
+            // Promote all numbers to complex
+            let promoted: Vec<Value> = values.into_iter()
+                .map(|v| match v {
+                    Value::Number(n) => Value::Complex(Complex::new(n, 0.0)),
+                    v => v,
+                })
+                .collect();
+            Ok(Value::Vector(promoted))
+        } else {
+            // All are numbers, no promotion needed
+            Ok(Value::Vector(values))
+        }
     } else {
-        // All elements are real numbers
-        let real_data: Vec<f64> = values.into_iter()
-            .map(|v| match v {
-                Value::Number(n) => n,
-                _ => unreachable!(), // Already validated above
-            })
-            .collect();
-        Ok(Value::Vector(Vector::new(real_data)))
+        // Non-numeric homogeneous vector (edges, records, strings, etc.)
+        Ok(Value::Vector(values))
     }
 }
 
@@ -111,4 +142,36 @@ pub fn evaluate_record(evaluator: &mut Evaluator, fields: &[(String, AstNode)]) 
     }
 
     Ok(Value::Record(record))
+}
+
+/// Evaluate an edge literal
+/// Note: from and to are pure identifiers (strings), never evaluated as variables
+pub fn evaluate_edge(
+    evaluator: &mut Evaluator,
+    from: &str,
+    to: &str,
+    directed: bool,
+    metadata: &Option<Box<AstNode>>,
+) -> Result<Value, String> {
+    use std::collections::HashMap;
+
+    // Evaluate metadata if provided
+    let properties = if let Some(metadata_node) = metadata {
+        let metadata_value = evaluator.evaluate(metadata_node)?;
+
+        // Metadata must be a record
+        match metadata_value {
+            Value::Record(map) => map,
+            _ => return Err("Edge metadata must be a record".to_string()),
+        }
+    } else {
+        HashMap::new()
+    };
+
+    Ok(Value::Edge {
+        from: from.to_string(),
+        to: to.to_string(),
+        directed,
+        properties,
+    })
 }

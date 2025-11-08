@@ -1,8 +1,6 @@
 use achronyme_parser::ast::BinaryOp;
 use achronyme_types::complex::Complex;
-use achronyme_types::complex_vector::ComplexVector;
 use achronyme_types::value::Value;
-use achronyme_types::vector::Vector;
 
 /// Apply a binary operation to two values
 pub fn apply(op: &BinaryOp, left: Value, right: Value) -> Result<Value, String> {
@@ -27,19 +25,12 @@ pub fn apply(op: &BinaryOp, left: Value, right: Value) -> Result<Value, String> 
 fn apply_add(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
         (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a + b)),
-        (Value::Vector(a), Value::Vector(b)) => a
-            .add(&b)
-            .map(Value::Vector)
-            .map_err(|e| e.to_string()),
-        (Value::ComplexVector(a), Value::ComplexVector(b)) => a
-            .add(&b)
-            .map(Value::ComplexVector)
-            .map_err(|e| e.to_string()),
+        (Value::Complex(a), Value::Complex(b)) => Ok(Value::Complex(a + b)),
         (Value::Matrix(a), Value::Matrix(b)) => a
             .add(&b)
             .map(Value::Matrix)
             .map_err(|e| e.to_string()),
-        (Value::Complex(a), Value::Complex(b)) => Ok(Value::Complex(a + b)),
+
         // Type promotion: Number → Complex
         (Value::Number(a), Value::Complex(b)) => {
             Ok(Value::Complex(Complex::from_real(a) + b))
@@ -47,50 +38,85 @@ fn apply_add(left: Value, right: Value) -> Result<Value, String> {
         (Value::Complex(a), Value::Number(b)) => {
             Ok(Value::Complex(a + Complex::from_real(b)))
         }
+
+        // Vector + Vector
+        (Value::Vector(ref a), Value::Vector(ref b)) => {
+            // Check if both vectors are numeric
+            if Value::is_numeric_vector(a) && Value::is_numeric_vector(b) {
+                // Check if any element is complex
+                let has_complex_a = a.iter().any(|v| matches!(v, Value::Complex(_)));
+                let has_complex_b = b.iter().any(|v| matches!(v, Value::Complex(_)));
+
+                if has_complex_a || has_complex_b {
+                    // Complex vector addition
+                    let vec_a = Value::to_complex_vector(a).map_err(|_| "Type conversion error")?;
+                    let vec_b = Value::to_complex_vector(b).map_err(|_| "Type conversion error")?;
+                    let result = vec_a.add(&vec_b).map_err(|e| e.to_string())?;
+                    Ok(Value::from_complex_vector(result))
+                } else {
+                    // Real vector addition
+                    let vec_a = Value::to_real_vector(a).map_err(|_| "Type conversion error")?;
+                    let vec_b = Value::to_real_vector(b).map_err(|_| "Type conversion error")?;
+                    let result = vec_a.add(&vec_b).map_err(|e| e.to_string())?;
+                    Ok(Value::from_real_vector(result))
+                }
+            } else {
+                Err("Vector addition requires numeric vectors".to_string())
+            }
+        }
+
         // Broadcasting: Scalar + Vector
-        (Value::Number(scalar), Value::Vector(vec)) => {
-            let data: Vec<f64> = vec.data().iter().map(|x| x + scalar).collect();
-            Ok(Value::Vector(Vector::new(data)))
+        (Value::Number(scalar), Value::Vector(ref vec)) => {
+            if Value::is_numeric_vector(vec) {
+                let result: Vec<Value> = vec.iter().map(|v| match v {
+                    Value::Number(n) => Value::Number(n + scalar),
+                    Value::Complex(c) => Value::Complex(*c + Complex::from_real(scalar)),
+                    _ => unreachable!(),
+                }).collect();
+                Ok(Value::Vector(result))
+            } else {
+                Err("Broadcasting requires numeric vector".to_string())
+            }
         }
-        (Value::Vector(vec), Value::Number(scalar)) => {
-            let data: Vec<f64> = vec.data().iter().map(|x| x + scalar).collect();
-            Ok(Value::Vector(Vector::new(data)))
+        (Value::Vector(ref vec), Value::Number(scalar)) => {
+            if Value::is_numeric_vector(vec) {
+                let result: Vec<Value> = vec.iter().map(|v| match v {
+                    Value::Number(n) => Value::Number(n + scalar),
+                    Value::Complex(c) => Value::Complex(*c + Complex::from_real(scalar)),
+                    _ => unreachable!(),
+                }).collect();
+                Ok(Value::Vector(result))
+            } else {
+                Err("Broadcasting requires numeric vector".to_string())
+            }
         }
-        // Broadcasting: Complex + Vector → ComplexVector
-        (Value::Complex(c), Value::Vector(vec)) => {
-            let data: Vec<Complex> = vec.data().iter()
-                .map(|x| Complex::from_real(*x) + c)
-                .collect();
-            Ok(Value::ComplexVector(ComplexVector::new(data)))
+
+        // Broadcasting: Complex + Vector
+        (Value::Complex(c), Value::Vector(ref vec)) => {
+            if Value::is_numeric_vector(vec) {
+                let result: Vec<Value> = vec.iter().map(|v| match v {
+                    Value::Number(n) => Value::Complex(Complex::from_real(*n) + c),
+                    Value::Complex(cv) => Value::Complex(*cv + c),
+                    _ => unreachable!(),
+                }).collect();
+                Ok(Value::Vector(result))
+            } else {
+                Err("Broadcasting requires numeric vector".to_string())
+            }
         }
-        (Value::Vector(vec), Value::Complex(c)) => {
-            let data: Vec<Complex> = vec.data().iter()
-                .map(|x| Complex::from_real(*x) + c)
-                .collect();
-            Ok(Value::ComplexVector(ComplexVector::new(data)))
+        (Value::Vector(ref vec), Value::Complex(c)) => {
+            if Value::is_numeric_vector(vec) {
+                let result: Vec<Value> = vec.iter().map(|v| match v {
+                    Value::Number(n) => Value::Complex(Complex::from_real(*n) + c),
+                    Value::Complex(cv) => Value::Complex(*cv + c),
+                    _ => unreachable!(),
+                }).collect();
+                Ok(Value::Vector(result))
+            } else {
+                Err("Broadcasting requires numeric vector".to_string())
+            }
         }
-        // Broadcasting: Scalar + ComplexVector
-        (Value::Number(scalar), Value::ComplexVector(vec)) => {
-            let data: Vec<Complex> = vec.data().iter()
-                .map(|c| *c + Complex::from_real(scalar))
-                .collect();
-            Ok(Value::ComplexVector(ComplexVector::new(data)))
-        }
-        (Value::ComplexVector(vec), Value::Number(scalar)) => {
-            let data: Vec<Complex> = vec.data().iter()
-                .map(|c| *c + Complex::from_real(scalar))
-                .collect();
-            Ok(Value::ComplexVector(ComplexVector::new(data)))
-        }
-        // Broadcasting: Complex + ComplexVector
-        (Value::Complex(c), Value::ComplexVector(vec)) => {
-            let data: Vec<Complex> = vec.data().iter().map(|x| *x + c).collect();
-            Ok(Value::ComplexVector(ComplexVector::new(data)))
-        }
-        (Value::ComplexVector(vec), Value::Complex(c)) => {
-            let data: Vec<Complex> = vec.data().iter().map(|x| *x + c).collect();
-            Ok(Value::ComplexVector(ComplexVector::new(data)))
-        }
+
         _ => Err("Incompatible types for addition".to_string()),
     }
 }
@@ -98,69 +124,98 @@ fn apply_add(left: Value, right: Value) -> Result<Value, String> {
 fn apply_subtract(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
         (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a - b)),
-        (Value::Vector(a), Value::Vector(b)) => a
-            .sub(&b)
-            .map(Value::Vector)
-            .map_err(|e| e.to_string()),
-        (Value::ComplexVector(a), Value::ComplexVector(b)) => a
-            .sub(&b)
-            .map(Value::ComplexVector)
-            .map_err(|e| e.to_string()),
+        (Value::Complex(a), Value::Complex(b)) => Ok(Value::Complex(a - b)),
         (Value::Matrix(a), Value::Matrix(b)) => a
             .sub(&b)
             .map(Value::Matrix)
             .map_err(|e| e.to_string()),
-        (Value::Complex(a), Value::Complex(b)) => Ok(Value::Complex(a - b)),
+
+        // Type promotion: Number → Complex
         (Value::Number(a), Value::Complex(b)) => {
             Ok(Value::Complex(Complex::from_real(a) - b))
         }
         (Value::Complex(a), Value::Number(b)) => {
             Ok(Value::Complex(a - Complex::from_real(b)))
         }
+
+        // Vector - Vector
+        (Value::Vector(ref a), Value::Vector(ref b)) => {
+            // Check if both vectors are numeric
+            if Value::is_numeric_vector(a) && Value::is_numeric_vector(b) {
+                // Check if any element is complex
+                let has_complex_a = a.iter().any(|v| matches!(v, Value::Complex(_)));
+                let has_complex_b = b.iter().any(|v| matches!(v, Value::Complex(_)));
+
+                if has_complex_a || has_complex_b {
+                    // Complex vector subtraction
+                    let vec_a = Value::to_complex_vector(a).map_err(|_| "Type conversion error")?;
+                    let vec_b = Value::to_complex_vector(b).map_err(|_| "Type conversion error")?;
+                    let result = vec_a.sub(&vec_b).map_err(|e| e.to_string())?;
+                    Ok(Value::from_complex_vector(result))
+                } else {
+                    // Real vector subtraction
+                    let vec_a = Value::to_real_vector(a).map_err(|_| "Type conversion error")?;
+                    let vec_b = Value::to_real_vector(b).map_err(|_| "Type conversion error")?;
+                    let result = vec_a.sub(&vec_b).map_err(|e| e.to_string())?;
+                    Ok(Value::from_real_vector(result))
+                }
+            } else {
+                Err("Vector subtraction requires numeric vectors".to_string())
+            }
+        }
+
         // Broadcasting: Scalar - Vector
-        (Value::Number(scalar), Value::Vector(vec)) => {
-            let data: Vec<f64> = vec.data().iter().map(|x| scalar - x).collect();
-            Ok(Value::Vector(Vector::new(data)))
+        (Value::Number(scalar), Value::Vector(ref vec)) => {
+            if Value::is_numeric_vector(vec) {
+                let result: Vec<Value> = vec.iter().map(|v| match v {
+                    Value::Number(n) => Value::Number(scalar - n),
+                    Value::Complex(c) => Value::Complex(Complex::from_real(scalar) - *c),
+                    _ => unreachable!(),
+                }).collect();
+                Ok(Value::Vector(result))
+            } else {
+                Err("Broadcasting requires numeric vector".to_string())
+            }
         }
-        (Value::Vector(vec), Value::Number(scalar)) => {
-            let data: Vec<f64> = vec.data().iter().map(|x| x - scalar).collect();
-            Ok(Value::Vector(Vector::new(data)))
+        (Value::Vector(ref vec), Value::Number(scalar)) => {
+            if Value::is_numeric_vector(vec) {
+                let result: Vec<Value> = vec.iter().map(|v| match v {
+                    Value::Number(n) => Value::Number(n - scalar),
+                    Value::Complex(c) => Value::Complex(*c - Complex::from_real(scalar)),
+                    _ => unreachable!(),
+                }).collect();
+                Ok(Value::Vector(result))
+            } else {
+                Err("Broadcasting requires numeric vector".to_string())
+            }
         }
-        // Broadcasting: Complex - Vector → ComplexVector
-        (Value::Complex(c), Value::Vector(vec)) => {
-            let data: Vec<Complex> = vec.data().iter()
-                .map(|x| c - Complex::from_real(*x))
-                .collect();
-            Ok(Value::ComplexVector(ComplexVector::new(data)))
+
+        // Broadcasting: Complex - Vector
+        (Value::Complex(c), Value::Vector(ref vec)) => {
+            if Value::is_numeric_vector(vec) {
+                let result: Vec<Value> = vec.iter().map(|v| match v {
+                    Value::Number(n) => Value::Complex(c - Complex::from_real(*n)),
+                    Value::Complex(cv) => Value::Complex(c - *cv),
+                    _ => unreachable!(),
+                }).collect();
+                Ok(Value::Vector(result))
+            } else {
+                Err("Broadcasting requires numeric vector".to_string())
+            }
         }
-        (Value::Vector(vec), Value::Complex(c)) => {
-            let data: Vec<Complex> = vec.data().iter()
-                .map(|x| Complex::from_real(*x) - c)
-                .collect();
-            Ok(Value::ComplexVector(ComplexVector::new(data)))
+        (Value::Vector(ref vec), Value::Complex(c)) => {
+            if Value::is_numeric_vector(vec) {
+                let result: Vec<Value> = vec.iter().map(|v| match v {
+                    Value::Number(n) => Value::Complex(Complex::from_real(*n) - c),
+                    Value::Complex(cv) => Value::Complex(*cv - c),
+                    _ => unreachable!(),
+                }).collect();
+                Ok(Value::Vector(result))
+            } else {
+                Err("Broadcasting requires numeric vector".to_string())
+            }
         }
-        // Broadcasting: Scalar - ComplexVector
-        (Value::Number(scalar), Value::ComplexVector(vec)) => {
-            let data: Vec<Complex> = vec.data().iter()
-                .map(|c| Complex::from_real(scalar) - *c)
-                .collect();
-            Ok(Value::ComplexVector(ComplexVector::new(data)))
-        }
-        (Value::ComplexVector(vec), Value::Number(scalar)) => {
-            let data: Vec<Complex> = vec.data().iter()
-                .map(|c| *c - Complex::from_real(scalar))
-                .collect();
-            Ok(Value::ComplexVector(ComplexVector::new(data)))
-        }
-        // Broadcasting: Complex - ComplexVector
-        (Value::Complex(c), Value::ComplexVector(vec)) => {
-            let data: Vec<Complex> = vec.data().iter().map(|x| c - *x).collect();
-            Ok(Value::ComplexVector(ComplexVector::new(data)))
-        }
-        (Value::ComplexVector(vec), Value::Complex(c)) => {
-            let data: Vec<Complex> = vec.data().iter().map(|x| *x - c).collect();
-            Ok(Value::ComplexVector(ComplexVector::new(data)))
-        }
+
         _ => Err("Incompatible types for subtraction".to_string()),
     }
 }
@@ -168,69 +223,98 @@ fn apply_subtract(left: Value, right: Value) -> Result<Value, String> {
 fn apply_multiply(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
         (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a * b)),
-        (Value::Vector(a), Value::Vector(b)) => a
-            .mul(&b)
-            .map(Value::Vector)
-            .map_err(|e| e.to_string()),
-        (Value::ComplexVector(a), Value::ComplexVector(b)) => a
-            .mul(&b)
-            .map(Value::ComplexVector)
-            .map_err(|e| e.to_string()),
+        (Value::Complex(a), Value::Complex(b)) => Ok(Value::Complex(a * b)),
         (Value::Matrix(a), Value::Matrix(b)) => a
             .mul(&b)
             .map(Value::Matrix)
             .map_err(|e| e.to_string()),
-        (Value::Complex(a), Value::Complex(b)) => Ok(Value::Complex(a * b)),
+
+        // Type promotion: Number → Complex
         (Value::Number(a), Value::Complex(b)) => {
             Ok(Value::Complex(Complex::from_real(a) * b))
         }
         (Value::Complex(a), Value::Number(b)) => {
             Ok(Value::Complex(a * Complex::from_real(b)))
         }
+
+        // Vector * Vector
+        (Value::Vector(ref a), Value::Vector(ref b)) => {
+            // Check if both vectors are numeric
+            if Value::is_numeric_vector(a) && Value::is_numeric_vector(b) {
+                // Check if any element is complex
+                let has_complex_a = a.iter().any(|v| matches!(v, Value::Complex(_)));
+                let has_complex_b = b.iter().any(|v| matches!(v, Value::Complex(_)));
+
+                if has_complex_a || has_complex_b {
+                    // Complex vector multiplication
+                    let vec_a = Value::to_complex_vector(a).map_err(|_| "Type conversion error")?;
+                    let vec_b = Value::to_complex_vector(b).map_err(|_| "Type conversion error")?;
+                    let result = vec_a.mul(&vec_b).map_err(|e| e.to_string())?;
+                    Ok(Value::from_complex_vector(result))
+                } else {
+                    // Real vector multiplication
+                    let vec_a = Value::to_real_vector(a).map_err(|_| "Type conversion error")?;
+                    let vec_b = Value::to_real_vector(b).map_err(|_| "Type conversion error")?;
+                    let result = vec_a.mul(&vec_b).map_err(|e| e.to_string())?;
+                    Ok(Value::from_real_vector(result))
+                }
+            } else {
+                Err("Vector multiplication requires numeric vectors".to_string())
+            }
+        }
+
         // Broadcasting: Scalar * Vector
-        (Value::Number(scalar), Value::Vector(vec)) => {
-            let data: Vec<f64> = vec.data().iter().map(|x| x * scalar).collect();
-            Ok(Value::Vector(Vector::new(data)))
+        (Value::Number(scalar), Value::Vector(ref vec)) => {
+            if Value::is_numeric_vector(vec) {
+                let result: Vec<Value> = vec.iter().map(|v| match v {
+                    Value::Number(n) => Value::Number(n * scalar),
+                    Value::Complex(c) => Value::Complex(*c * Complex::from_real(scalar)),
+                    _ => unreachable!(),
+                }).collect();
+                Ok(Value::Vector(result))
+            } else {
+                Err("Broadcasting requires numeric vector".to_string())
+            }
         }
-        (Value::Vector(vec), Value::Number(scalar)) => {
-            let data: Vec<f64> = vec.data().iter().map(|x| x * scalar).collect();
-            Ok(Value::Vector(Vector::new(data)))
+        (Value::Vector(ref vec), Value::Number(scalar)) => {
+            if Value::is_numeric_vector(vec) {
+                let result: Vec<Value> = vec.iter().map(|v| match v {
+                    Value::Number(n) => Value::Number(n * scalar),
+                    Value::Complex(c) => Value::Complex(*c * Complex::from_real(scalar)),
+                    _ => unreachable!(),
+                }).collect();
+                Ok(Value::Vector(result))
+            } else {
+                Err("Broadcasting requires numeric vector".to_string())
+            }
         }
-        // Broadcasting: Complex * Vector → ComplexVector
-        (Value::Complex(c), Value::Vector(vec)) => {
-            let data: Vec<Complex> = vec.data().iter()
-                .map(|x| Complex::from_real(*x) * c)
-                .collect();
-            Ok(Value::ComplexVector(ComplexVector::new(data)))
+
+        // Broadcasting: Complex * Vector
+        (Value::Complex(c), Value::Vector(ref vec)) => {
+            if Value::is_numeric_vector(vec) {
+                let result: Vec<Value> = vec.iter().map(|v| match v {
+                    Value::Number(n) => Value::Complex(Complex::from_real(*n) * c),
+                    Value::Complex(cv) => Value::Complex(*cv * c),
+                    _ => unreachable!(),
+                }).collect();
+                Ok(Value::Vector(result))
+            } else {
+                Err("Broadcasting requires numeric vector".to_string())
+            }
         }
-        (Value::Vector(vec), Value::Complex(c)) => {
-            let data: Vec<Complex> = vec.data().iter()
-                .map(|x| Complex::from_real(*x) * c)
-                .collect();
-            Ok(Value::ComplexVector(ComplexVector::new(data)))
+        (Value::Vector(ref vec), Value::Complex(c)) => {
+            if Value::is_numeric_vector(vec) {
+                let result: Vec<Value> = vec.iter().map(|v| match v {
+                    Value::Number(n) => Value::Complex(Complex::from_real(*n) * c),
+                    Value::Complex(cv) => Value::Complex(*cv * c),
+                    _ => unreachable!(),
+                }).collect();
+                Ok(Value::Vector(result))
+            } else {
+                Err("Broadcasting requires numeric vector".to_string())
+            }
         }
-        // Broadcasting: Scalar * ComplexVector
-        (Value::Number(scalar), Value::ComplexVector(vec)) => {
-            let data: Vec<Complex> = vec.data().iter()
-                .map(|c| *c * Complex::from_real(scalar))
-                .collect();
-            Ok(Value::ComplexVector(ComplexVector::new(data)))
-        }
-        (Value::ComplexVector(vec), Value::Number(scalar)) => {
-            let data: Vec<Complex> = vec.data().iter()
-                .map(|c| *c * Complex::from_real(scalar))
-                .collect();
-            Ok(Value::ComplexVector(ComplexVector::new(data)))
-        }
-        // Broadcasting: Complex * ComplexVector
-        (Value::Complex(c), Value::ComplexVector(vec)) => {
-            let data: Vec<Complex> = vec.data().iter().map(|x| *x * c).collect();
-            Ok(Value::ComplexVector(ComplexVector::new(data)))
-        }
-        (Value::ComplexVector(vec), Value::Complex(c)) => {
-            let data: Vec<Complex> = vec.data().iter().map(|x| *x * c).collect();
-            Ok(Value::ComplexVector(ComplexVector::new(data)))
-        }
+
         _ => Err("Incompatible types for multiplication".to_string()),
     }
 }
@@ -244,14 +328,6 @@ fn apply_divide(left: Value, right: Value) -> Result<Value, String> {
                 Ok(Value::Number(a / b))
             }
         }
-        (Value::Vector(a), Value::Vector(b)) => a
-            .div(&b)
-            .map(Value::Vector)
-            .map_err(|e| e.to_string()),
-        (Value::ComplexVector(a), Value::ComplexVector(b)) => a
-            .div(&b)
-            .map(Value::ComplexVector)
-            .map_err(|e| e.to_string()),
         (Value::Complex(a), Value::Complex(b)) => Ok(Value::Complex(a / b)),
         (Value::Number(a), Value::Complex(b)) => {
             Ok(Value::Complex(Complex::from_real(a) / b))
@@ -259,55 +335,89 @@ fn apply_divide(left: Value, right: Value) -> Result<Value, String> {
         (Value::Complex(a), Value::Number(b)) => {
             Ok(Value::Complex(a / Complex::from_real(b)))
         }
+
+        // Vector / Vector
+        (Value::Vector(ref a), Value::Vector(ref b)) => {
+            // Check if both vectors are numeric
+            if Value::is_numeric_vector(a) && Value::is_numeric_vector(b) {
+                // Check if any element is complex
+                let has_complex_a = a.iter().any(|v| matches!(v, Value::Complex(_)));
+                let has_complex_b = b.iter().any(|v| matches!(v, Value::Complex(_)));
+
+                if has_complex_a || has_complex_b {
+                    // Complex vector division
+                    let vec_a = Value::to_complex_vector(a).map_err(|_| "Type conversion error")?;
+                    let vec_b = Value::to_complex_vector(b).map_err(|_| "Type conversion error")?;
+                    let result = vec_a.div(&vec_b).map_err(|e| e.to_string())?;
+                    Ok(Value::from_complex_vector(result))
+                } else {
+                    // Real vector division
+                    let vec_a = Value::to_real_vector(a).map_err(|_| "Type conversion error")?;
+                    let vec_b = Value::to_real_vector(b).map_err(|_| "Type conversion error")?;
+                    let result = vec_a.div(&vec_b).map_err(|e| e.to_string())?;
+                    Ok(Value::from_real_vector(result))
+                }
+            } else {
+                Err("Vector division requires numeric vectors".to_string())
+            }
+        }
+
         // Broadcasting: Scalar / Vector
-        (Value::Number(scalar), Value::Vector(vec)) => {
-            let data: Vec<f64> = vec.data().iter().map(|x| scalar / x).collect();
-            Ok(Value::Vector(Vector::new(data)))
+        (Value::Number(scalar), Value::Vector(ref vec)) => {
+            if Value::is_numeric_vector(vec) {
+                let result: Result<Vec<Value>, String> = vec.iter().map(|v| match v {
+                    Value::Number(n) => if *n == 0.0 { Err("Division by zero".to_string()) } else { Ok(Value::Number(scalar / n)) },
+                    Value::Complex(c) => if c.re == 0.0 && c.im == 0.0 { Err("Division by zero".to_string()) } else { Ok(Value::Complex(Complex::from_real(scalar) / *c)) },
+                    _ => unreachable!(),
+                }).collect();
+                result.map(Value::Vector)
+            } else {
+                Err("Broadcasting requires numeric vector".to_string())
+            }
         }
-        (Value::Vector(vec), Value::Number(scalar)) => {
+        (Value::Vector(ref vec), Value::Number(scalar)) => {
             if scalar == 0.0 {
                 return Err("Division by zero".to_string());
             }
-            let data: Vec<f64> = vec.data().iter().map(|x| x / scalar).collect();
-            Ok(Value::Vector(Vector::new(data)))
+            if Value::is_numeric_vector(vec) {
+                let result: Vec<Value> = vec.iter().map(|v| match v {
+                    Value::Number(n) => Value::Number(n / scalar),
+                    Value::Complex(c) => Value::Complex(*c / Complex::from_real(scalar)),
+                    _ => unreachable!(),
+                }).collect();
+                Ok(Value::Vector(result))
+            } else {
+                Err("Broadcasting requires numeric vector".to_string())
+            }
         }
-        // Broadcasting: Complex / Vector → ComplexVector
-        (Value::Complex(c), Value::Vector(vec)) => {
-            let data: Vec<Complex> = vec.data().iter()
-                .map(|x| c / Complex::from_real(*x))
-                .collect();
-            Ok(Value::ComplexVector(ComplexVector::new(data)))
+
+        // Broadcasting: Complex / Vector
+        (Value::Complex(c), Value::Vector(ref vec)) => {
+            if Value::is_numeric_vector(vec) {
+                let result: Result<Vec<Value>, String> = vec.iter().map(|v| match v {
+                    Value::Number(n) => if *n == 0.0 { Err("Division by zero".to_string()) } else { Ok(Value::Complex(c / Complex::from_real(*n))) },
+                    Value::Complex(cv) => if cv.re == 0.0 && cv.im == 0.0 { Err("Division by zero".to_string()) } else { Ok(Value::Complex(c / *cv)) },
+                    _ => unreachable!(),
+                }).collect();
+                result.map(Value::Vector)
+            } else {
+                Err("Broadcasting requires numeric vector".to_string())
+            }
         }
-        (Value::Vector(vec), Value::Complex(c)) => {
-            let data: Vec<Complex> = vec.data().iter()
-                .map(|x| Complex::from_real(*x) / c)
-                .collect();
-            Ok(Value::ComplexVector(ComplexVector::new(data)))
-        }
-        // Broadcasting: Scalar / ComplexVector
-        (Value::Number(scalar), Value::ComplexVector(vec)) => {
-            let data: Vec<Complex> = vec.data().iter()
-                .map(|c| Complex::from_real(scalar) / *c)
-                .collect();
-            Ok(Value::ComplexVector(ComplexVector::new(data)))
-        }
-        (Value::ComplexVector(vec), Value::Number(scalar)) => {
-            if scalar == 0.0 {
+        (Value::Vector(ref vec), Value::Complex(c)) => {
+            if c.re == 0.0 && c.im == 0.0 {
                 return Err("Division by zero".to_string());
             }
-            let data: Vec<Complex> = vec.data().iter()
-                .map(|c| *c / Complex::from_real(scalar))
-                .collect();
-            Ok(Value::ComplexVector(ComplexVector::new(data)))
-        }
-        // Broadcasting: Complex / ComplexVector
-        (Value::Complex(c), Value::ComplexVector(vec)) => {
-            let data: Vec<Complex> = vec.data().iter().map(|x| c / *x).collect();
-            Ok(Value::ComplexVector(ComplexVector::new(data)))
-        }
-        (Value::ComplexVector(vec), Value::Complex(c)) => {
-            let data: Vec<Complex> = vec.data().iter().map(|x| *x / c).collect();
-            Ok(Value::ComplexVector(ComplexVector::new(data)))
+            if Value::is_numeric_vector(vec) {
+                let result: Vec<Value> = vec.iter().map(|v| match v {
+                    Value::Number(n) => Value::Complex(Complex::from_real(*n) / c),
+                    Value::Complex(cv) => Value::Complex(*cv / c),
+                    _ => unreachable!(),
+                }).collect();
+                Ok(Value::Vector(result))
+            } else {
+                Err("Broadcasting requires numeric vector".to_string())
+            }
         }
         _ => Err("Incompatible types for division".to_string()),
     }
@@ -321,53 +431,57 @@ fn apply_power(left: Value, right: Value) -> Result<Value, String> {
         (Value::Number(a), Value::Complex(b)) => {
             Ok(Value::Complex(Complex::from_real(a).pow_complex(&b)))
         }
+
         // Broadcasting: Vector ^ Scalar
-        (Value::Vector(vec), Value::Number(scalar)) => {
-            let data: Vec<f64> = vec.data().iter().map(|x| x.powf(scalar)).collect();
-            Ok(Value::Vector(Vector::new(data)))
+        (Value::Vector(ref vec), Value::Number(scalar)) => {
+            if Value::is_numeric_vector(vec) {
+                let result: Vec<Value> = vec.iter().map(|v| match v {
+                    Value::Number(n) => Value::Number(n.powf(scalar)),
+                    Value::Complex(c) => Value::Complex(c.pow(scalar)),
+                    _ => unreachable!(),
+                }).collect();
+                Ok(Value::Vector(result))
+            } else {
+                Err("Broadcasting requires numeric vector".to_string())
+            }
         }
-        (Value::Number(scalar), Value::Vector(vec)) => {
-            let data: Vec<f64> = vec.data().iter().map(|x| scalar.powf(*x)).collect();
-            Ok(Value::Vector(Vector::new(data)))
+        (Value::Number(scalar), Value::Vector(ref vec)) => {
+            if Value::is_numeric_vector(vec) {
+                let result: Vec<Value> = vec.iter().map(|v| match v {
+                    Value::Number(n) => Value::Number(scalar.powf(*n)),
+                    Value::Complex(c) => Value::Complex(Complex::from_real(scalar).pow_complex(c)),
+                    _ => unreachable!(),
+                }).collect();
+                Ok(Value::Vector(result))
+            } else {
+                Err("Broadcasting requires numeric vector".to_string())
+            }
         }
-        // Broadcasting: Vector ^ Complex → ComplexVector
-        (Value::Vector(vec), Value::Complex(c)) => {
-            let data: Vec<Complex> = vec.data().iter()
-                .map(|x| Complex::from_real(*x).pow_complex(&c))
-                .collect();
-            Ok(Value::ComplexVector(ComplexVector::new(data)))
+
+        // Broadcasting: Vector ^ Complex
+        (Value::Vector(ref vec), Value::Complex(c)) => {
+            if Value::is_numeric_vector(vec) {
+                let result: Vec<Value> = vec.iter().map(|v| match v {
+                    Value::Number(n) => Value::Complex(Complex::from_real(*n).pow_complex(&c)),
+                    Value::Complex(cv) => Value::Complex(cv.pow_complex(&c)),
+                    _ => unreachable!(),
+                }).collect();
+                Ok(Value::Vector(result))
+            } else {
+                Err("Broadcasting requires numeric vector".to_string())
+            }
         }
-        (Value::Complex(c), Value::Vector(vec)) => {
-            let data: Vec<Complex> = vec.data().iter()
-                .map(|x| c.pow(*x))
-                .collect();
-            Ok(Value::ComplexVector(ComplexVector::new(data)))
-        }
-        // Broadcasting: ComplexVector ^ Scalar
-        (Value::ComplexVector(vec), Value::Number(scalar)) => {
-            let data: Vec<Complex> = vec.data().iter()
-                .map(|c| c.pow(scalar))
-                .collect();
-            Ok(Value::ComplexVector(ComplexVector::new(data)))
-        }
-        (Value::Number(scalar), Value::ComplexVector(vec)) => {
-            let data: Vec<Complex> = vec.data().iter()
-                .map(|c| Complex::from_real(scalar).pow_complex(c))
-                .collect();
-            Ok(Value::ComplexVector(ComplexVector::new(data)))
-        }
-        // Broadcasting: ComplexVector ^ Complex
-        (Value::ComplexVector(vec), Value::Complex(c)) => {
-            let data: Vec<Complex> = vec.data().iter()
-                .map(|x| x.pow_complex(&c))
-                .collect();
-            Ok(Value::ComplexVector(ComplexVector::new(data)))
-        }
-        (Value::Complex(c), Value::ComplexVector(vec)) => {
-            let data: Vec<Complex> = vec.data().iter()
-                .map(|x| c.pow_complex(x))
-                .collect();
-            Ok(Value::ComplexVector(ComplexVector::new(data)))
+        (Value::Complex(c), Value::Vector(ref vec)) => {
+            if Value::is_numeric_vector(vec) {
+                let result: Vec<Value> = vec.iter().map(|v| match v {
+                    Value::Number(n) => Value::Complex(c.pow(*n)),
+                    Value::Complex(cv) => Value::Complex(c.pow_complex(cv)),
+                    _ => unreachable!(),
+                }).collect();
+                Ok(Value::Vector(result))
+            } else {
+                Err("Broadcasting requires numeric vector".to_string())
+            }
         }
         _ => Err("Incompatible types for power".to_string()),
     }

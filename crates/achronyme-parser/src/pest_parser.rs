@@ -95,20 +95,94 @@ fn build_ast_from_expr(pair: Pair<Rule>) -> Result<AstNode, String> {
         Rule::logical_or => build_binary_op(pair),
         Rule::logical_and => build_binary_op(pair),
         Rule::comparison => build_comparison(pair),
+        Rule::edge => build_edge(pair),
         Rule::additive => build_binary_op(pair),
         Rule::multiplicative => build_binary_op(pair),
         Rule::unary => build_unary(pair),
         Rule::power => build_power(pair),
         Rule::primary => build_primary(pair),
+        Rule::field_access => build_field_access(pair),
         _ => Err(format!("Unexpected expression rule: {:?}", rule))
     }
+}
+
+fn build_edge(pair: Pair<Rule>) -> Result<AstNode, String> {
+    let pairs: Vec<_> = pair.into_inner().collect();
+
+    if pairs.len() == 1 {
+        // No edge, just the additive expression
+        return build_ast_from_expr(pairs[0].clone());
+    }
+
+    // Edge syntax: additive edge_op additive [":" additive]
+    // pairs can be: [left, edge_op, right] or [left, edge_op, right, metadata]
+
+    if pairs.len() < 3 {
+        return Err(format!("Edge requires at least 3 pairs (from, op, to), got {}", pairs.len()));
+    }
+
+    // Extract 'from' identifier - must be a single identifier
+    let from = extract_identifier(&pairs[0])?;
+
+    // Extract edge operator
+    let directed = match pairs[1].as_rule() {
+        Rule::edge_op => {
+            match pairs[1].as_str() {
+                "->" => true,
+                "--" => false,
+                _ => return Err(format!("Unknown edge operator: {}", pairs[1].as_str()))
+            }
+        }
+        _ => return Err(format!("Expected edge_op, got: {:?}", pairs[1].as_rule()))
+    };
+
+    // Extract 'to' identifier - must be a single identifier
+    let to = extract_identifier(&pairs[2])?;
+
+    // Extract optional metadata
+    let metadata = if pairs.len() >= 4 {
+        Some(Box::new(build_ast_from_expr(pairs[3].clone())?))
+    } else {
+        None
+    };
+
+    Ok(AstNode::Edge {
+        from,
+        to,
+        directed,
+        metadata,
+    })
+}
+
+/// Extract an identifier from a Pair, ensuring it's a single identifier
+/// This enforces that edge nodes are pure identifiers, not expressions
+fn extract_identifier(pair: &Pair<Rule>) -> Result<String, String> {
+    // Navigate through the parsing tree to find the identifier
+    // The structure is: additive -> multiplicative -> unary -> power -> field_access -> primary -> identifier
+
+    fn find_identifier(p: &Pair<Rule>) -> Result<String, String> {
+        match p.as_rule() {
+            Rule::identifier => Ok(p.as_str().to_string()),
+            Rule::additive | Rule::multiplicative | Rule::unary |
+            Rule::power | Rule::field_access | Rule::primary => {
+                let inner: Vec<_> = p.clone().into_inner().collect();
+                if inner.len() != 1 {
+                    return Err("Edge nodes must be simple identifiers, not expressions".to_string());
+                }
+                find_identifier(&inner[0])
+            }
+            _ => Err(format!("Edge nodes must be identifiers, got: {:?}", p.as_rule()))
+        }
+    }
+
+    find_identifier(pair)
 }
 
 fn build_comparison(pair: Pair<Rule>) -> Result<AstNode, String> {
     let pairs: Vec<_> = pair.into_inner().collect();
 
     if pairs.len() == 1 {
-        // No comparison, just the additive expression
+        // No comparison, just the edge expression
         return build_ast_from_expr(pairs[0].clone());
     }
 

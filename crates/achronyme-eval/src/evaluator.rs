@@ -1,7 +1,6 @@
 use achronyme_parser::ast::AstNode;
 use achronyme_types::function::Function;
 use achronyme_types::value::Value;
-use achronyme_types::vector::Vector;
 use achronyme_types::LambdaEvaluator;
 
 use crate::constants::ConstantsRegistry;
@@ -162,6 +161,11 @@ impl Evaluator {
             AstNode::Lambda { params, body } => {
                 handlers::functions::evaluate_lambda(self, params, body)
             }
+
+            // Edges (graph/network support)
+            AstNode::Edge { from, to, directed, metadata } => {
+                handlers::literals::evaluate_edge(self, from, to, *directed, metadata)
+            }
         }
     }
 
@@ -186,7 +190,7 @@ impl LambdaEvaluator for Evaluator {
 
     fn eval_vec_at(&mut self, func: &Function, point: &[f64]) -> Result<f64, String> {
         // Create a vector value and apply the lambda
-        let vec_arg = Value::Vector(Vector::new(point.to_vec()));
+        let vec_arg = Value::Vector(point.iter().map(|&n| Value::Number(n)).collect());
         let result = self.apply_lambda(func, vec![vec_arg])?;
 
         // Extract the numeric result
