@@ -12,6 +12,22 @@ pub fn register_functions(registry: &mut FunctionRegistry) {
 
 fn dot(args: &[Value]) -> Result<Value, String> {
     match (&args[0], &args[1]) {
+        // Tensor support (optimized path)
+        (Value::Tensor(t1), Value::Tensor(t2)) => {
+            if !t1.is_vector() || !t2.is_vector() {
+                return Err("dot() requires rank-1 tensors (vectors)".to_string());
+            }
+            let result = t1.dot(t2).map_err(|e| e.to_string())?;
+            Ok(Value::Number(result))
+        }
+        (Value::ComplexTensor(t1), Value::ComplexTensor(t2)) => {
+            if !t1.is_vector() || !t2.is_vector() {
+                return Err("dot() requires rank-1 tensors (vectors)".to_string());
+            }
+            let result = t1.dot(t2).map_err(|e| e.to_string())?;
+            Ok(Value::Complex(result))
+        }
+        // Legacy Vector support (backward compatibility)
         (Value::Vector(vec1), Value::Vector(vec2)) => {
             if !Value::is_numeric_vector(vec1) || !Value::is_numeric_vector(vec2) {
                 return Err("dot() requires numeric vectors".to_string());
@@ -20,88 +36,106 @@ fn dot(args: &[Value]) -> Result<Value, String> {
             let has_complex = vec1.iter().any(|v| matches!(v, Value::Complex(_))) || vec2.iter().any(|v| matches!(v, Value::Complex(_)));
 
             if has_complex {
-                let v1 = Value::to_complex_vector(vec1).map_err(|e| e.to_string())?;
-                let v2 = Value::to_complex_vector(vec2).map_err(|e| e.to_string())?;
-                 if v1.len() != v2.len() {
-                    return Err(format!("dot() requires vectors of same length ({} vs {})", v1.len(), v2.len()));
-                }
-                let result = v1.dot(&v2).map_err(|e| e.to_string())?;
+                let t1 = Value::to_complex_tensor(vec1).map_err(|e| e.to_string())?;
+                let t2 = Value::to_complex_tensor(vec2).map_err(|e| e.to_string())?;
+                let result = t1.dot(&t2).map_err(|e| e.to_string())?;
                 Ok(Value::Complex(result))
             } else {
-                let v1 = Value::to_real_vector(vec1).map_err(|e| e.to_string())?;
-                let v2 = Value::to_real_vector(vec2).map_err(|e| e.to_string())?;
-                 if v1.len() != v2.len() {
-                    return Err(format!("dot() requires vectors of same length ({} vs {})", v1.len(), v2.len()));
-                }
-                let result = v1.dot(&v2).map_err(|e| e.to_string())?;
+                let t1 = Value::to_real_tensor(vec1).map_err(|e| e.to_string())?;
+                let t2 = Value::to_real_tensor(vec2).map_err(|e| e.to_string())?;
+                let result = t1.dot(&t2).map_err(|e| e.to_string())?;
                 Ok(Value::Number(result))
             }
         }
-        _ => Err("dot() requires two vectors".to_string()),
+        _ => Err("dot() requires two vectors or tensors".to_string()),
     }
 }
 
 fn cross(args: &[Value]) -> Result<Value, String> {
     match (&args[0], &args[1]) {
+        // Tensor support (optimized path)
+        (Value::Tensor(t1), Value::Tensor(t2)) => {
+            let result = t1.cross(t2).map_err(|e| e.to_string())?;
+            Ok(Value::Tensor(result))
+        }
+        // Legacy Vector support (backward compatibility)
         (Value::Vector(vec1), Value::Vector(vec2)) => {
             if !Value::is_numeric_vector(vec1) || !Value::is_numeric_vector(vec2) {
                 return Err("cross() requires numeric vectors".to_string());
             }
-            let v1 = Value::to_real_vector(vec1).map_err(|e| e.to_string())?;
-            let v2 = Value::to_real_vector(vec2).map_err(|e| e.to_string())?;
-
-            if v1.len() != 3 || v2.len() != 3 {
-                return Err("cross() requires two 3D vectors".to_string());
-            }
-            let result = v1.cross(&v2).map_err(|e| e.to_string())?;
-            Ok(Value::from_real_vector(result))
+            let t1 = Value::to_real_tensor(vec1).map_err(|e| e.to_string())?;
+            let t2 = Value::to_real_tensor(vec2).map_err(|e| e.to_string())?;
+            let result = t1.cross(&t2).map_err(|e| e.to_string())?;
+            Ok(Value::from_real_tensor(result))
         }
-        _ => Err("cross() requires two vectors".to_string()),
+        _ => Err("cross() requires two vectors or tensors".to_string()),
     }
 }
 
 fn norm(args: &[Value]) -> Result<Value, String> {
     match &args[0] {
+        // Tensor support (optimized path)
+        Value::Tensor(t) => {
+            if !t.is_vector() {
+                return Err("norm() requires a rank-1 tensor (vector)".to_string());
+            }
+            Ok(Value::Number(t.norm()))
+        }
+        Value::ComplexTensor(t) => {
+            if !t.is_vector() {
+                return Err("norm() requires a rank-1 tensor (vector)".to_string());
+            }
+            Ok(Value::Number(t.norm()))
+        }
+        // Legacy Vector support (backward compatibility)
         Value::Vector(vec) => {
             if !Value::is_numeric_vector(vec) {
                 return Err("norm() requires a numeric vector".to_string());
             }
             if vec.iter().any(|v| matches!(v, Value::Complex(_))) {
-                let v = Value::to_complex_vector(vec).map_err(|e| e.to_string())?;
-                Ok(Value::Number(v.norm()))
+                let t = Value::to_complex_tensor(vec).map_err(|e| e.to_string())?;
+                Ok(Value::Number(t.norm()))
             } else {
-                let v = Value::to_real_vector(vec).map_err(|e| e.to_string())?;
-                Ok(Value::Number(v.norm()))
+                let t = Value::to_real_tensor(vec).map_err(|e| e.to_string())?;
+                Ok(Value::Number(t.norm()))
             }
         }
-        _ => Err("norm() requires a vector".to_string()),
+        _ => Err("norm() requires a vector or tensor".to_string()),
     }
 }
 
 fn normalize(args: &[Value]) -> Result<Value, String> {
     match &args[0] {
+        // Tensor support (optimized path)
+        Value::Tensor(t) => {
+            if !t.is_vector() {
+                return Err("normalize() requires a rank-1 tensor (vector)".to_string());
+            }
+            let result = t.normalize().map_err(|e| e.to_string())?;
+            Ok(Value::Tensor(result))
+        }
+        Value::ComplexTensor(t) => {
+            if !t.is_vector() {
+                return Err("normalize() requires a rank-1 tensor (vector)".to_string());
+            }
+            let result = t.normalize().map_err(|e| e.to_string())?;
+            Ok(Value::ComplexTensor(result))
+        }
+        // Legacy Vector support (backward compatibility)
         Value::Vector(vec) => {
             if !Value::is_numeric_vector(vec) {
                 return Err("normalize() requires a numeric vector".to_string());
             }
             if vec.iter().any(|v| matches!(v, Value::Complex(_))) {
-                let v = Value::to_complex_vector(vec).map_err(|e| e.to_string())?;
-                let norm = v.norm();
-                if norm < 1e-10 {
-                    return Err("Cannot normalize a zero vector".to_string());
-                }
-                let result = v.normalize().map_err(|e| e.to_string())?;
-                Ok(Value::from_complex_vector(result))
+                let t = Value::to_complex_tensor(vec).map_err(|e| e.to_string())?;
+                let result = t.normalize().map_err(|e| e.to_string())?;
+                Ok(Value::from_complex_tensor(result))
             } else {
-                let v = Value::to_real_vector(vec).map_err(|e| e.to_string())?;
-                let norm = v.norm();
-                if norm < 1e-10 {
-                    return Err("Cannot normalize a zero vector".to_string());
-                }
-                let result = v.normalize().map_err(|e| e.to_string())?;
-                Ok(Value::from_real_vector(result))
+                let t = Value::to_real_tensor(vec).map_err(|e| e.to_string())?;
+                let result = t.normalize().map_err(|e| e.to_string())?;
+                Ok(Value::from_real_tensor(result))
             }
         }
-        _ => Err("normalize() requires a vector".to_string()),
+        _ => Err("normalize() requires a vector or tensor".to_string()),
     }
 }

@@ -24,6 +24,21 @@ fn real(args: &[Value]) -> Result<Value, String> {
     match &args[0] {
         Value::Number(x) => Ok(Value::Number(*x)),
         Value::Complex(c) => Ok(Value::Number(c.re)),
+
+        // Tensor support (optimized path)
+        Value::Tensor(t) => {
+            // Real tensor - return as-is (all values are already real)
+            Ok(Value::Tensor(t.clone()))
+        }
+        Value::ComplexTensor(t) => {
+            // Extract real parts from complex tensor
+            let data: Vec<f64> = t.data().iter().map(|c| c.re).collect();
+            let tensor = achronyme_types::tensor::RealTensor::new(data, t.shape().to_vec())
+                .map_err(|e| format!("real(): {}", e))?;
+            Ok(Value::Tensor(tensor))
+        }
+
+        // Legacy Vector support (backward compatibility)
         Value::Vector(v) => {
             let mut real_parts = Vec::new();
             for val in v {
@@ -35,7 +50,8 @@ fn real(args: &[Value]) -> Result<Value, String> {
             }
             Ok(Value::Vector(real_parts))
         }
-        _ => Err("real() requires a number, complex number, or vector".to_string()),
+
+        _ => Err("real() requires a number, complex number, vector, or tensor".to_string()),
     }
 }
 
@@ -43,6 +59,24 @@ fn imag(args: &[Value]) -> Result<Value, String> {
     match &args[0] {
         Value::Number(_) => Ok(Value::Number(0.0)),
         Value::Complex(c) => Ok(Value::Number(c.im)),
+
+        // Tensor support (optimized path)
+        Value::Tensor(t) => {
+            // Real tensor - all imaginary parts are 0
+            let data = vec![0.0; t.size()];
+            let tensor = achronyme_types::tensor::RealTensor::new(data, t.shape().to_vec())
+                .map_err(|e| format!("imag(): {}", e))?;
+            Ok(Value::Tensor(tensor))
+        }
+        Value::ComplexTensor(t) => {
+            // Extract imaginary parts from complex tensor
+            let data: Vec<f64> = t.data().iter().map(|c| c.im).collect();
+            let tensor = achronyme_types::tensor::RealTensor::new(data, t.shape().to_vec())
+                .map_err(|e| format!("imag(): {}", e))?;
+            Ok(Value::Tensor(tensor))
+        }
+
+        // Legacy Vector support (backward compatibility)
         Value::Vector(v) => {
             let mut imag_parts = Vec::new();
             for val in v {
@@ -54,7 +88,8 @@ fn imag(args: &[Value]) -> Result<Value, String> {
             }
             Ok(Value::Vector(imag_parts))
         }
-        _ => Err("imag() requires a number, complex number, or vector".to_string()),
+
+        _ => Err("imag() requires a number, complex number, vector, or tensor".to_string()),
     }
 }
 

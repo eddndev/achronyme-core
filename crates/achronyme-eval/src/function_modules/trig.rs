@@ -2,11 +2,21 @@ use achronyme_types::value::Value;
 
 use super::super::functions::FunctionRegistry;
 
-/// Helper macro for unary functions that work on both scalars and vectors
+/// Helper macro for unary functions that work on both scalars, vectors, and tensors
 macro_rules! unary_math_fn {
     ($name:expr, $f:expr, $arg:expr) => {
         match $arg {
             Value::Number(x) => Ok(Value::Number($f(*x))),
+
+            // Tensor support (optimized path)
+            Value::Tensor(t) => {
+                let data: Vec<f64> = t.data().iter().map(|&x| $f(x)).collect();
+                let result = achronyme_types::tensor::RealTensor::new(data, t.shape().to_vec())
+                    .map_err(|e| format!("{}(): {}", $name, e))?;
+                Ok(Value::Tensor(result))
+            }
+
+            // Legacy Vector support (backward compatibility)
             Value::Vector(v) => {
                 let mut result = Vec::new();
                 for val in v {
@@ -18,7 +28,8 @@ macro_rules! unary_math_fn {
                 }
                 Ok(Value::Vector(result))
             }
-            _ => Err(format!("{}() requires a number or vector", $name)),
+
+            _ => Err(format!("{}() requires a number, vector, or tensor", $name)),
         }
     };
 }

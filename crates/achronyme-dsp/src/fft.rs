@@ -1,5 +1,4 @@
 use achronyme_types::complex::Complex;
-use achronyme_types::vector::Vector;
 use rustfft::{FftPlanner, num_complex::Complex64};
 
 /// Convert Achronyme Complex vector to rustfft Complex64 vector
@@ -102,7 +101,7 @@ pub fn ifft_transform(input: &[Complex]) -> Vec<Complex> {
 /// Convenience function that converts real vector to complex and computes FFT.
 ///
 /// # Arguments
-/// * `input` - Real-valued signal
+/// * `input` - Real-valued signal (slice)
 ///
 /// # Returns
 /// Complex FFT of the input
@@ -110,14 +109,12 @@ pub fn ifft_transform(input: &[Complex]) -> Vec<Complex> {
 /// # Example
 /// ```
 /// use achronyme_dsp::fft_real;
-/// use achronyme_types::vector::Vector;
 ///
-/// let signal = Vector::new(vec![1.0, 0.0, -1.0, 0.0]);
+/// let signal = vec![1.0, 0.0, -1.0, 0.0];
 /// let spectrum = fft_real(&signal);
 /// ```
-pub fn fft_real(input: &Vector) -> Vec<Complex> {
+pub fn fft_real(input: &[f64]) -> Vec<Complex> {
     let complex_input: Vec<Complex> = input
-        .data()
         .iter()
         .map(|&x| Complex::new(x, 0.0))
         .collect();
@@ -138,16 +135,14 @@ pub fn fft_real(input: &Vector) -> Vec<Complex> {
 /// # Example
 /// ```
 /// use achronyme_dsp::{fft_real, ifft_real};
-/// use achronyme_types::vector::Vector;
 ///
-/// let signal = Vector::new(vec![1.0, 2.0, 3.0, 4.0]);
+/// let signal = vec![1.0, 2.0, 3.0, 4.0];
 /// let spectrum = fft_real(&signal);
 /// let reconstructed = ifft_real(&spectrum);
 /// ```
-pub fn ifft_real(input: &[Complex]) -> Vector {
+pub fn ifft_real(input: &[Complex]) -> Vec<f64> {
     let result = ifft_transform(input);
-    let real_parts: Vec<f64> = result.iter().map(|c| c.re).collect();
-    Vector::new(real_parts)
+    result.iter().map(|c| c.re).collect()
 }
 
 #[cfg(test)]
@@ -177,9 +172,9 @@ mod tests {
 
     #[test]
     fn test_fft_real() {
-        let signal = Vector::new(vec![1.0, 0.0, -1.0, 0.0]);
+        let signal = vec![1.0, 0.0, -1.0, 0.0];
         let spectrum = fft_real(&signal);
-        
+
         assert_eq!(spectrum.len(), 4);
     }
 

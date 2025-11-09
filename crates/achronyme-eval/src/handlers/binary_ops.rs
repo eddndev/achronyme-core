@@ -26,6 +26,16 @@ fn apply_add(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
         (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a + b)),
         (Value::Complex(a), Value::Complex(b)) => Ok(Value::Complex(a + b)),
+
+        // Tensor support (optimized path)
+        (Value::Tensor(a), Value::Tensor(b)) => {
+            a.add(&b).map(Value::Tensor).map_err(|e| e.to_string())
+        }
+        (Value::ComplexTensor(a), Value::ComplexTensor(b)) => {
+            a.add(&b).map(Value::ComplexTensor).map_err(|e| e.to_string())
+        }
+
+        // Legacy Matrix support
         (Value::Matrix(a), Value::Matrix(b)) => a
             .add(&b)
             .map(Value::Matrix)
@@ -39,7 +49,7 @@ fn apply_add(left: Value, right: Value) -> Result<Value, String> {
             Ok(Value::Complex(a + Complex::from_real(b)))
         }
 
-        // Vector + Vector
+        // Legacy Vector + Vector
         (Value::Vector(ref a), Value::Vector(ref b)) => {
             // Check if both vectors are numeric
             if Value::is_numeric_vector(a) && Value::is_numeric_vector(b) {
@@ -125,6 +135,16 @@ fn apply_subtract(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
         (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a - b)),
         (Value::Complex(a), Value::Complex(b)) => Ok(Value::Complex(a - b)),
+
+        // Tensor support (optimized path)
+        (Value::Tensor(a), Value::Tensor(b)) => {
+            a.sub(&b).map(Value::Tensor).map_err(|e| e.to_string())
+        }
+        (Value::ComplexTensor(a), Value::ComplexTensor(b)) => {
+            a.sub(&b).map(Value::ComplexTensor).map_err(|e| e.to_string())
+        }
+
+        // Legacy Matrix support
         (Value::Matrix(a), Value::Matrix(b)) => a
             .sub(&b)
             .map(Value::Matrix)
@@ -138,7 +158,7 @@ fn apply_subtract(left: Value, right: Value) -> Result<Value, String> {
             Ok(Value::Complex(a - Complex::from_real(b)))
         }
 
-        // Vector - Vector
+        // Legacy Vector - Vector
         (Value::Vector(ref a), Value::Vector(ref b)) => {
             // Check if both vectors are numeric
             if Value::is_numeric_vector(a) && Value::is_numeric_vector(b) {
@@ -224,6 +244,16 @@ fn apply_multiply(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
         (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a * b)),
         (Value::Complex(a), Value::Complex(b)) => Ok(Value::Complex(a * b)),
+
+        // Tensor support (optimized path)
+        (Value::Tensor(a), Value::Tensor(b)) => {
+            a.mul(&b).map(Value::Tensor).map_err(|e| e.to_string())
+        }
+        (Value::ComplexTensor(a), Value::ComplexTensor(b)) => {
+            a.mul(&b).map(Value::ComplexTensor).map_err(|e| e.to_string())
+        }
+
+        // Legacy Matrix support
         (Value::Matrix(a), Value::Matrix(b)) => a
             .mul(&b)
             .map(Value::Matrix)
@@ -237,7 +267,7 @@ fn apply_multiply(left: Value, right: Value) -> Result<Value, String> {
             Ok(Value::Complex(a * Complex::from_real(b)))
         }
 
-        // Vector * Vector
+        // Legacy Vector * Vector
         (Value::Vector(ref a), Value::Vector(ref b)) => {
             // Check if both vectors are numeric
             if Value::is_numeric_vector(a) && Value::is_numeric_vector(b) {
@@ -329,6 +359,16 @@ fn apply_divide(left: Value, right: Value) -> Result<Value, String> {
             }
         }
         (Value::Complex(a), Value::Complex(b)) => Ok(Value::Complex(a / b)),
+
+        // Tensor support (optimized path)
+        (Value::Tensor(a), Value::Tensor(b)) => {
+            a.div(&b).map(Value::Tensor).map_err(|e| e.to_string())
+        }
+        (Value::ComplexTensor(a), Value::ComplexTensor(b)) => {
+            a.div(&b).map(Value::ComplexTensor).map_err(|e| e.to_string())
+        }
+
+        // Type promotion: Number → Complex
         (Value::Number(a), Value::Complex(b)) => {
             Ok(Value::Complex(Complex::from_real(a) / b))
         }
@@ -336,7 +376,7 @@ fn apply_divide(left: Value, right: Value) -> Result<Value, String> {
             Ok(Value::Complex(a / Complex::from_real(b)))
         }
 
-        // Vector / Vector
+        // Legacy Vector / Vector
         (Value::Vector(ref a), Value::Vector(ref b)) => {
             // Check if both vectors are numeric
             if Value::is_numeric_vector(a) && Value::is_numeric_vector(b) {

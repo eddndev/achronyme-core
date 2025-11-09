@@ -11,6 +11,14 @@ pub fn register_functions(registry: &mut FunctionRegistry) {
 
 fn sum(args: &[Value]) -> Result<Value, String> {
     match &args[0] {
+        // Tensor support (optimized path)
+        Value::Tensor(t) => {
+            Ok(Value::Number(t.sum()))
+        }
+        Value::ComplexTensor(t) => {
+            Ok(Value::Complex(t.sum()))
+        }
+        // Legacy Vector support (backward compatibility)
         Value::Vector(vec) => {
             if !Value::is_numeric_vector(vec) {
                 return Err("sum() requires a numeric vector".to_string());
@@ -21,12 +29,22 @@ fn sum(args: &[Value]) -> Result<Value, String> {
             }
             Ok(total)
         }
-        _ => Err("sum() requires a vector".to_string()),
+        _ => Err("sum() requires a vector or tensor".to_string()),
     }
 }
 
 fn mean(args: &[Value]) -> Result<Value, String> {
     match &args[0] {
+        // Tensor support (optimized path)
+        Value::Tensor(t) => {
+            let result = t.mean().map_err(|e| e.to_string())?;
+            Ok(Value::Number(result))
+        }
+        Value::ComplexTensor(t) => {
+            let result = t.mean().map_err(|e| e.to_string())?;
+            Ok(Value::Complex(result))
+        }
+        // Legacy Vector support (backward compatibility)
         Value::Vector(vec) => {
             if vec.is_empty() {
                 return Err("mean() requires a non-empty vector".to_string());
@@ -38,12 +56,22 @@ fn mean(args: &[Value]) -> Result<Value, String> {
             let len_val = Value::Number(vec.len() as f64);
             crate::handlers::binary_ops::apply(&achronyme_parser::ast::BinaryOp::Divide, sum_val, len_val)
         }
-        _ => Err("mean() requires a vector".to_string()),
+        _ => Err("mean() requires a vector or tensor".to_string()),
     }
 }
 
 fn std(args: &[Value]) -> Result<Value, String> {
     match &args[0] {
+        // Tensor support (optimized path)
+        Value::Tensor(t) => {
+            let result = t.std_dev().map_err(|e| e.to_string())?;
+            Ok(Value::Number(result))
+        }
+        Value::ComplexTensor(t) => {
+            let result = t.std_dev().map_err(|e| e.to_string())?;
+            Ok(Value::Number(result))
+        }
+        // Legacy Vector support (backward compatibility)
         Value::Vector(vec) => {
             if vec.len() < 2 {
                 return Err("std() requires a vector with at least 2 elements".to_string());
@@ -67,6 +95,6 @@ fn std(args: &[Value]) -> Result<Value, String> {
                 _ => Err("Cannot compute sqrt of non-numeric variance".to_string())
             }
         }
-        _ => Err("std() requires a vector".to_string()),
+        _ => Err("std() requires a vector or tensor".to_string()),
     }
 }

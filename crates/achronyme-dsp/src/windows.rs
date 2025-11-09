@@ -1,4 +1,3 @@
-use achronyme_types::vector::Vector;
 use std::f64::consts::PI;
 
 /// Generate a Hanning window
@@ -18,23 +17,23 @@ use std::f64::consts::PI;
 ///
 /// let window = hanning_window(128);
 /// ```
-pub fn hanning_window(n: usize) -> Vector {
+pub fn hanning_window(n: usize) -> Vec<f64> {
     if n == 0 {
-        return Vector::new(vec![]);
+        return vec![];
     }
     if n == 1 {
-        return Vector::new(vec![1.0]);
+        return vec![1.0];
     }
-    
+
     let mut window = Vec::with_capacity(n);
     let n_minus_1 = (n - 1) as f64;
-    
+
     for i in 0..n {
         let value = 0.5 * (1.0 - (2.0 * PI * i as f64 / n_minus_1).cos());
         window.push(value);
     }
-    
-    Vector::new(window)
+
+    window
 }
 
 /// Generate a Hamming window
@@ -54,23 +53,23 @@ pub fn hanning_window(n: usize) -> Vector {
 ///
 /// let window = hamming_window(256);
 /// ```
-pub fn hamming_window(n: usize) -> Vector {
+pub fn hamming_window(n: usize) -> Vec<f64> {
     if n == 0 {
-        return Vector::new(vec![]);
+        return vec![];
     }
     if n == 1 {
-        return Vector::new(vec![1.0]);
+        return vec![1.0];
     }
-    
+
     let mut window = Vec::with_capacity(n);
     let n_minus_1 = (n - 1) as f64;
-    
+
     for i in 0..n {
         let value = 0.54 - 0.46 * (2.0 * PI * i as f64 / n_minus_1).cos();
         window.push(value);
     }
-    
-    Vector::new(window)
+
+    window
 }
 
 /// Generate a Blackman window
@@ -90,24 +89,24 @@ pub fn hamming_window(n: usize) -> Vector {
 ///
 /// let window = blackman_window(512);
 /// ```
-pub fn blackman_window(n: usize) -> Vector {
+pub fn blackman_window(n: usize) -> Vec<f64> {
     if n == 0 {
-        return Vector::new(vec![]);
+        return vec![];
     }
     if n == 1 {
-        return Vector::new(vec![1.0]);
+        return vec![1.0];
     }
-    
+
     let mut window = Vec::with_capacity(n);
     let n_minus_1 = (n - 1) as f64;
-    
+
     for i in 0..n {
         let t = 2.0 * PI * i as f64 / n_minus_1;
         let value = 0.42 - 0.5 * t.cos() + 0.08 * (2.0 * t).cos();
         window.push(value);
     }
-    
-    Vector::new(window)
+
+    window
 }
 
 /// Generate a rectangular (boxcar) window
@@ -126,14 +125,14 @@ pub fn blackman_window(n: usize) -> Vector {
 ///
 /// let window = rectangular_window(64);
 /// ```
-pub fn rectangular_window(n: usize) -> Vector {
-    Vector::new(vec![1.0; n])
+pub fn rectangular_window(n: usize) -> Vec<f64> {
+    vec![1.0; n]
 }
 
 /// Apply a window to a signal (element-wise multiplication)
 ///
 /// # Arguments
-/// * `signal` - Input signal
+/// * `signal` - Input signal (slice)
 /// * `window` - Window function (must have same length as signal)
 ///
 /// # Returns
@@ -142,13 +141,12 @@ pub fn rectangular_window(n: usize) -> Vector {
 /// # Example
 /// ```
 /// use achronyme_dsp::{apply_window, hanning_window};
-/// use achronyme_types::vector::Vector;
 ///
-/// let signal = Vector::new(vec![1.0, 2.0, 3.0, 4.0]);
+/// let signal = vec![1.0, 2.0, 3.0, 4.0];
 /// let window = hanning_window(4);
 /// let windowed = apply_window(&signal, &window).unwrap();
 /// ```
-pub fn apply_window(signal: &Vector, window: &Vector) -> Result<Vector, String> {
+pub fn apply_window(signal: &[f64], window: &[f64]) -> Result<Vec<f64>, String> {
     if signal.len() != window.len() {
         return Err(format!(
             "Signal length ({}) must match window length ({})",
@@ -158,13 +156,12 @@ pub fn apply_window(signal: &Vector, window: &Vector) -> Result<Vector, String> 
     }
 
     let result: Vec<f64> = signal
-        .data()
         .iter()
-        .zip(window.data().iter())
+        .zip(window.iter())
         .map(|(s, w)| s * w)
         .collect();
 
-    Ok(Vector::new(result))
+    Ok(result)
 }
 
 #[cfg(test)]
@@ -175,68 +172,68 @@ mod tests {
     #[test]
     fn test_hanning_window() {
         let window = hanning_window(5);
-        
+
         assert_eq!(window.len(), 5);
-        
+
         // Hanning window should start and end at 0
-        assert_relative_eq!(window.data()[0], 0.0, epsilon = 1e-10);
-        assert_relative_eq!(window.data()[4], 0.0, epsilon = 1e-10);
-        
+        assert_relative_eq!(window[0], 0.0, epsilon = 1e-10);
+        assert_relative_eq!(window[4], 0.0, epsilon = 1e-10);
+
         // Middle value should be 1.0
-        assert_relative_eq!(window.data()[2], 1.0, epsilon = 1e-10);
+        assert_relative_eq!(window[2], 1.0, epsilon = 1e-10);
     }
 
     #[test]
     fn test_hamming_window() {
         let window = hamming_window(5);
-        
+
         assert_eq!(window.len(), 5);
-        
+
         // Hamming window should have non-zero endpoints
-        assert!(window.data()[0] > 0.0);
-        assert!(window.data()[4] > 0.0);
+        assert!(window[0] > 0.0);
+        assert!(window[4] > 0.0);
     }
 
     #[test]
     fn test_blackman_window() {
         let window = blackman_window(5);
-        
+
         assert_eq!(window.len(), 5);
-        
+
         // Blackman window should start and end near 0
-        assert!(window.data()[0] < 0.01);
-        assert!(window.data()[4] < 0.01);
+        assert!(window[0] < 0.01);
+        assert!(window[4] < 0.01);
     }
 
     #[test]
     fn test_rectangular_window() {
         let window = rectangular_window(10);
-        
+
         assert_eq!(window.len(), 10);
-        
-        for &val in window.data() {
+
+        for &val in &window {
             assert_relative_eq!(val, 1.0, epsilon = 1e-10);
         }
     }
 
     #[test]
     fn test_apply_window() {
-        let signal = Vector::new(vec![1.0, 2.0, 3.0, 4.0]);
-        let window = Vector::new(vec![1.0, 0.5, 0.5, 1.0]);
-        
+        let signal = vec![1.0, 2.0, 3.0, 4.0];
+        let window = vec![1.0, 0.5, 0.5, 1.0];
+
         let result = apply_window(&signal, &window).unwrap();
-        
-        assert_relative_eq!(result.data()[0], 1.0, epsilon = 1e-10);
-        assert_relative_eq!(result.data()[1], 1.0, epsilon = 1e-10);
-        assert_relative_eq!(result.data()[2], 1.5, epsilon = 1e-10);
-        assert_relative_eq!(result.data()[3], 4.0, epsilon = 1e-10);
+
+        assert_relative_eq!(result[0], 1.0, epsilon = 1e-10);
+        assert_relative_eq!(result[1], 1.0, epsilon = 1e-10);
+        assert_relative_eq!(result[2], 1.5, epsilon = 1e-10);
+        assert_relative_eq!(result[3], 4.0, epsilon = 1e-10);
     }
 
     #[test]
     fn test_apply_window_length_mismatch() {
-        let signal = Vector::new(vec![1.0, 2.0, 3.0]);
-        let window = Vector::new(vec![1.0, 1.0]);
-        
+        let signal = vec![1.0, 2.0, 3.0];
+        let window = vec![1.0, 1.0];
+
         let result = apply_window(&signal, &window);
         assert!(result.is_err());
     }
@@ -246,10 +243,10 @@ mod tests {
         // Zero-length window
         let w0 = hanning_window(0);
         assert_eq!(w0.len(), 0);
-        
+
         // Single-element window
         let w1 = hanning_window(1);
         assert_eq!(w1.len(), 1);
-        assert_relative_eq!(w1.data()[0], 1.0, epsilon = 1e-10);
+        assert_relative_eq!(w1[0], 1.0, epsilon = 1e-10);
     }
 }

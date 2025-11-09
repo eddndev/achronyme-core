@@ -1,7 +1,5 @@
 use crate::complex::Complex;
-use crate::vector::Vector as RealVector;
-use crate::complex_vector::ComplexVector;
-use crate::matrix::Matrix;
+use crate::tensor::{RealTensor, ComplexTensor};
 use crate::function::Function;
 use std::collections::HashMap;
 
@@ -23,8 +21,10 @@ pub enum Value {
     Number(f64),
     Boolean(bool),
     Complex(Complex),
-    Vector(Vec<Value>),  // Generic vector - can hold any Value type
-    Matrix(Matrix),
+    Vector(Vec<Value>),  // Generic vector - can hold any Value type (strings, records, etc.)
+    Tensor(RealTensor),  // Optimized N-dimensional array of real numbers
+    ComplexTensor(ComplexTensor),  // Optimized N-dimensional array of complex numbers
+    Matrix(Matrix),  // Legacy - will be phased out in favor of Tensor
     Function(Function),
     String(String),
     Record(HashMap<String, Value>),
@@ -50,33 +50,49 @@ impl Value {
         vec.iter().all(|v| matches!(v, Value::Number(_) | Value::Complex(_)))
     }
 
-    /// Convert a generic vector to a RealVector if all elements are numbers
-    pub fn to_real_vector(vec: &[Value]) -> Result<RealVector, TypeError> {
+    /// Convert a generic vector to a RealTensor (rank 1)
+    pub fn to_real_tensor(vec: &[Value]) -> Result<RealTensor, TypeError> {
         let nums: Result<Vec<f64>, _> = vec.iter().map(|v| match v {
             Value::Number(n) => Ok(*n),
             _ => Err(TypeError::IncompatibleTypes),
         }).collect();
-        nums.map(RealVector::new)
+
+        nums.and_then(|data| {
+            let len = data.len();
+            RealTensor::new(data, vec![len]).map_err(|_| TypeError::IncompatibleTypes)
+        })
     }
 
-    /// Convert a generic vector to a ComplexVector if all elements are numeric
-    pub fn to_complex_vector(vec: &[Value]) -> Result<ComplexVector, TypeError> {
+    /// Convert a generic vector to a ComplexTensor (rank 1)
+    pub fn to_complex_tensor(vec: &[Value]) -> Result<ComplexTensor, TypeError> {
         let complexes: Result<Vec<Complex>, _> = vec.iter().map(|v| match v {
             Value::Number(n) => Ok(Complex::new(*n, 0.0)),
             Value::Complex(c) => Ok(*c),
             _ => Err(TypeError::IncompatibleTypes),
         }).collect();
-        complexes.map(ComplexVector::new)
+
+        complexes.and_then(|data| {
+            let len = data.len();
+            ComplexTensor::new(data, vec![len]).map_err(|_| TypeError::IncompatibleTypes)
+        })
     }
 
-    /// Convert a RealVector to a generic vector
-    pub fn from_real_vector(vec: RealVector) -> Value {
-        Value::Vector(vec.data().iter().map(|&n| Value::Number(n)).collect())
+    /// Convert a RealTensor to a generic vector (if rank 1)
+    pub fn from_real_tensor(tensor: RealTensor) -> Value {
+        if tensor.is_vector() {
+            Value::Vector(tensor.data().iter().map(|&n| Value::Number(n)).collect())
+        } else {
+            Value::Tensor(tensor)
+        }
     }
 
-    /// Convert a ComplexVector to a generic vector
-    pub fn from_complex_vector(vec: ComplexVector) -> Value {
-        Value::Vector(vec.data().iter().map(|&c| Value::Complex(c)).collect())
+    /// Convert a ComplexTensor to a generic vector (if rank 1) or keep as ComplexTensor
+    pub fn from_complex_tensor(tensor: ComplexTensor) -> Value {
+        if tensor.is_vector() {
+            Value::Vector(tensor.data().iter().map(|&c| Value::Complex(c)).collect())
+        } else {
+            Value::ComplexTensor(tensor)
+        }
     }
 
     pub fn as_complex(&self) -> Option<&Complex> {
@@ -103,17 +119,17 @@ impl std::ops::Add for Value {
                     let has_complex_b = b.iter().any(|v| matches!(v, Value::Complex(_)));
 
                     if has_complex_a || has_complex_b {
-                        // Complex vector addition
-                        let vec_a = Value::to_complex_vector(a)?;
-                        let vec_b = Value::to_complex_vector(b)?;
-                        let result = vec_a.add(&vec_b).map_err(|_| TypeError::IncompatibleTypes)?;
-                        Ok(Value::from_complex_vector(result))
+                        // Complex tensor addition
+                        let tensor_a = Value::to_complex_tensor(a)?;
+                        let tensor_b = Value::to_complex_tensor(b)?;
+                        let result = tensor_a.add(&tensor_b).map_err(|_| TypeError::IncompatibleTypes)?;
+                        Ok(Value::ComplexTensor(result))
                     } else {
-                        // Real vector addition
-                        let vec_a = Value::to_real_vector(a)?;
-                        let vec_b = Value::to_real_vector(b)?;
-                        let result = vec_a.add(&vec_b).map_err(|_| TypeError::IncompatibleTypes)?;
-                        Ok(Value::from_real_vector(result))
+                        // Real tensor addition
+                        let tensor_a = Value::to_real_tensor(a)?;
+                        let tensor_b = Value::to_real_tensor(b)?;
+                        let result = tensor_a.add(&tensor_b).map_err(|_| TypeError::IncompatibleTypes)?;
+                        Ok(Value::Tensor(result))
                     }
                 } else {
                     Err(TypeError::IncompatibleTypes)

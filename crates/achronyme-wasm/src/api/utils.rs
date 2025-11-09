@@ -37,6 +37,69 @@ pub fn format_value(value: &Value) -> String {
             }
             format!("[{}]", rows.join(", "))
         }
+        Value::Tensor(t) => {
+            // Format tensor based on rank
+            match t.rank() {
+                0 => format!("{}", t.data()[0]),  // Scalar
+                1 => {
+                    // Vector
+                    let elements: Vec<String> = t.data().iter()
+                        .map(|&x| format!("{:.6}", x))
+                        .collect();
+                    format!("[{}]", elements.join(", "))
+                }
+                2 => {
+                    // Matrix
+                    let rows = t.shape()[0];
+                    let cols = t.shape()[1];
+                    let mut row_strings = Vec::new();
+                    for i in 0..rows {
+                        let mut row_elements = Vec::new();
+                        for j in 0..cols {
+                            if let Ok(val) = t.get(&[i, j]) {
+                                row_elements.push(format!("{:.6}", val));
+                            }
+                        }
+                        row_strings.push(format!("[{}]", row_elements.join(", ")));
+                    }
+                    format!("[{}]", row_strings.join(", "))
+                }
+                _ => {
+                    // Higher-order tensor
+                    format!("Tensor(shape: {:?})", t.shape())
+                }
+            }
+        }
+        Value::ComplexTensor(ct) => {
+            // Format complex tensor
+            match ct.rank() {
+                0 => {
+                    let c = &ct.data()[0];
+                    if c.im >= 0.0 {
+                        format!("{}+{}i", c.re, c.im)
+                    } else {
+                        format!("{}{}i", c.re, c.im)
+                    }
+                }
+                1 => {
+                    // Complex vector
+                    let elements: Vec<String> = ct.data().iter()
+                        .map(|c| {
+                            if c.im >= 0.0 {
+                                format!("{}+{}i", c.re, c.im)
+                            } else {
+                                format!("{}{}i", c.re, c.im)
+                            }
+                        })
+                        .collect();
+                    format!("[{}]", elements.join(", "))
+                }
+                _ => {
+                    // Higher-order complex tensor
+                    format!("ComplexTensor(shape: {:?})", ct.shape())
+                }
+            }
+        }
         Value::Record(map) => {
             let mut fields: Vec<String> = map.iter()
                 .map(|(k, v)| format!("{}: {}", k, format_value(v)))

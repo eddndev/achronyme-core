@@ -3,6 +3,7 @@ pub mod complex;
 pub mod vector;
 pub mod complex_vector;
 pub mod matrix;
+pub mod tensor;
 pub mod function;
 pub mod lambda_evaluator;
 

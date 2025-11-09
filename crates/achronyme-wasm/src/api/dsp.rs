@@ -2,6 +2,7 @@ use wasm_bindgen::prelude::*;
 use crate::state::{Handle, HANDLES};
 use achronyme_types::value::Value;
 use achronyme_types::complex_vector::ComplexVector;
+use achronyme_types::vector::Vector;
 
 // ============================================================================
 // DSP Operations
@@ -19,7 +20,7 @@ pub fn dsp_fft(handle: Handle) -> Result<Handle, JsValue> {
                 Value::Vector(v) => {
                     let real_vec = Value::to_real_vector(v)
                         .map_err(|e| JsValue::from_str(&e.to_string()))?;
-                    let spectrum = achronyme_dsp::fft::fft_real(&real_vec);
+                    let spectrum = achronyme_dsp::fft::fft_real(real_vec.data());
                     Ok(Value::from_complex_vector(ComplexVector::new(spectrum)))
                 }
                 _ => Err(JsValue::from_str("dspFft requires a vector handle")),
@@ -42,7 +43,7 @@ pub fn dsp_fft_mag(handle: Handle) -> Result<Handle, JsValue> {
                 Value::Vector(v) => {
                     let real_vec = Value::to_real_vector(v)
                         .map_err(|e| JsValue::from_str(&e.to_string()))?;
-                    let spectrum = achronyme_dsp::fft::fft_real(&real_vec);
+                    let spectrum = achronyme_dsp::fft::fft_real(real_vec.data());
                     let magnitudes: Vec<Value> = spectrum.iter()
                         .map(|c| Value::Number(c.norm()))
                         .collect();
@@ -70,7 +71,7 @@ pub fn ifft(handle: Handle) -> Result<Handle, JsValue> {
                     let complex_vec = Value::to_complex_vector(v)
                         .map_err(|e| JsValue::from_str(&e.to_string()))?;
                     let signal = achronyme_dsp::fft::ifft_real(complex_vec.data());
-                    Ok(Value::from_real_vector(signal))
+                    Ok(Value::from_real_vector(Vector::new(signal)))
                 }
                 _ => Err(JsValue::from_str("ifft requires a complex vector handle")),
             }
@@ -88,19 +89,19 @@ pub fn ifft(handle: Handle) -> Result<Handle, JsValue> {
 #[wasm_bindgen(js_name = hanningWindow)]
 pub fn hanning_window(n: usize) -> Handle {
     let window = achronyme_dsp::windows::hanning_window(n);
-    HANDLES.with(|h| h.borrow_mut().create(Value::from_real_vector(window)))
+    HANDLES.with(|h| h.borrow_mut().create(Value::from_real_vector(Vector::new(window))))
 }
 
 /// Hamming window
 #[wasm_bindgen(js_name = hammingWindow)]
 pub fn hamming_window(n: usize) -> Handle {
     let window = achronyme_dsp::windows::hamming_window(n);
-    HANDLES.with(|h| h.borrow_mut().create(Value::from_real_vector(window)))
+    HANDLES.with(|h| h.borrow_mut().create(Value::from_real_vector(Vector::new(window))))
 }
 
 /// Blackman window
 #[wasm_bindgen(js_name = blackmanWindow)]
 pub fn blackman_window(n: usize) -> Handle {
     let window = achronyme_dsp::windows::blackman_window(n);
-    HANDLES.with(|h| h.borrow_mut().create(Value::from_real_vector(window)))
+    HANDLES.with(|h| h.borrow_mut().create(Value::from_real_vector(Vector::new(window))))
 }
