@@ -1,7 +1,7 @@
 use crate::function_modules::graphs::helpers::{build_adjacency_list, extract_node_ids};
 use achronyme_types::value::Value;
 use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 /// Connected Components - Find all connected components in a graph
 pub fn connected_components(args: &[Value]) -> Result<Value, String> {

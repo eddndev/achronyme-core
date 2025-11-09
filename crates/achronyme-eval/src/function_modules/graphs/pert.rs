@@ -2,7 +2,7 @@
 // Includes both CPM (Critical Path Method) and Probabilistic PERT analysis
 
 use achronyme_types::value::Value;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use super::helpers::build_adjacency_list;
 use super::cycles::has_cycle;
 use super::topological::topological_sort;
@@ -149,6 +149,52 @@ fn get_node_duration(node_props: &HashMap<String, Value>) -> Result<f64, String>
 }
 
 // ============================================================================
+// Helper Functions for Auto-Calculation
+// ============================================================================
+
+/// Check if network has ES and EF calculated (from forward_pass)
+fn has_es_ef_data(network: &HashMap<String, Value>) -> bool {
+    if let Some(Value::Record(nodes)) = network.get("nodes") {
+        return nodes.iter().any(|(_id, node_data)| {
+            if let Value::Record(props) = node_data {
+                props.contains_key("ES") && props.contains_key("EF")
+            } else {
+                false
+            }
+        });
+    }
+    false
+}
+
+/// Check if network has LS and LF calculated (from backward_pass)
+fn has_ls_lf_data(network: &HashMap<String, Value>) -> bool {
+    if let Some(Value::Record(nodes)) = network.get("nodes") {
+        return nodes.iter().any(|(_id, node_data)| {
+            if let Value::Record(props) = node_data {
+                props.contains_key("LS") && props.contains_key("LF")
+            } else {
+                false
+            }
+        });
+    }
+    false
+}
+
+/// Check if network has slack calculated (from calculate_slack)
+fn has_slack_data(network: &HashMap<String, Value>) -> bool {
+    if let Some(Value::Record(nodes)) = network.get("nodes") {
+        return nodes.iter().any(|(_id, node_data)| {
+            if let Value::Record(props) = node_data {
+                props.contains_key("slack")
+            } else {
+                false
+            }
+        });
+    }
+    false
+}
+
+// ============================================================================
 // PERT/CPM - Critical Path Method (Costos)
 // ============================================================================
 
@@ -175,9 +221,6 @@ pub fn forward_pass(args: &[Value]) -> Result<Value, String> {
         Some(Value::Vector(v)) => v,
         _ => return Err("Network must have 'edges' field".to_string()),
     };
-
-    // Build adjacency list (predecessors)
-    let adj_list = build_adjacency_list(edges_vec)?;
 
     // Build reverse adjacency list (predecessors)
     let mut predecessors: HashMap<String, Vec<String>> = HashMap::new();
@@ -254,32 +297,30 @@ pub fn forward_pass(args: &[Value]) -> Result<Value, String> {
 /// Backward pass: Calculate Late Start (LS) and Late Finish (LF) for all tasks
 /// LF[task] = min(LS[successors])
 /// LS[task] = LF[task] - duration[task]
+/// Auto-calculates forward_pass if ES/EF data is missing
 pub fn backward_pass(args: &[Value]) -> Result<Value, String> {
     let network = match &args[0] {
         Value::Record(map) => map,
         _ => return Err("backward_pass() requires a network record".to_string()),
     };
 
+    // Auto-calculate forward pass if ES/EF data is missing
+    let network_with_es_ef = if !has_es_ef_data(network) {
+        match forward_pass(&[Value::Record(network.clone())])? {
+            Value::Record(n) => n,
+            _ => return Err("Failed to calculate forward pass".to_string()),
+        }
+    } else {
+        network.clone()
+    };
+
     // Validate that network has ES/EF (from forward_pass)
-    let nodes_record = match network.get("nodes") {
+    let nodes_record = match network_with_es_ef.get("nodes") {
         Some(Value::Record(r)) => r,
         _ => return Err("Network must have 'nodes' field".to_string()),
     };
 
-    // Check that at least one node has ES/EF
-    let has_forward_data = nodes_record.iter().any(|(_node_id, node_data)| {
-        if let Value::Record(props) = node_data {
-            props.contains_key("ES") && props.contains_key("EF")
-        } else {
-            false
-        }
-    });
-
-    if !has_forward_data {
-        return Err("backward_pass() requires network with ES/EF calculated (run forward_pass() first)".to_string());
-    }
-
-    let edges_vec = match network.get("edges") {
+    let edges_vec = match network_with_es_ef.get("edges") {
         Some(Value::Vector(v)) => v,
         _ => return Err("Network must have 'edges' field".to_string()),
     };
@@ -288,7 +329,7 @@ pub fn backward_pass(args: &[Value]) -> Result<Value, String> {
     let adj_list = build_adjacency_list(edges_vec)?;
 
     // Get topological order (reversed for backward pass)
-    let topo_order = match topological_sort(&[Value::Record(network.clone())])? {
+    let topo_order = match topological_sort(&[Value::Record(network_with_es_ef.clone())])? {
         Value::Vector(mut v) => {
             v.reverse();
             v
@@ -362,7 +403,7 @@ pub fn backward_pass(args: &[Value]) -> Result<Value, String> {
         new_nodes.insert(node_id.clone(), Value::Record(new_props));
     }
 
-    let mut new_network = network.clone();
+    let mut new_network = network_with_es_ef.clone();
     new_network.insert("nodes".to_string(), Value::Record(new_nodes));
 
     Ok(Value::Record(new_network))
@@ -370,27 +411,28 @@ pub fn backward_pass(args: &[Value]) -> Result<Value, String> {
 
 /// Calculate slack (float) for all tasks
 /// Slack = LS - ES (or LF - EF)
+/// Auto-calculates forward_pass and backward_pass if ES/EF or LS/LF data is missing
 pub fn calculate_slack(args: &[Value]) -> Result<Value, String> {
     let network = match &args[0] {
         Value::Record(map) => map,
         _ => return Err("calculate_slack() requires a network record".to_string()),
     };
 
-    let nodes_record = match network.get("nodes") {
+    // Auto-calculate backward pass if LS/LF data is missing
+    // (backward_pass will auto-calculate forward_pass if ES/EF is also missing)
+    let network_with_all_data = if !has_ls_lf_data(network) {
+        match backward_pass(&[Value::Record(network.clone())])? {
+            Value::Record(n) => n,
+            _ => return Err("Failed to calculate backward pass".to_string()),
+        }
+    } else {
+        network.clone()
+    };
+
+    let nodes_record = match network_with_all_data.get("nodes") {
         Some(Value::Record(r)) => r,
         _ => return Err("Network must have 'nodes' field".to_string()),
     };
-
-    // Validate that network has ES/EF/LS/LF
-    for (node_id, node_data) in nodes_record {
-        if let Value::Record(props) = node_data {
-            if !props.contains_key("ES") || !props.contains_key("LS") {
-                return Err(format!(
-                    "calculate_slack() requires network with ES/EF/LS/LF calculated (run forward_pass() and backward_pass() first)"
-                ));
-            }
-        }
-    }
 
     // Calculate slack for each node
     let mut new_nodes = HashMap::new();
@@ -416,63 +458,310 @@ pub fn calculate_slack(args: &[Value]) -> Result<Value, String> {
         new_nodes.insert(node_id.clone(), Value::Record(new_props));
     }
 
-    let mut new_network = network.clone();
+    let mut new_network = network_with_all_data.clone();
     new_network.insert("nodes".to_string(), Value::Record(new_nodes));
 
     Ok(Value::Record(new_network))
 }
 
-/// Find the critical path (nodes with slack = 0)
+/// Find one complete critical path from start to finish
+/// Returns a single path (vector of node IDs) following nodes with slack = 0
+/// Auto-calculates all prerequisites (forward_pass, backward_pass, calculate_slack) if missing
 pub fn critical_path(args: &[Value]) -> Result<Value, String> {
     let network = match &args[0] {
         Value::Record(map) => map,
         _ => return Err("critical_path() requires a network record".to_string()),
     };
 
-    let nodes_record = match network.get("nodes") {
+    // Auto-calculate slack if missing
+    // (calculate_slack will auto-calculate forward_pass and backward_pass if needed)
+    let network_with_slack = if !has_slack_data(network) {
+        match calculate_slack(&[Value::Record(network.clone())])? {
+            Value::Record(n) => n,
+            _ => return Err("Failed to calculate slack".to_string()),
+        }
+    } else {
+        network.clone()
+    };
+
+    let nodes_record = match network_with_slack.get("nodes") {
         Some(Value::Record(r)) => r,
         _ => return Err("Network must have 'nodes' field".to_string()),
     };
 
-    // Validate that network has slack calculated
-    let has_slack = nodes_record.values().any(|node_data| {
-        if let Value::Record(props) = node_data {
-            props.contains_key("slack")
-        } else {
-            false
-        }
-    });
-
-    if !has_slack {
-        return Err("critical_path() requires network with slack calculated (run calculate_slack() first)".to_string());
-    }
-
-    // Get topological order to preserve path order
-    let topo_order = match topological_sort(&[Value::Record(network.clone())])? {
-        Value::Vector(v) => v,
-        _ => return Err("Failed to get topological order".to_string()),
+    let edges_vec = match network_with_slack.get("edges") {
+        Some(Value::Vector(v)) => v,
+        _ => return Err("Network must have 'edges' field".to_string()),
     };
 
-    // Find nodes with slack ~= 0 (allowing small floating point error)
+    // Find nodes with slack ~= 0 (critical nodes)
     let epsilon = 1e-6;
-    let mut critical_nodes = Vec::new();
+    let mut critical_nodes_set: HashSet<String> = HashSet::new();
 
-    for node_val in topo_order {
-        let node_id = match node_val {
-            Value::String(ref s) => s,
-            _ => continue,
-        };
-
-        if let Some(Value::Record(props)) = nodes_record.get(node_id) {
+    for (node_id, node_data) in nodes_record {
+        if let Value::Record(props) = node_data {
             if let Some(Value::Number(slack)) = props.get("slack") {
                 if slack.abs() < epsilon {
-                    critical_nodes.push(node_val.clone());
+                    critical_nodes_set.insert(node_id.clone());
                 }
             }
         }
     }
 
-    Ok(Value::Vector(critical_nodes))
+    // Build adjacency list for critical nodes only
+    let mut critical_adj: HashMap<String, Vec<String>> = HashMap::new();
+    for edge in edges_vec {
+        if let Value::Edge { from, to, .. } = edge {
+            if critical_nodes_set.contains(from) && critical_nodes_set.contains(to) {
+                critical_adj.entry(from.clone())
+                    .or_insert_with(Vec::new)
+                    .push(to.clone());
+            }
+        }
+    }
+
+    // Find start node (ES = 0 and is critical)
+    let mut start_node: Option<String> = None;
+    for (node_id, node_data) in nodes_record {
+        if critical_nodes_set.contains(node_id) {
+            if let Value::Record(props) = node_data {
+                if let Some(Value::Number(es)) = props.get("ES") {
+                    if es.abs() < epsilon {
+                        start_node = Some(node_id.clone());
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    let start = start_node.ok_or("No critical start node found (ES=0)")?;
+
+    // Find project duration to identify end nodes
+    let project_duration = nodes_record.values()
+        .filter_map(|node_data| {
+            if let Value::Record(props) = node_data {
+                if let Some(Value::Number(ef)) = props.get("EF") {
+                    return Some(*ef);
+                }
+            }
+            None
+        })
+        .fold(0.0, f64::max);
+
+    // Find end nodes (EF = project_duration and is critical)
+    let mut end_nodes: Vec<String> = Vec::new();
+    for (node_id, node_data) in nodes_record {
+        if critical_nodes_set.contains(node_id) {
+            if let Value::Record(props) = node_data {
+                if let Some(Value::Number(ef)) = props.get("EF") {
+                    if (ef - project_duration).abs() < epsilon {
+                        end_nodes.push(node_id.clone());
+                    }
+                }
+            }
+        }
+    }
+
+    if end_nodes.is_empty() {
+        return Err("No critical end node found".to_string());
+    }
+
+    // DFS to find one complete path from start to any end node
+    fn dfs_find_path(
+        current: &str,
+        end_nodes: &[String],
+        adj: &HashMap<String, Vec<String>>,
+        path: &mut Vec<String>,
+        visited: &mut HashSet<String>,
+    ) -> bool {
+        path.push(current.to_string());
+        visited.insert(current.to_string());
+
+        // Check if we reached an end node
+        if end_nodes.contains(&current.to_string()) {
+            return true;
+        }
+
+        // Explore neighbors
+        if let Some(neighbors) = adj.get(current) {
+            for neighbor in neighbors {
+                if !visited.contains(neighbor) {
+                    if dfs_find_path(neighbor, end_nodes, adj, path, visited) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        // Backtrack
+        path.pop();
+        visited.remove(current);
+        false
+    }
+
+    let mut path = Vec::new();
+    let mut visited = HashSet::new();
+
+    if !dfs_find_path(&start, &end_nodes, &critical_adj, &mut path, &mut visited) {
+        return Err("Could not find complete critical path from start to end".to_string());
+    }
+
+    // Convert to Value::Vector
+    let path_values: Vec<Value> = path.into_iter().map(Value::String).collect();
+    Ok(Value::Vector(path_values))
+}
+
+/// Find all complete critical paths from start to finish
+/// Returns a vector of paths (each path is a vector of node IDs)
+/// Shows all parallel critical paths in the network
+/// Auto-calculates all prerequisites if missing
+pub fn all_critical_paths(args: &[Value]) -> Result<Value, String> {
+    let network = match &args[0] {
+        Value::Record(map) => map,
+        _ => return Err("all_critical_paths() requires a network record".to_string()),
+    };
+
+    // Auto-calculate slack if missing
+    let network_with_slack = if !has_slack_data(network) {
+        match calculate_slack(&[Value::Record(network.clone())])? {
+            Value::Record(n) => n,
+            _ => return Err("Failed to calculate slack".to_string()),
+        }
+    } else {
+        network.clone()
+    };
+
+    let nodes_record = match network_with_slack.get("nodes") {
+        Some(Value::Record(r)) => r,
+        _ => return Err("Network must have 'nodes' field".to_string()),
+    };
+
+    let edges_vec = match network_with_slack.get("edges") {
+        Some(Value::Vector(v)) => v,
+        _ => return Err("Network must have 'edges' field".to_string()),
+    };
+
+    // Find nodes with slack ~= 0 (critical nodes)
+    let epsilon = 1e-6;
+    let mut critical_nodes_set: HashSet<String> = HashSet::new();
+
+    for (node_id, node_data) in nodes_record {
+        if let Value::Record(props) = node_data {
+            if let Some(Value::Number(slack)) = props.get("slack") {
+                if slack.abs() < epsilon {
+                    critical_nodes_set.insert(node_id.clone());
+                }
+            }
+        }
+    }
+
+    // Build adjacency list for critical nodes only
+    let mut critical_adj: HashMap<String, Vec<String>> = HashMap::new();
+    for edge in edges_vec {
+        if let Value::Edge { from, to, .. } = edge {
+            if critical_nodes_set.contains(from) && critical_nodes_set.contains(to) {
+                critical_adj.entry(from.clone())
+                    .or_insert_with(Vec::new)
+                    .push(to.clone());
+            }
+        }
+    }
+
+    // Find start node (ES = 0 and is critical)
+    let mut start_node: Option<String> = None;
+    for (node_id, node_data) in nodes_record {
+        if critical_nodes_set.contains(node_id) {
+            if let Value::Record(props) = node_data {
+                if let Some(Value::Number(es)) = props.get("ES") {
+                    if es.abs() < epsilon {
+                        start_node = Some(node_id.clone());
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    let start = start_node.ok_or("No critical start node found (ES=0)")?;
+
+    // Find project duration to identify end nodes
+    let project_duration = nodes_record.values()
+        .filter_map(|node_data| {
+            if let Value::Record(props) = node_data {
+                if let Some(Value::Number(ef)) = props.get("EF") {
+                    return Some(*ef);
+                }
+            }
+            None
+        })
+        .fold(0.0, f64::max);
+
+    // Find end nodes (EF = project_duration and is critical)
+    let mut end_nodes: Vec<String> = Vec::new();
+    for (node_id, node_data) in nodes_record {
+        if critical_nodes_set.contains(node_id) {
+            if let Value::Record(props) = node_data {
+                if let Some(Value::Number(ef)) = props.get("EF") {
+                    if (ef - project_duration).abs() < epsilon {
+                        end_nodes.push(node_id.clone());
+                    }
+                }
+            }
+        }
+    }
+
+    if end_nodes.is_empty() {
+        return Err("No critical end node found".to_string());
+    }
+
+    // DFS to find ALL complete paths from start to any end node
+    fn dfs_find_all_paths(
+        current: &str,
+        end_nodes: &[String],
+        adj: &HashMap<String, Vec<String>>,
+        path: &mut Vec<String>,
+        visited: &mut HashSet<String>,
+        all_paths: &mut Vec<Vec<String>>,
+    ) {
+        path.push(current.to_string());
+        visited.insert(current.to_string());
+
+        // Check if we reached an end node
+        if end_nodes.contains(&current.to_string()) {
+            all_paths.push(path.clone());
+        } else {
+            // Explore neighbors
+            if let Some(neighbors) = adj.get(current) {
+                for neighbor in neighbors {
+                    if !visited.contains(neighbor) {
+                        dfs_find_all_paths(neighbor, end_nodes, adj, path, visited, all_paths);
+                    }
+                }
+            }
+        }
+
+        // Backtrack
+        path.pop();
+        visited.remove(current);
+    }
+
+    let mut all_paths = Vec::new();
+    let mut path = Vec::new();
+    let mut visited = HashSet::new();
+
+    dfs_find_all_paths(&start, &end_nodes, &critical_adj, &mut path, &mut visited, &mut all_paths);
+
+    if all_paths.is_empty() {
+        return Err("Could not find any critical path from start to end".to_string());
+    }
+
+    // Convert to Value::Vector of Value::Vector
+    let paths_values: Vec<Value> = all_paths.into_iter()
+        .map(|p| Value::Vector(p.into_iter().map(Value::String).collect()))
+        .collect();
+
+    Ok(Value::Vector(paths_values))
 }
 
 /// Calculate total project duration (max EF across all nodes)
@@ -572,6 +861,7 @@ pub fn task_variance(args: &[Value]) -> Result<Value, String> {
 }
 
 /// Calculate project variance (sum of variances on critical path)
+/// Auto-calculates critical path if needed
 pub fn project_variance(args: &[Value]) -> Result<Value, String> {
     let network = match &args[0] {
         Value::Record(map) => map,
@@ -582,11 +872,8 @@ pub fn project_variance(args: &[Value]) -> Result<Value, String> {
     validate_dag(network)?;
     validate_probabilistic_properties(network)?;
 
-    // Calculate ES/EF/LS/LF/slack and find critical path
-    let with_es_ef = forward_pass(&[Value::Record(network.clone())])?;
-    let with_ls_lf = backward_pass(&[with_es_ef])?;
-    let with_slack = calculate_slack(&[with_ls_lf])?;
-    let critical_nodes = critical_path(&[with_slack])?;
+    // Get critical path (auto-calculates all prerequisites if needed)
+    let critical_nodes = critical_path(&[Value::Record(network.clone())])?;
 
     let nodes_record = match network.get("nodes") {
         Some(Value::Record(r)) => r,
@@ -714,6 +1001,57 @@ pub fn time_for_probability(args: &[Value]) -> Result<Value, String> {
     let time = te + z * std_dev;
 
     Ok(Value::Number(time))
+}
+
+/// Complete PERT analysis - one-stop function for all PERT calculations
+/// Returns a record with: network (with ES/EF/LS/LF/slack), critical_path, duration,
+/// and if probabilistic properties exist: variance and std_dev
+pub fn pert_analysis(args: &[Value]) -> Result<Value, String> {
+    let network = match &args[0] {
+        Value::Record(map) => map,
+        _ => return Err("pert_analysis() requires a network record".to_string()),
+    };
+
+    // Calculate network with all properties (auto-calculates prerequisites)
+    let network_with_slack = match calculate_slack(&[Value::Record(network.clone())])? {
+        Value::Record(n) => n,
+        _ => return Err("Failed to calculate slack".to_string()),
+    };
+
+    // Get critical path
+    let critical_path_nodes = critical_path(&[Value::Record(network_with_slack.clone())])?;
+
+    // Calculate project duration
+    let duration = project_duration(&[Value::Record(network_with_slack.clone())])?;
+
+    // Check if network has probabilistic properties (op, mo, pe)
+    let has_probabilistic = if let Some(Value::Record(nodes)) = network.get("nodes") {
+        nodes.values().any(|node_data| {
+            if let Value::Record(props) = node_data {
+                props.contains_key("op") && props.contains_key("mo") && props.contains_key("pe")
+            } else {
+                false
+            }
+        })
+    } else {
+        false
+    };
+
+    // Build result record
+    let mut result = HashMap::new();
+    result.insert("network".to_string(), Value::Record(network_with_slack.clone()));
+    result.insert("critical_path".to_string(), critical_path_nodes);
+    result.insert("duration".to_string(), duration);
+
+    // Add probabilistic analysis if applicable
+    if has_probabilistic {
+        let variance = project_variance(&[Value::Record(network.clone())])?;
+        let std_dev = project_std_dev(&[Value::Record(network.clone())])?;
+        result.insert("variance".to_string(), variance);
+        result.insert("std_dev".to_string(), std_dev);
+    }
+
+    Ok(Value::Record(result))
 }
 
 // ============================================================================

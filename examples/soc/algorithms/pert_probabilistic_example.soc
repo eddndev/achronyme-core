@@ -33,26 +33,32 @@ let var_foundation = task_variance(3, 5, 7)
 var_foundation
 // Expected: ((7 - 3) / 6)^2 = 0.444...
 
-// Calculate total project duration (using expected times)
+// SIMPLIFIED APPROACH: Use pert_analysis() for complete analysis
+let analisis = pert_analysis(construction)
+analisis
+
+// The analysis returns everything in one record:
+analisis.duration        // Expected duration
+analisis.variance        // Project variance
+analisis.std_dev         // Standard deviation
+analisis.critical_path   // Critical path nodes
+
+// You can still use individual functions if needed
+// They auto-calculate prerequisites now!
+
 let total_duration = project_duration(construction)
 total_duration
-// Expected duration based on critical path
 
-// Calculate project variance (sum of variances on critical path)
 let total_variance = project_variance(construction)
 total_variance
 
-// Calculate project standard deviation
 let std_dev = project_std_dev(construction)
 std_dev
-// Square root of variance
 
 // Calculate probability of completing in 25 days
 let prob_25 = completion_probability(construction, 25)
 prob_25
-// Probability based on normal distribution
 
 // Calculate time needed for 95% confidence
 let time_95 = time_for_probability(construction, 0.95)
 time_95
-// Time required to be 95% confident of completion

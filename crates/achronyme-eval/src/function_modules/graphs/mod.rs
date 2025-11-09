@@ -47,6 +47,7 @@ pub fn register_functions(registry: &mut FunctionRegistry) {
     registry.register("backward_pass", pert::backward_pass, 1);
     registry.register("calculate_slack", pert::calculate_slack, 1);
     registry.register("critical_path", pert::critical_path, 1);
+    registry.register("all_critical_paths", pert::all_critical_paths, 1);
     registry.register("project_duration", pert::project_duration, 1);
 
     // PERT - Probabilistic Analysis
@@ -56,4 +57,7 @@ pub fn register_functions(registry: &mut FunctionRegistry) {
     registry.register("project_std_dev", pert::project_std_dev, 1);
     registry.register("completion_probability", pert::completion_probability, 2);
     registry.register("time_for_probability", pert::time_for_probability, 2);
+
+    // PERT - Comprehensive Analysis
+    registry.register("pert_analysis", pert::pert_analysis, 1);
 }
