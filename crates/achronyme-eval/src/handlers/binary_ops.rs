@@ -35,12 +35,6 @@ fn apply_add(left: Value, right: Value) -> Result<Value, String> {
             a.add(&b).map(Value::ComplexTensor).map_err(|e| e.to_string())
         }
 
-        // Legacy Matrix support
-        (Value::Matrix(a), Value::Matrix(b)) => a
-            .add(&b)
-            .map(Value::Matrix)
-            .map_err(|e| e.to_string()),
-
         // Type promotion: Number → Complex
         (Value::Number(a), Value::Complex(b)) => {
             Ok(Value::Complex(Complex::from_real(a) + b))
@@ -58,17 +52,17 @@ fn apply_add(left: Value, right: Value) -> Result<Value, String> {
                 let has_complex_b = b.iter().any(|v| matches!(v, Value::Complex(_)));
 
                 if has_complex_a || has_complex_b {
-                    // Complex vector addition
-                    let vec_a = Value::to_complex_vector(a).map_err(|_| "Type conversion error")?;
-                    let vec_b = Value::to_complex_vector(b).map_err(|_| "Type conversion error")?;
-                    let result = vec_a.add(&vec_b).map_err(|e| e.to_string())?;
-                    Ok(Value::from_complex_vector(result))
+                    // Complex tensor addition
+                    let tensor_a = Value::to_complex_tensor(a).map_err(|_| "Type conversion error")?;
+                    let tensor_b = Value::to_complex_tensor(b).map_err(|_| "Type conversion error")?;
+                    let result = tensor_a.add(&tensor_b).map_err(|e| e.to_string())?;
+                    Ok(Value::ComplexTensor(result))
                 } else {
-                    // Real vector addition
-                    let vec_a = Value::to_real_vector(a).map_err(|_| "Type conversion error")?;
-                    let vec_b = Value::to_real_vector(b).map_err(|_| "Type conversion error")?;
-                    let result = vec_a.add(&vec_b).map_err(|e| e.to_string())?;
-                    Ok(Value::from_real_vector(result))
+                    // Real tensor addition
+                    let tensor_a = Value::to_real_tensor(a).map_err(|_| "Type conversion error")?;
+                    let tensor_b = Value::to_real_tensor(b).map_err(|_| "Type conversion error")?;
+                    let result = tensor_a.add(&tensor_b).map_err(|e| e.to_string())?;
+                    Ok(Value::Tensor(result))
                 }
             } else {
                 Err("Vector addition requires numeric vectors".to_string())
@@ -127,6 +121,42 @@ fn apply_add(left: Value, right: Value) -> Result<Value, String> {
             }
         }
 
+        // Broadcasting: Tensor + Scalar
+        (Value::Tensor(t), Value::Number(scalar)) => {
+            Ok(Value::Tensor(t.add_scalar(scalar)))
+        }
+        (Value::Number(scalar), Value::Tensor(t)) => {
+            Ok(Value::Tensor(t.add_scalar(scalar)))
+        }
+
+        // Broadcasting: Tensor + Complex
+        (Value::Tensor(t), Value::Complex(c)) => {
+            // Convert real tensor to complex tensor, then add
+            let ct = t.to_complex();
+            Ok(Value::ComplexTensor(ct.add_scalar(c)))
+        }
+        (Value::Complex(c), Value::Tensor(t)) => {
+            // Convert real tensor to complex tensor, then add
+            let ct = t.to_complex();
+            Ok(Value::ComplexTensor(ct.add_scalar(c)))
+        }
+
+        // Broadcasting: ComplexTensor + Scalar
+        (Value::ComplexTensor(ct), Value::Number(scalar)) => {
+            Ok(Value::ComplexTensor(ct.add_scalar(Complex::from_real(scalar))))
+        }
+        (Value::Number(scalar), Value::ComplexTensor(ct)) => {
+            Ok(Value::ComplexTensor(ct.add_scalar(Complex::from_real(scalar))))
+        }
+
+        // Broadcasting: ComplexTensor + Complex
+        (Value::ComplexTensor(ct), Value::Complex(c)) => {
+            Ok(Value::ComplexTensor(ct.add_scalar(c)))
+        }
+        (Value::Complex(c), Value::ComplexTensor(ct)) => {
+            Ok(Value::ComplexTensor(ct.add_scalar(c)))
+        }
+
         _ => Err("Incompatible types for addition".to_string()),
     }
 }
@@ -143,12 +173,6 @@ fn apply_subtract(left: Value, right: Value) -> Result<Value, String> {
         (Value::ComplexTensor(a), Value::ComplexTensor(b)) => {
             a.sub(&b).map(Value::ComplexTensor).map_err(|e| e.to_string())
         }
-
-        // Legacy Matrix support
-        (Value::Matrix(a), Value::Matrix(b)) => a
-            .sub(&b)
-            .map(Value::Matrix)
-            .map_err(|e| e.to_string()),
 
         // Type promotion: Number → Complex
         (Value::Number(a), Value::Complex(b)) => {
@@ -167,17 +191,17 @@ fn apply_subtract(left: Value, right: Value) -> Result<Value, String> {
                 let has_complex_b = b.iter().any(|v| matches!(v, Value::Complex(_)));
 
                 if has_complex_a || has_complex_b {
-                    // Complex vector subtraction
-                    let vec_a = Value::to_complex_vector(a).map_err(|_| "Type conversion error")?;
-                    let vec_b = Value::to_complex_vector(b).map_err(|_| "Type conversion error")?;
-                    let result = vec_a.sub(&vec_b).map_err(|e| e.to_string())?;
-                    Ok(Value::from_complex_vector(result))
+                    // Complex tensor subtraction
+                    let tensor_a = Value::to_complex_tensor(a).map_err(|_| "Type conversion error")?;
+                    let tensor_b = Value::to_complex_tensor(b).map_err(|_| "Type conversion error")?;
+                    let result = tensor_a.sub(&tensor_b).map_err(|e| e.to_string())?;
+                    Ok(Value::ComplexTensor(result))
                 } else {
-                    // Real vector subtraction
-                    let vec_a = Value::to_real_vector(a).map_err(|_| "Type conversion error")?;
-                    let vec_b = Value::to_real_vector(b).map_err(|_| "Type conversion error")?;
-                    let result = vec_a.sub(&vec_b).map_err(|e| e.to_string())?;
-                    Ok(Value::from_real_vector(result))
+                    // Real tensor subtraction
+                    let tensor_a = Value::to_real_tensor(a).map_err(|_| "Type conversion error")?;
+                    let tensor_b = Value::to_real_tensor(b).map_err(|_| "Type conversion error")?;
+                    let result = tensor_a.sub(&tensor_b).map_err(|e| e.to_string())?;
+                    Ok(Value::Tensor(result))
                 }
             } else {
                 Err("Vector subtraction requires numeric vectors".to_string())
@@ -236,6 +260,44 @@ fn apply_subtract(left: Value, right: Value) -> Result<Value, String> {
             }
         }
 
+        // Broadcasting: Tensor - Scalar
+        (Value::Tensor(t), Value::Number(scalar)) => {
+            Ok(Value::Tensor(t.sub_scalar(scalar)))
+        }
+        (Value::Number(scalar), Value::Tensor(t)) => {
+            // scalar - tensor = -(tensor - scalar)
+            Ok(Value::Tensor(t.sub_scalar(scalar).negate()))
+        }
+
+        // Broadcasting: Tensor - Complex
+        (Value::Tensor(t), Value::Complex(c)) => {
+            let ct = t.to_complex();
+            Ok(Value::ComplexTensor(ct.sub_scalar(c)))
+        }
+        (Value::Complex(c), Value::Tensor(t)) => {
+            // c - tensor = -(tensor - c)
+            let ct = t.to_complex();
+            Ok(Value::ComplexTensor(ct.sub_scalar(c).negate()))
+        }
+
+        // Broadcasting: ComplexTensor - Scalar
+        (Value::ComplexTensor(ct), Value::Number(scalar)) => {
+            Ok(Value::ComplexTensor(ct.sub_scalar(Complex::from_real(scalar))))
+        }
+        (Value::Number(scalar), Value::ComplexTensor(ct)) => {
+            // scalar - tensor = -(tensor - scalar)
+            Ok(Value::ComplexTensor(ct.sub_scalar(Complex::from_real(scalar)).negate()))
+        }
+
+        // Broadcasting: ComplexTensor - Complex
+        (Value::ComplexTensor(ct), Value::Complex(c)) => {
+            Ok(Value::ComplexTensor(ct.sub_scalar(c)))
+        }
+        (Value::Complex(c), Value::ComplexTensor(ct)) => {
+            // c - tensor = -(tensor - c)
+            Ok(Value::ComplexTensor(ct.sub_scalar(c).negate()))
+        }
+
         _ => Err("Incompatible types for subtraction".to_string()),
     }
 }
@@ -247,17 +309,21 @@ fn apply_multiply(left: Value, right: Value) -> Result<Value, String> {
 
         // Tensor support (optimized path)
         (Value::Tensor(a), Value::Tensor(b)) => {
-            a.mul(&b).map(Value::Tensor).map_err(|e| e.to_string())
+            // If both are matrices, do matrix multiplication
+            if a.is_matrix() && b.is_matrix() {
+                a.matmul(&b)
+                    .map(Value::Tensor)
+                    .map_err(|e| e.to_string())
+            } else {
+                // Otherwise, do element-wise multiplication (Hadamard product)
+                a.mul(&b)
+                    .map(Value::Tensor)
+                    .map_err(|e| e.to_string())
+            }
         }
         (Value::ComplexTensor(a), Value::ComplexTensor(b)) => {
             a.mul(&b).map(Value::ComplexTensor).map_err(|e| e.to_string())
         }
-
-        // Legacy Matrix support
-        (Value::Matrix(a), Value::Matrix(b)) => a
-            .mul(&b)
-            .map(Value::Matrix)
-            .map_err(|e| e.to_string()),
 
         // Type promotion: Number → Complex
         (Value::Number(a), Value::Complex(b)) => {
@@ -276,17 +342,17 @@ fn apply_multiply(left: Value, right: Value) -> Result<Value, String> {
                 let has_complex_b = b.iter().any(|v| matches!(v, Value::Complex(_)));
 
                 if has_complex_a || has_complex_b {
-                    // Complex vector multiplication
-                    let vec_a = Value::to_complex_vector(a).map_err(|_| "Type conversion error")?;
-                    let vec_b = Value::to_complex_vector(b).map_err(|_| "Type conversion error")?;
-                    let result = vec_a.mul(&vec_b).map_err(|e| e.to_string())?;
-                    Ok(Value::from_complex_vector(result))
+                    // Complex tensor multiplication
+                    let tensor_a = Value::to_complex_tensor(a).map_err(|_| "Type conversion error")?;
+                    let tensor_b = Value::to_complex_tensor(b).map_err(|_| "Type conversion error")?;
+                    let result = tensor_a.mul(&tensor_b).map_err(|e| e.to_string())?;
+                    Ok(Value::ComplexTensor(result))
                 } else {
-                    // Real vector multiplication
-                    let vec_a = Value::to_real_vector(a).map_err(|_| "Type conversion error")?;
-                    let vec_b = Value::to_real_vector(b).map_err(|_| "Type conversion error")?;
-                    let result = vec_a.mul(&vec_b).map_err(|e| e.to_string())?;
-                    Ok(Value::from_real_vector(result))
+                    // Real tensor multiplication
+                    let tensor_a = Value::to_real_tensor(a).map_err(|_| "Type conversion error")?;
+                    let tensor_b = Value::to_real_tensor(b).map_err(|_| "Type conversion error")?;
+                    let result = tensor_a.mul(&tensor_b).map_err(|e| e.to_string())?;
+                    Ok(Value::Tensor(result))
                 }
             } else {
                 Err("Vector multiplication requires numeric vectors".to_string())
@@ -345,6 +411,40 @@ fn apply_multiply(left: Value, right: Value) -> Result<Value, String> {
             }
         }
 
+        // Broadcasting: Tensor * Scalar
+        (Value::Tensor(t), Value::Number(scalar)) => {
+            Ok(Value::Tensor(t.mul_scalar(scalar)))
+        }
+        (Value::Number(scalar), Value::Tensor(t)) => {
+            Ok(Value::Tensor(t.mul_scalar(scalar)))
+        }
+
+        // Broadcasting: Tensor * Complex
+        (Value::Tensor(t), Value::Complex(c)) => {
+            let ct = t.to_complex();
+            Ok(Value::ComplexTensor(ct.mul_scalar(c)))
+        }
+        (Value::Complex(c), Value::Tensor(t)) => {
+            let ct = t.to_complex();
+            Ok(Value::ComplexTensor(ct.mul_scalar(c)))
+        }
+
+        // Broadcasting: ComplexTensor * Scalar
+        (Value::ComplexTensor(ct), Value::Number(scalar)) => {
+            Ok(Value::ComplexTensor(ct.mul_scalar(Complex::from_real(scalar))))
+        }
+        (Value::Number(scalar), Value::ComplexTensor(ct)) => {
+            Ok(Value::ComplexTensor(ct.mul_scalar(Complex::from_real(scalar))))
+        }
+
+        // Broadcasting: ComplexTensor * Complex
+        (Value::ComplexTensor(ct), Value::Complex(c)) => {
+            Ok(Value::ComplexTensor(ct.mul_scalar(c)))
+        }
+        (Value::Complex(c), Value::ComplexTensor(ct)) => {
+            Ok(Value::ComplexTensor(ct.mul_scalar(c)))
+        }
+
         _ => Err("Incompatible types for multiplication".to_string()),
     }
 }
@@ -385,17 +485,17 @@ fn apply_divide(left: Value, right: Value) -> Result<Value, String> {
                 let has_complex_b = b.iter().any(|v| matches!(v, Value::Complex(_)));
 
                 if has_complex_a || has_complex_b {
-                    // Complex vector division
-                    let vec_a = Value::to_complex_vector(a).map_err(|_| "Type conversion error")?;
-                    let vec_b = Value::to_complex_vector(b).map_err(|_| "Type conversion error")?;
-                    let result = vec_a.div(&vec_b).map_err(|e| e.to_string())?;
-                    Ok(Value::from_complex_vector(result))
+                    // Complex tensor division
+                    let tensor_a = Value::to_complex_tensor(a).map_err(|_| "Type conversion error")?;
+                    let tensor_b = Value::to_complex_tensor(b).map_err(|_| "Type conversion error")?;
+                    let result = tensor_a.div(&tensor_b).map_err(|e| e.to_string())?;
+                    Ok(Value::ComplexTensor(result))
                 } else {
-                    // Real vector division
-                    let vec_a = Value::to_real_vector(a).map_err(|_| "Type conversion error")?;
-                    let vec_b = Value::to_real_vector(b).map_err(|_| "Type conversion error")?;
-                    let result = vec_a.div(&vec_b).map_err(|e| e.to_string())?;
-                    Ok(Value::from_real_vector(result))
+                    // Real tensor division
+                    let tensor_a = Value::to_real_tensor(a).map_err(|_| "Type conversion error")?;
+                    let tensor_b = Value::to_real_tensor(b).map_err(|_| "Type conversion error")?;
+                    let result = tensor_a.div(&tensor_b).map_err(|e| e.to_string())?;
+                    Ok(Value::Tensor(result))
                 }
             } else {
                 Err("Vector division requires numeric vectors".to_string())
@@ -459,6 +559,85 @@ fn apply_divide(left: Value, right: Value) -> Result<Value, String> {
                 Err("Broadcasting requires numeric vector".to_string())
             }
         }
+
+        // Broadcasting: Tensor / Scalar
+        (Value::Tensor(t), Value::Number(scalar)) => {
+            t.div_scalar(scalar).map(Value::Tensor)
+        }
+        (Value::Number(scalar), Value::Tensor(t)) => {
+            // scalar / tensor = scalar * (1 / tensor)
+            // We need to compute element-wise: scalar / each_element
+            let data: Vec<f64> = t.data().iter().map(|&x| {
+                if x == 0.0 {
+                    f64::INFINITY // Or could return error
+                } else {
+                    scalar / x
+                }
+            }).collect();
+            use achronyme_types::tensor::RealTensor;
+            RealTensor::new(data, t.shape().to_vec())
+                .map(Value::Tensor)
+                .map_err(|e| e.to_string())
+        }
+
+        // Broadcasting: Tensor / Complex
+        (Value::Tensor(t), Value::Complex(c)) => {
+            let ct = t.to_complex();
+            ct.div_scalar(c).map(Value::ComplexTensor)
+        }
+        (Value::Complex(c), Value::Tensor(t)) => {
+            // c / tensor: element-wise c / each_element
+            let data: Vec<Complex> = t.data().iter().map(|&x| {
+                if x == 0.0 {
+                    Complex::new(f64::INFINITY, 0.0)
+                } else {
+                    c / Complex::from_real(x)
+                }
+            }).collect();
+            use achronyme_types::tensor::ComplexTensor;
+            ComplexTensor::new(data, t.shape().to_vec())
+                .map(Value::ComplexTensor)
+                .map_err(|e| e.to_string())
+        }
+
+        // Broadcasting: ComplexTensor / Scalar
+        (Value::ComplexTensor(ct), Value::Number(scalar)) => {
+            ct.div_scalar(Complex::from_real(scalar)).map(Value::ComplexTensor)
+        }
+        (Value::Number(scalar), Value::ComplexTensor(ct)) => {
+            // scalar / tensor: element-wise scalar / each_element
+            let data: Vec<Complex> = ct.data().iter().map(|c| {
+                if c.re == 0.0 && c.im == 0.0 {
+                    Complex::new(f64::INFINITY, 0.0)
+                } else {
+                    Complex::from_real(scalar) / *c
+                }
+            }).collect();
+            use achronyme_types::tensor::ComplexTensor;
+            ComplexTensor::new(data, ct.shape().to_vec())
+                .map(Value::ComplexTensor)
+                .map_err(|e| e.to_string())
+        }
+
+        // Broadcasting: ComplexTensor / Complex
+        (Value::ComplexTensor(ct), Value::Complex(c)) => {
+            ct.div_scalar(c).map(Value::ComplexTensor)
+        }
+        (Value::Complex(c), Value::ComplexTensor(ct)) => {
+            // c / tensor: element-wise c / each_element
+            let data: Vec<Complex> = ct.data().iter().map(|elem| {
+                if elem.re == 0.0 && elem.im == 0.0 {
+                    Complex::new(f64::INFINITY, 0.0)
+                } else {
+                    c / *elem
+                }
+            }).collect();
+            use achronyme_types::tensor::ComplexTensor;
+            ComplexTensor::new(data, ct.shape().to_vec())
+                .map(Value::ComplexTensor)
+                .map_err(|e| e.to_string())
+        }
+
         _ => Err("Incompatible types for division".to_string()),
     }
 }

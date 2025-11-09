@@ -63,15 +63,15 @@ identifier = @{
 // Composite Literals
 // ============================================================================
 
-// Vector: [1, 2, 3], [x, y+1, sin(z)]
-vector = {
+// Array (N-dimensional tensor): [1, 2, 3], [[1, 2], [3, 4]], [[[1,2],[3,4]], [[5,6],[7,8]]]
+// This is now recursive to support arbitrary tensor dimensions
+array = {
     "[" ~ expr ~ ("," ~ expr)* ~ "]"
 }
 
-// Matrix: [[1, 2], [3, 4]]
-matrix = {
-    "[" ~ vector ~ ("," ~ vector)* ~ "]"
-}
+// Vector and Matrix are now aliases for the unified array syntax
+vector = { array }
+matrix = { array }
 
 // Record: { name: "Alice", age: 30, city: "Madrid" }
 record = {
@@ -117,8 +117,7 @@ primary = {
   | complex        // Must come before number (3i contains number)
   | number
   | record         // Record literals { key: value }
-  | matrix         // Must come before vector (matrix starts with [)
-  | vector
+  | array          // Arrays/tensors (vectors, matrices, and higher-dimensional)
   | lambda
   | function_call
   | identifier

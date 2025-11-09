@@ -1,4 +1,4 @@
-use achronyme_types::matrix::Matrix;
+use achronyme_types::tensor::RealTensor;
 
 /// Calcular precios sombra (shadow prices) para un problema LP
 ///
@@ -32,12 +32,12 @@ use achronyme_types::matrix::Matrix;
 /// //   x₂ ≤ 50        (materia prima B)
 /// //   x₁ + x₂ ≤ 70   (horas de trabajo)
 ///
-/// let shadow = shadow_price(&c, &A, &b, 1.0);
+/// // let shadow = shadow_price(&c, &A, &b, 1.0);
 /// // shadow[0] = 40 (cada unidad más de A vale $40)
 /// // shadow[1] = 30 (cada unidad más de B vale $30)
 /// // shadow[2] = 0  (horas no son limitantes)
 /// ```
-pub fn shadow_price(c: &[f64], a: &Matrix, b: &[f64], sense: f64) -> Result<Vec<f64>, String> {
+pub fn shadow_price(c: &[f64], a: &RealTensor, b: &[f64], sense: f64) -> Result<Vec<f64>, String> {
     // Resolver el problema para obtener el tableau óptimo
     let mut tableau = super::tableau::Tableau::new(c, a, b, sense)?;
 
@@ -99,13 +99,13 @@ pub fn shadow_price(c: &[f64], a: &Matrix, b: &[f64], sense: f64) -> Result<Vec<
 ///
 /// ```
 /// // Para c = [40, 30], si analizamos c[0]:
-/// let range = sensitivity_c(&c, &A, &b, 0);
+/// // let range = sensitivity_c(&c, &A, &b, 0);
 /// // range = [20.0, 60.0]
 /// // Significa: c[0] puede variar entre $20 y $60 sin cambiar la solución
 /// ```
 pub fn sensitivity_c(
     c: &[f64],
-    a: &Matrix,
+    a: &RealTensor,
     b: &[f64],
     index: usize,
 ) -> Result<Vec<f64>, String> {
@@ -180,17 +180,17 @@ pub fn sensitivity_c(
 ///
 /// ```
 /// // Para b = [40, 50, 70], si analizamos b[2] (horas de trabajo):
-/// let range = sensitivity_b(&c, &A, &b, 2);
+/// // let range = sensitivity_b(&c, &A, &b, 2);
 /// // range = [60.0, 90.0]
 /// // Significa: horas pueden variar entre 60 y 90 sin cambiar la base
 /// ```
 pub fn sensitivity_b(
     c: &[f64],
-    a: &Matrix,
+    a: &RealTensor,
     b: &[f64],
     index: usize,
 ) -> Result<Vec<f64>, String> {
-    let m = a.rows;
+    let m = a.rows();
 
     if index >= m {
         return Err(format!("Index {} out of bounds (b has {} elements)", index, m));
@@ -246,7 +246,7 @@ mod tests {
         //   x₁ + x₂ ≤ 70
 
         let c = vec![40.0, 30.0];
-        let a = Matrix::new(3, 2, vec![1.0, 0.0, 0.0, 1.0, 1.0, 1.0]).unwrap();
+        let a = RealTensor::matrix(3, 2, vec![1.0, 0.0, 0.0, 1.0, 1.0, 1.0]).unwrap();
         let b = vec![40.0, 50.0, 70.0];
 
         let shadow = shadow_price(&c, &a, &b, 1.0).unwrap();
@@ -261,7 +261,7 @@ mod tests {
     #[test]
     fn test_sensitivity_c() {
         let c = vec![3.0, 5.0];
-        let a = Matrix::new(3, 2, vec![1.0, 0.0, 0.0, 2.0, 3.0, 2.0]).unwrap();
+        let a = RealTensor::matrix(3, 2, vec![1.0, 0.0, 0.0, 2.0, 3.0, 2.0]).unwrap();
         let b = vec![4.0, 12.0, 18.0];
 
         let range = sensitivity_c(&c, &a, &b, 0).unwrap();
@@ -273,7 +273,7 @@ mod tests {
     #[test]
     fn test_sensitivity_b() {
         let c = vec![3.0, 5.0];
-        let a = Matrix::new(3, 2, vec![1.0, 0.0, 0.0, 2.0, 3.0, 2.0]).unwrap();
+        let a = RealTensor::matrix(3, 2, vec![1.0, 0.0, 0.0, 2.0, 3.0, 2.0]).unwrap();
         let b = vec![4.0, 12.0, 18.0];
 
         let range = sensitivity_b(&c, &a, &b, 1).unwrap();

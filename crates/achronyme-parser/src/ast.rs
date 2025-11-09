@@ -58,8 +58,7 @@ pub enum AstNode {
         re: f64,
         im: f64,
     },
-    VectorLiteral(Vec<AstNode>),
-    MatrixLiteral(Vec<Vec<AstNode>>),
+    ArrayLiteral(Vec<AstNode>), // Unified array syntax: [1,2,3], [[1,2],[3,4]], [[[...]]], etc.
     RecordLiteral(Vec<(String, AstNode)>), // Vec of (key, value) pairs
     FieldAccess {
         record: Box<AstNode>,

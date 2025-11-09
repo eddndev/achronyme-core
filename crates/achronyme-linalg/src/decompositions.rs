@@ -1,15 +1,16 @@
-use achronyme_types::matrix::Matrix;
+use achronyme_types::tensor::RealTensor;
 use faer::prelude::*;
 
-/// Convert Achronyme Matrix to faer Mat
-fn matrix_to_faer(matrix: &Matrix) -> Mat<f64> {
-    let rows = matrix.rows;
-    let cols = matrix.cols;
-    Mat::from_fn(rows, cols, |i, j| matrix.data[i * cols + j])
+/// Convert Achronyme RealTensor to faer Mat
+fn tensor_to_faer_mat(tensor: &RealTensor) -> Mat<f64> {
+    assert!(tensor.is_matrix());
+    let rows = tensor.rows();
+    let cols = tensor.cols();
+    Mat::from_fn(rows, cols, |i, j| tensor.get_matrix(i, j).unwrap())
 }
 
-/// Convert faer Mat to Achronyme Matrix
-fn faer_to_matrix(mat: Mat<f64>) -> Result<Matrix, String> {
+/// Convert faer Mat to Achronyme RealTensor
+fn faer_mat_to_tensor(mat: Mat<f64>) -> Result<RealTensor, String> {
     let rows = mat.nrows();
     let cols = mat.ncols();
     let mut data = Vec::with_capacity(rows * cols);
@@ -20,11 +21,11 @@ fn faer_to_matrix(mat: Mat<f64>) -> Result<Matrix, String> {
         }
     }
 
-    Matrix::new(rows, cols, data).map_err(|e| e.to_string())
+    RealTensor::matrix(rows, cols, data).map_err(|e| e.to_string())
 }
 
-/// Convert faer MatRef to Achronyme Matrix
-fn faer_ref_to_matrix(mat: MatRef<f64>) -> Result<Matrix, String> {
+/// Convert faer MatRef to Achronyme RealTensor
+fn faer_mat_ref_to_tensor(mat: MatRef<f64>) -> Result<RealTensor, String> {
     let rows = mat.nrows();
     let cols = mat.ncols();
     let mut data = Vec::with_capacity(rows * cols);
@@ -35,7 +36,7 @@ fn faer_ref_to_matrix(mat: MatRef<f64>) -> Result<Matrix, String> {
         }
     }
 
-    Matrix::new(rows, cols, data).map_err(|e| e.to_string())
+    RealTensor::matrix(rows, cols, data).map_err(|e| e.to_string())
 }
 
 /// LU Decomposition with Partial Pivoting
@@ -48,9 +49,9 @@ fn faer_ref_to_matrix(mat: MatRef<f64>) -> Result<Matrix, String> {
 /// # Example
 /// ```
 /// use achronyme_linalg::lu_decomposition;
-/// use achronyme_types::matrix::Matrix;
+/// use achronyme_types::tensor::RealTensor;
 ///
-/// let a = Matrix::new(3, 3, vec![
+/// let a = RealTensor::matrix(3, 3, vec![
 ///     2.0, 1.0, 1.0,
 ///     4.0, 3.0, 3.0,
 ///     8.0, 7.0, 9.0
@@ -58,12 +59,12 @@ fn faer_ref_to_matrix(mat: MatRef<f64>) -> Result<Matrix, String> {
 ///
 /// let (l, u, _p) = lu_decomposition(&a).unwrap();
 /// ```
-pub fn lu_decomposition(matrix: &Matrix) -> Result<(Matrix, Matrix, Vec<usize>), String> {
-    if matrix.rows != matrix.cols {
+pub fn lu_decomposition(tensor: &RealTensor) -> Result<(RealTensor, RealTensor, Vec<usize>), String> {
+    if !tensor.is_square() {
         return Err("LU decomposition requires square matrix".to_string());
     }
 
-    let mat = matrix_to_faer(matrix);
+    let mat = tensor_to_faer_mat(tensor);
     let lu = mat.partial_piv_lu();
 
     let l = lu.compute_l();
@@ -71,14 +72,14 @@ pub fn lu_decomposition(matrix: &Matrix) -> Result<(Matrix, Matrix, Vec<usize>),
     let p = lu.row_permutation();
 
     // Convert permutation to vector
-    let perm_vec: Vec<usize> = (0..matrix.rows)
+    let perm_vec: Vec<usize> = (0..tensor.rows())
         .map(|i| p.arrays().0[i])
         .collect();
 
-    let l_matrix = faer_to_matrix(l)?;
-    let u_matrix = faer_to_matrix(u)?;
+    let l_tensor = faer_mat_to_tensor(l)?;
+    let u_tensor = faer_mat_to_tensor(u)?;
 
-    Ok((l_matrix, u_matrix, perm_vec))
+    Ok((l_tensor, u_tensor, perm_vec))
 }
 
 /// Cholesky Decomposition
@@ -91,9 +92,9 @@ pub fn lu_decomposition(matrix: &Matrix) -> Result<(Matrix, Matrix, Vec<usize>),
 /// # Example
 /// ```
 /// use achronyme_linalg::cholesky_decomposition;
-/// use achronyme_types::matrix::Matrix;
+/// use achronyme_types::tensor::RealTensor;
 ///
-/// let a = Matrix::new(3, 3, vec![
+/// let a = RealTensor::matrix(3, 3, vec![
 ///     4.0, 2.0, 1.0,
 ///     2.0, 3.0, 1.0,
 ///     1.0, 1.0, 2.0
@@ -101,12 +102,12 @@ pub fn lu_decomposition(matrix: &Matrix) -> Result<(Matrix, Matrix, Vec<usize>),
 ///
 /// let l = cholesky_decomposition(&a).unwrap();
 /// ```
-pub fn cholesky_decomposition(matrix: &Matrix) -> Result<Matrix, String> {
-    if matrix.rows != matrix.cols {
+pub fn cholesky_decomposition(tensor: &RealTensor) -> Result<RealTensor, String> {
+    if !tensor.is_square() {
         return Err("Cholesky decomposition requires square matrix".to_string());
     }
 
-    let mat = matrix_to_faer(matrix);
+    let mat = tensor_to_faer_mat(tensor);
 
     // Perform Cholesky decomposition
     let chol = mat
@@ -114,7 +115,7 @@ pub fn cholesky_decomposition(matrix: &Matrix) -> Result<Matrix, String> {
         .map_err(|_| "Cholesky decomposition failed (matrix not positive definite?)".to_string())?;
 
     let l = chol.compute_l();
-    faer_to_matrix(l)
+    faer_mat_to_tensor(l)
 }
 
 /// QR Decomposition
@@ -127,9 +128,9 @@ pub fn cholesky_decomposition(matrix: &Matrix) -> Result<Matrix, String> {
 /// # Example
 /// ```
 /// use achronyme_linalg::qr_decomposition;
-/// use achronyme_types::matrix::Matrix;
+/// use achronyme_types::tensor::RealTensor;
 ///
-/// let a = Matrix::new(3, 2, vec![
+/// let a = RealTensor::matrix(3, 2, vec![
 ///     1.0, 1.0,
 ///     1.0, 2.0,
 ///     1.0, 3.0
@@ -137,8 +138,8 @@ pub fn cholesky_decomposition(matrix: &Matrix) -> Result<Matrix, String> {
 ///
 /// let (q, r) = qr_decomposition(&a).unwrap();
 /// ```
-pub fn qr_decomposition(matrix: &Matrix) -> Result<(Matrix, Matrix), String> {
-    let mat = matrix_to_faer(matrix);
+pub fn qr_decomposition(tensor: &RealTensor) -> Result<(RealTensor, RealTensor), String> {
+    let mat = tensor_to_faer_mat(tensor);
 
     // Perform QR decomposition
     let qr = mat.qr();
@@ -146,10 +147,10 @@ pub fn qr_decomposition(matrix: &Matrix) -> Result<(Matrix, Matrix), String> {
     let q = qr.compute_thin_q();
     let r = qr.compute_thin_r();
 
-    let q_matrix = faer_to_matrix(q)?;
-    let r_matrix = faer_to_matrix(r)?;
+    let q_tensor = faer_mat_to_tensor(q)?;
+    let r_tensor = faer_mat_to_tensor(r)?;
 
-    Ok((q_matrix, r_matrix))
+    Ok((q_tensor, r_tensor))
 }
 
 /// SVD (Singular Value Decomposition)
@@ -165,9 +166,9 @@ pub fn qr_decomposition(matrix: &Matrix) -> Result<(Matrix, Matrix), String> {
 /// # Example
 /// ```
 /// use achronyme_linalg::svd_decomposition;
-/// use achronyme_types::matrix::Matrix;
+/// use achronyme_types::tensor::RealTensor;
 ///
-/// let a = Matrix::new(3, 2, vec![
+/// let a = RealTensor::matrix(3, 2, vec![
 ///     1.0, 2.0,
 ///     3.0, 4.0,
 ///     5.0, 6.0
@@ -175,8 +176,8 @@ pub fn qr_decomposition(matrix: &Matrix) -> Result<(Matrix, Matrix), String> {
 ///
 /// let (u, s, vt) = svd_decomposition(&a).unwrap();
 /// ```
-pub fn svd_decomposition(matrix: &Matrix) -> Result<(Matrix, Vec<f64>, Matrix), String> {
-    let mat = matrix_to_faer(matrix);
+pub fn svd_decomposition(tensor: &RealTensor) -> Result<(RealTensor, Vec<f64>, RealTensor), String> {
+    let mat = tensor_to_faer_mat(tensor);
 
     // Perform SVD
     let svd = mat.thin_svd();
@@ -186,15 +187,15 @@ pub fn svd_decomposition(matrix: &Matrix) -> Result<(Matrix, Vec<f64>, Matrix), 
     let v = svd.v();
 
     // Convert V to V^T by transposing during extraction
-    let u_matrix = faer_ref_to_matrix(u)?;
-    let vt_matrix = faer_ref_to_matrix(v.transpose().as_ref())?;
+    let u_tensor = faer_mat_ref_to_tensor(u)?;
+    let vt_tensor = faer_mat_ref_to_tensor(v.transpose().as_ref())?;
 
     // Extract singular values
     let singular_values: Vec<f64> = (0..s.nrows())
         .map(|i| s.read(i))
         .collect();
 
-    Ok((u_matrix, singular_values, vt_matrix))
+    Ok((u_tensor, singular_values, vt_tensor))
 }
 
 #[cfg(test)]
@@ -203,7 +204,7 @@ mod tests {
 
     #[test]
     fn test_lu_decomposition() {
-        let a = Matrix::new(3, 3, vec![
+        let a = RealTensor::matrix(3, 3, vec![
             2.0, 1.0, 1.0,
             4.0, 3.0, 3.0,
             8.0, 7.0, 9.0
@@ -213,16 +214,16 @@ mod tests {
         assert!(result.is_ok());
 
         let (l, u, _p) = result.unwrap();
-        assert_eq!(l.rows, 3);
-        assert_eq!(l.cols, 3);
-        assert_eq!(u.rows, 3);
-        assert_eq!(u.cols, 3);
+        assert_eq!(l.rows(), 3);
+        assert_eq!(l.cols(), 3);
+        assert_eq!(u.rows(), 3);
+        assert_eq!(u.cols(), 3);
     }
 
     #[test]
     fn test_cholesky_decomposition() {
         // Symmetric positive-definite matrix
-        let a = Matrix::new(3, 3, vec![
+        let a = RealTensor::matrix(3, 3, vec![
             4.0, 2.0, 1.0,
             2.0, 3.0, 1.0,
             1.0, 1.0, 2.0
@@ -232,13 +233,13 @@ mod tests {
         assert!(result.is_ok());
 
         let l = result.unwrap();
-        assert_eq!(l.rows, 3);
-        assert_eq!(l.cols, 3);
+        assert_eq!(l.rows(), 3);
+        assert_eq!(l.cols(), 3);
     }
 
     #[test]
     fn test_qr_decomposition() {
-        let a = Matrix::new(3, 2, vec![
+        let a = RealTensor::matrix(3, 2, vec![
             1.0, 1.0,
             1.0, 2.0,
             1.0, 3.0
@@ -248,13 +249,13 @@ mod tests {
         assert!(result.is_ok());
 
         let (q, r) = result.unwrap();
-        assert_eq!(q.rows, 3);
-        assert_eq!(r.rows, 2);
+        assert_eq!(q.rows(), 3);
+        assert_eq!(r.rows(), 2);
     }
 
     #[test]
     fn test_svd_decomposition() {
-        let a = Matrix::new(3, 2, vec![
+        let a = RealTensor::matrix(3, 2, vec![
             1.0, 2.0,
             3.0, 4.0,
             5.0, 6.0
@@ -264,8 +265,8 @@ mod tests {
         assert!(result.is_ok());
 
         let (u, s, vt) = result.unwrap();
-        assert_eq!(u.rows, 3);
+        assert_eq!(u.rows(), 3);
         assert_eq!(s.len(), 2); // min(3, 2)
-        assert_eq!(vt.rows, 2);
+        assert_eq!(vt.rows(), 2);
     }
 }

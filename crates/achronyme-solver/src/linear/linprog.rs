@@ -1,4 +1,4 @@
-use achronyme_types::matrix::Matrix;
+use achronyme_types::tensor::RealTensor;
 use super::simplex;
 
 /// Resolver un problema de programación lineal con auto-selección de método
@@ -21,9 +21,9 @@ use super::simplex;
 /// Returns:
 ///   - Ok(x): vector solución óptima (n elementos)
 ///   - Err: mensaje de error
-pub fn solve(c: &[f64], a: &Matrix, b: &[f64], sense: f64) -> Result<Vec<f64>, String> {
+pub fn solve(c: &[f64], a: &RealTensor, b: &[f64], sense: f64) -> Result<Vec<f64>, String> {
     let _n = c.len();
-    let _m = a.rows;
+    let _m = a.rows();
 
     // Heurística de selección de método (por ahora, solo Simplex)
     // TODO: Implementar Dual Simplex, Revised Simplex, Interior Point
@@ -47,9 +47,9 @@ pub fn solve(c: &[f64], a: &Matrix, b: &[f64], sense: f64) -> Result<Vec<f64>, S
 ///
 /// Una matriz se considera dispersa si más del 50% de sus elementos son cero
 #[allow(dead_code)]
-fn is_sparse(matrix: &Matrix) -> bool {
-    let total = matrix.rows * matrix.cols;
-    let zeros = matrix.data.iter().filter(|&&x| x.abs() < 1e-10).count();
+fn is_sparse(tensor: &RealTensor) -> bool {
+    let total = tensor.size();
+    let zeros = tensor.data().iter().filter(|&&x| x.abs() < 1e-10).count();
     zeros > total / 2
 }
 
@@ -66,7 +66,7 @@ mod tests {
         //   3x₁ + 2x₂ ≤ 18
 
         let c = vec![3.0, 5.0];
-        let a = Matrix::new(3, 2, vec![1.0, 0.0, 0.0, 2.0, 3.0, 2.0]).unwrap();
+        let a = RealTensor::matrix(3, 2, vec![1.0, 0.0, 0.0, 2.0, 3.0, 2.0]).unwrap();
         let b = vec![4.0, 12.0, 18.0];
 
         let solution = solve(&c, &a, &b, 1.0).unwrap();
@@ -78,7 +78,7 @@ mod tests {
     #[test]
     fn test_is_sparse() {
         // Matriz dispersa: 6 ceros de 9 elementos (66%)
-        let sparse = Matrix::new(3, 3, vec![
+        let sparse = RealTensor::matrix(3, 3, vec![
             1.0, 0.0, 0.0,
             0.0, 2.0, 0.0,
             0.0, 0.0, 3.0,
@@ -87,7 +87,7 @@ mod tests {
         assert!(is_sparse(&sparse));
 
         // Matriz densa: 0 ceros de 4 elementos (0%)
-        let dense = Matrix::new(2, 2, vec![
+        let dense = RealTensor::matrix(2, 2, vec![
             1.0, 2.0,
             3.0, 4.0,
         ]).unwrap();

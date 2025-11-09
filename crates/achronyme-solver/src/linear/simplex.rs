@@ -1,4 +1,4 @@
-use achronyme_types::matrix::Matrix;
+use achronyme_types::tensor::RealTensor;
 use super::tableau::Tableau;
 
 /// Resolver un problema de programación lineal usando el método Simplex
@@ -22,7 +22,7 @@ use super::tableau::Tableau;
 /// # Ejemplo
 ///
 /// ```
-/// use achronyme_types::matrix::Matrix;
+/// use achronyme_types::tensor::RealTensor;
 /// use achronyme_solver::linear::simplex::solve;
 ///
 /// // maximize z = 3x₁ + 5x₂
@@ -33,7 +33,7 @@ use super::tableau::Tableau;
 /// //   x₁, x₂ ≥ 0
 ///
 /// let c = vec![3.0, 5.0];
-/// let a = Matrix::new(3, 2, vec![
+/// let a = RealTensor::matrix(3, 2, vec![
 ///     1.0, 0.0,
 ///     0.0, 2.0,
 ///     3.0, 2.0,
@@ -44,7 +44,7 @@ use super::tableau::Tableau;
 /// // solution ≈ [2.0, 6.0]
 /// // z* = 3*2 + 5*6 = 36
 /// ```
-pub fn solve(c: &[f64], a: &Matrix, b: &[f64], sense: f64) -> Result<Vec<f64>, String> {
+pub fn solve(c: &[f64], a: &RealTensor, b: &[f64], sense: f64) -> Result<Vec<f64>, String> {
     // Validar sense
     if sense != 1.0 && sense != -1.0 {
         return Err("sense must be 1.0 (maximize) or -1.0 (minimize)".to_string());
@@ -140,7 +140,7 @@ mod tests {
         // Solución óptima: x₁ = 2, x₂ = 6, z = 36
 
         let c = vec![3.0, 5.0];
-        let a = Matrix::new(3, 2, vec![1.0, 0.0, 0.0, 2.0, 3.0, 2.0]).unwrap();
+        let a = RealTensor::matrix(3, 2, vec![1.0, 0.0, 0.0, 2.0, 3.0, 2.0]).unwrap();
         let b = vec![4.0, 12.0, 18.0];
 
         let solution = solve(&c, &a, &b, 1.0).unwrap();
@@ -171,7 +171,7 @@ mod tests {
         // Solución óptima: x₁ = 0, x₂ = 0, z = 0
 
         let c = vec![1.0, 1.0];
-        let a = Matrix::new(1, 2, vec![1.0, 1.0]).unwrap();
+        let a = RealTensor::matrix(1, 2, vec![1.0, 1.0]).unwrap();
         let b = vec![10.0];
 
         let solution = solve(&c, &a, &b, -1.0).unwrap();
@@ -197,7 +197,7 @@ mod tests {
         // Solución óptima: x₁ = 40, x₂ = 30, z = 2500
 
         let c = vec![40.0, 30.0];
-        let a = Matrix::new(3, 2, vec![1.0, 0.0, 0.0, 1.0, 1.0, 1.0]).unwrap();
+        let a = RealTensor::matrix(3, 2, vec![1.0, 0.0, 0.0, 1.0, 1.0, 1.0]).unwrap();
         let b = vec![40.0, 50.0, 70.0];
 
         let solution = solve(&c, &a, &b, 1.0).unwrap();
@@ -223,7 +223,7 @@ mod tests {
         // Este problema es no acotado (unbounded)
 
         let c = vec![1.0];
-        let a = Matrix::new(1, 1, vec![-1.0]).unwrap();
+        let a = RealTensor::matrix(1, 1, vec![-1.0]).unwrap();
         let b = vec![0.0];
 
         let result = solve(&c, &a, &b, 1.0);
@@ -239,7 +239,7 @@ mod tests {
     fn test_negative_rhs() {
         // Test que verifica que rechazamos b[i] < 0
         let c = vec![1.0, 1.0];
-        let a = Matrix::new(2, 2, vec![1.0, 0.0, 0.0, 1.0]).unwrap();
+        let a = RealTensor::matrix(2, 2, vec![1.0, 0.0, 0.0, 1.0]).unwrap();
         let b = vec![5.0, -3.0]; // b[1] es negativo
 
         let result = solve(&c, &a, &b, 1.0);

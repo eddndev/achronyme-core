@@ -1,4 +1,4 @@
-use achronyme_types::matrix::Matrix;
+use achronyme_types::tensor::RealTensor;
 
 /// Simplex Tableau
 ///
@@ -56,15 +56,18 @@ impl Tableau {
     ///
     /// Returns:
     ///   Tableau inicial en forma estándar
-    pub fn new(c: &[f64], a: &Matrix, b: &[f64], sense: f64) -> Result<Self, String> {
+    pub fn new(c: &[f64], a: &RealTensor, b: &[f64], sense: f64) -> Result<Self, String> {
+        if !a.is_matrix() {
+            return Err("`a` must be a matrix".to_string());
+        }
         let n = c.len(); // Número de variables
-        let m = a.rows; // Número de restricciones
+        let m = a.rows(); // Número de restricciones
 
         // Validaciones
-        if a.cols != n {
+        if a.cols() != n {
             return Err(format!(
                 "Matrix A has {} columns but c has {} elements",
-                a.cols,
+                a.cols(),
                 n
             ));
         }
@@ -95,7 +98,7 @@ impl Tableau {
         for i in 0..m {
             // Copiar fila de A
             for j in 0..n {
-                data[i][j] = a.data[i * n + j];
+                data[i][j] = a.get_matrix(i, j).unwrap();
             }
 
             // Agregar variable de holgura (matriz identidad)
@@ -302,7 +305,7 @@ mod tests {
         //   2x₂ ≤ 12
         //   3x₁ + 2x₂ ≤ 18
         let c = vec![3.0, 5.0];
-        let a = Matrix::new(3, 2, vec![1.0, 0.0, 0.0, 2.0, 3.0, 2.0]).unwrap();
+        let a = RealTensor::matrix(3, 2, vec![1.0, 0.0, 0.0, 2.0, 3.0, 2.0]).unwrap();
         let b = vec![4.0, 12.0, 18.0];
 
         let tableau = Tableau::new(&c, &a, &b, 1.0).unwrap();
@@ -327,7 +330,7 @@ mod tests {
     #[test]
     fn test_is_optimal() {
         let c = vec![3.0, 5.0];
-        let a = Matrix::new(3, 2, vec![1.0, 0.0, 0.0, 2.0, 3.0, 2.0]).unwrap();
+        let a = RealTensor::matrix(3, 2, vec![1.0, 0.0, 0.0, 2.0, 3.0, 2.0]).unwrap();
         let b = vec![4.0, 12.0, 18.0];
 
         let tableau = Tableau::new(&c, &a, &b, 1.0).unwrap();
@@ -339,7 +342,7 @@ mod tests {
     #[test]
     fn test_find_entering_variable() {
         let c = vec![3.0, 5.0];
-        let a = Matrix::new(3, 2, vec![1.0, 0.0, 0.0, 2.0, 3.0, 2.0]).unwrap();
+        let a = RealTensor::matrix(3, 2, vec![1.0, 0.0, 0.0, 2.0, 3.0, 2.0]).unwrap();
         let b = vec![4.0, 12.0, 18.0];
 
         let tableau = Tableau::new(&c, &a, &b, 1.0).unwrap();
@@ -352,7 +355,7 @@ mod tests {
     #[test]
     fn test_find_leaving_variable() {
         let c = vec![3.0, 5.0];
-        let a = Matrix::new(3, 2, vec![1.0, 0.0, 0.0, 2.0, 3.0, 2.0]).unwrap();
+        let a = RealTensor::matrix(3, 2, vec![1.0, 0.0, 0.0, 2.0, 3.0, 2.0]).unwrap();
         let b = vec![4.0, 12.0, 18.0];
 
         let tableau = Tableau::new(&c, &a, &b, 1.0).unwrap();
@@ -367,7 +370,7 @@ mod tests {
     #[test]
     fn test_pivot() {
         let c = vec![3.0, 5.0];
-        let a = Matrix::new(3, 2, vec![1.0, 0.0, 0.0, 2.0, 3.0, 2.0]).unwrap();
+        let a = RealTensor::matrix(3, 2, vec![1.0, 0.0, 0.0, 2.0, 3.0, 2.0]).unwrap();
         let b = vec![4.0, 12.0, 18.0];
 
         let mut tableau = Tableau::new(&c, &a, &b, 1.0).unwrap();

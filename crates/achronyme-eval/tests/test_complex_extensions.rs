@@ -44,7 +44,8 @@ fn test_complex_vector_literal() {
             assert_eq!(v.len(), 3);
             assert_eq!(v[0], Value::Complex(Complex::new(0.0, 1.0)));
             assert_eq!(v[1], Value::Complex(Complex::new(2.0, 3.0)));
-            assert_eq!(v[2], Value::Number(4.0));
+            // Numbers are promoted to complex when in a vector with complex values
+            assert_eq!(v[2], Value::Complex(Complex::new(4.0, 0.0)));
         }
         _ => panic!("Expected vector, got {:?}", result),
     }
@@ -57,12 +58,13 @@ fn test_complex_vector_addition() {
     let result = evaluator.eval_str("[1+2i, 3+4i] + [5+6i, 7+8i]").unwrap();
 
     match result {
-        Value::Vector(v) => {
-            assert_eq!(v.len(), 2);
-            assert_eq!(v[0], Value::Complex(Complex::new(6.0, 8.0)));
-            assert_eq!(v[1], Value::Complex(Complex::new(10.0, 12.0)));
+        Value::ComplexTensor(ct) => {
+            assert!(ct.is_vector());
+            assert_eq!(ct.size(), 2);
+            assert_eq!(ct.data()[0], Complex::new(6.0, 8.0));
+            assert_eq!(ct.data()[1], Complex::new(10.0, 12.0));
         }
-        _ => panic!("Expected vector"),
+        _ => panic!("Expected ComplexTensor, got {:?}", result),
     }
 }
 
@@ -74,14 +76,15 @@ fn test_complex_vector_multiplication() {
     let result = evaluator.eval_str("[1+i, 2+2i] * [1-i, 1+i]").unwrap();
 
     match result {
-        Value::Vector(v) => {
-            assert_eq!(v.len(), 2);
+        Value::ComplexTensor(ct) => {
+            assert!(ct.is_vector());
+            assert_eq!(ct.size(), 2);
             // (1+i)(1-i) = 1 - i + i - i^2 = 1 - (-1) = 2
-            assert_eq!(v[0], Value::Complex(Complex::new(2.0, 0.0)));
+            assert_eq!(ct.data()[0], Complex::new(2.0, 0.0));
             // (2+2i)(1+i) = 2 + 2i + 2i + 2i^2 = 2 + 4i - 2 = 0 + 4i
-            assert_eq!(v[1], Value::Complex(Complex::new(0.0, 4.0)));
+            assert_eq!(ct.data()[1], Complex::new(0.0, 4.0));
         }
-        _ => panic!("Expected vector"),
+        _ => panic!("Expected ComplexTensor, got {:?}", result),
     }
 }
 

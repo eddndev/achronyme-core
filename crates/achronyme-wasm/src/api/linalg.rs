@@ -1,7 +1,7 @@
 use wasm_bindgen::prelude::*;
 use crate::state::{Handle, HANDLES};
 use achronyme_types::value::Value;
-use achronyme_types::matrix::Matrix;
+use achronyme_types::tensor::RealTensor;
 
 // ============================================================================
 // Linear Algebra Bindings (Compatible with C++ SDK)
@@ -27,8 +27,11 @@ pub fn lu_decomposition(handle: Handle) -> Result<LuResult, JsValue> {
                 .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
 
             match value {
-                Value::Matrix(m) => {
-                    let (l, u, p) = achronyme_linalg::lu_decomposition(m)
+                Value::Tensor(t) => {
+                    if !t.is_matrix() {
+                        return Err(JsValue::from_str("LU decomposition requires matrix (rank-2 tensor)"));
+                    }
+                    let (l, u, p) = achronyme_linalg::lu_decomposition(t)
                         .map_err(|e| JsValue::from_str(&e))?;
 
                     // Convert permutation vector to permutation matrix
@@ -37,20 +40,20 @@ pub fn lu_decomposition(handle: Handle) -> Result<LuResult, JsValue> {
                     for (i, &pi) in p.iter().enumerate() {
                         p_data[i * n + pi] = 1.0;
                     }
-                    let p_matrix = Matrix::new(n, n, p_data)
+                    let p_matrix = RealTensor::matrix(n, n, p_data)
                         .map_err(|e| JsValue::from_str(&e.to_string()))?;
 
                     Ok((l, u, p_matrix))
                 }
-                _ => Err(JsValue::from_str("LU decomposition requires matrix"))
+                _ => Err(JsValue::from_str("LU decomposition requires tensor"))
             }
         }?; // Immutable borrow is dropped here
 
         // Now borrow mutably to create handles
         let mut handles_mut = h.borrow_mut();
-        let l_handle = handles_mut.create(Value::Matrix(l_mat));
-        let u_handle = handles_mut.create(Value::Matrix(u_mat));
-        let p_handle = handles_mut.create(Value::Matrix(p_matrix));
+        let l_handle = handles_mut.create(Value::Tensor(l_mat));
+        let u_handle = handles_mut.create(Value::Tensor(u_mat));
+        let p_handle = handles_mut.create(Value::Tensor(p_matrix));
 
         Ok(LuResult { l: l_handle, u: u_handle, p: p_handle })
     })
@@ -66,15 +69,18 @@ pub fn matrix_inverse(handle: Handle) -> Result<Handle, JsValue> {
                 .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
 
             match value {
-                Value::Matrix(m) => {
-                    achronyme_linalg::inverse(m)
+                Value::Tensor(t) => {
+                    if !t.is_matrix() {
+                        return Err(JsValue::from_str("Matrix inverse requires matrix (rank-2 tensor)"));
+                    }
+                    achronyme_linalg::inverse(t)
                         .map_err(|e| JsValue::from_str(&e))?
                 }
-                _ => return Err(JsValue::from_str("Matrix inverse requires matrix"))
+                _ => return Err(JsValue::from_str("Matrix inverse requires tensor"))
             }
         };
 
-        Ok(h.borrow_mut().create(Value::Matrix(inv_matrix)))
+        Ok(h.borrow_mut().create(Value::Tensor(inv_matrix)))
     })
 }
 
@@ -100,18 +106,21 @@ pub fn qr_decomposition(handle: Handle) -> Result<QrResult, JsValue> {
                 .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
 
             match value {
-                Value::Matrix(m) => {
-                    achronyme_linalg::qr_decomposition(m)
+                Value::Tensor(t) => {
+                    if !t.is_matrix() {
+                        return Err(JsValue::from_str("QR decomposition requires matrix (rank-2 tensor)"));
+                    }
+                    achronyme_linalg::qr_decomposition(t)
                         .map_err(|e| JsValue::from_str(&e))
                 }
-                _ => Err(JsValue::from_str("QR decomposition requires matrix"))
+                _ => Err(JsValue::from_str("QR decomposition requires tensor"))
             }
         }?; // Immutable borrow is dropped here
 
         // Now borrow mutably to create handles
         let mut handles_mut = h.borrow_mut();
-        let q_handle = handles_mut.create(Value::Matrix(q_mat));
-        let r_handle = handles_mut.create(Value::Matrix(r_mat));
+        let q_handle = handles_mut.create(Value::Tensor(q_mat));
+        let r_handle = handles_mut.create(Value::Tensor(r_mat));
 
         Ok(QrResult { q: q_handle, r: r_handle })
     })
@@ -131,16 +140,19 @@ pub fn cholesky_decomposition(handle: Handle) -> Result<Handle, JsValue> {
                 .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
 
             match value {
-                Value::Matrix(m) => {
-                    achronyme_linalg::cholesky_decomposition(m)
+                Value::Tensor(t) => {
+                    if !t.is_matrix() {
+                        return Err(JsValue::from_str("Cholesky decomposition requires matrix (rank-2 tensor)"));
+                    }
+                    achronyme_linalg::cholesky_decomposition(t)
                         .map_err(|e| JsValue::from_str(&e))
                 }
-                _ => Err(JsValue::from_str("Cholesky decomposition requires matrix"))
+                _ => Err(JsValue::from_str("Cholesky decomposition requires tensor"))
             }
         }?; // Immutable borrow is dropped here
 
         // Now borrow mutably to create handle
-        Ok(h.borrow_mut().create(Value::Matrix(l)))
+        Ok(h.borrow_mut().create(Value::Tensor(l)))
     })
 }
 
@@ -168,19 +180,22 @@ pub fn svd_decomposition(handle: Handle) -> Result<SvdResult, JsValue> {
                 .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
 
             match value {
-                Value::Matrix(m) => {
-                    achronyme_linalg::svd_decomposition(m)
+                Value::Tensor(t) => {
+                    if !t.is_matrix() {
+                        return Err(JsValue::from_str("SVD requires matrix (rank-2 tensor)"));
+                    }
+                    achronyme_linalg::svd_decomposition(t)
                         .map_err(|e| JsValue::from_str(&format!("{}", e)))
                 }
-                _ => Err(JsValue::from_str("SVD requires matrix"))
+                _ => Err(JsValue::from_str("SVD requires tensor"))
             }
         }?; // Immutable borrow is dropped here
 
         // Now borrow mutably to create handles
         let mut handles_mut = h.borrow_mut();
-        let u_handle = handles_mut.create(Value::Matrix(u_mat));
+        let u_handle = handles_mut.create(Value::Tensor(u_mat));
         let s_handle = handles_mut.create(Value::Vector(s_vec.into_iter().map(Value::Number).collect()));
-        let v_handle = handles_mut.create(Value::Matrix(v_mat));
+        let v_handle = handles_mut.create(Value::Tensor(v_mat));
 
         Ok(SvdResult { u: u_handle, s: s_handle, v: v_handle })
     })
@@ -212,16 +227,19 @@ pub fn power_iteration(
                 .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
 
             match value {
-                Value::Matrix(m) => {
-                    achronyme_linalg::power_iteration(m, max_iterations, tolerance)
+                Value::Tensor(t) => {
+                    if !t.is_matrix() {
+                        return Err(JsValue::from_str("Power iteration requires matrix (rank-2 tensor)"));
+                    }
+                    achronyme_linalg::power_iteration(t, max_iterations, tolerance)
                         .map_err(|e| JsValue::from_str(&format!("{}", e)))
                 }
-                _ => Err(JsValue::from_str("Power iteration requires matrix"))
+                _ => Err(JsValue::from_str("Power iteration requires tensor"))
             }
         }?; // Immutable borrow is dropped here
 
         // Now borrow mutably to create handle
-        let eigenvector_handle = h.borrow_mut().create(Value::Matrix(eigenvector_matrix));
+        let eigenvector_handle = h.borrow_mut().create(Value::Tensor(eigenvector_matrix));
 
         Ok(PowerIterationResult {
             eigenvalue,
@@ -244,11 +262,14 @@ pub fn qr_eigenvalues(
                 .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
 
             match value {
-                Value::Matrix(m) => {
-                    achronyme_linalg::qr_eigenvalues(m, max_iterations, tolerance)
+                Value::Tensor(t) => {
+                    if !t.is_matrix() {
+                        return Err(JsValue::from_str("QR eigenvalues requires matrix (rank-2 tensor)"));
+                    }
+                    achronyme_linalg::qr_eigenvalues(t, max_iterations, tolerance)
                         .map_err(|e| JsValue::from_str(&format!("{}", e)))
                 }
-                _ => Err(JsValue::from_str("QR eigenvalues requires matrix"))
+                _ => Err(JsValue::from_str("QR eigenvalues requires tensor"))
             }
         }?; // Immutable borrow is dropped here
 
@@ -279,18 +300,21 @@ pub fn eigen_symmetric(
                 .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
 
             match value {
-                Value::Matrix(m) => {
-                    achronyme_linalg::eigen_symmetric(m, max_iterations, tolerance)
+                Value::Tensor(t) => {
+                    if !t.is_matrix() {
+                        return Err(JsValue::from_str("Eigen symmetric requires matrix (rank-2 tensor)"));
+                    }
+                    achronyme_linalg::eigen_symmetric(t, max_iterations, tolerance)
                         .map_err(|e| JsValue::from_str(&format!("{}", e)))
                 }
-                _ => Err(JsValue::from_str("Eigen symmetric requires matrix"))
+                _ => Err(JsValue::from_str("Eigen symmetric requires tensor"))
             }
         }?; // Immutable borrow is dropped here
 
         // Now borrow mutably to create handles
         let mut handles_mut = h.borrow_mut();
         let eigenvalues_handle = handles_mut.create(Value::Vector(eigenvalues_vec.into_iter().map(Value::Number).collect()));
-        let eigenvectors_handle = handles_mut.create(Value::Matrix(eigenvectors_mat));
+        let eigenvectors_handle = handles_mut.create(Value::Tensor(eigenvectors_mat));
 
         Ok(EigenResult {
             eigenvalues: eigenvalues_handle,
@@ -311,10 +335,13 @@ pub fn is_symmetric(handle: Handle, tolerance: f64) -> Result<bool, JsValue> {
             .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
 
         match value {
-            Value::Matrix(m) => {
-                Ok(achronyme_linalg::is_symmetric(m, tolerance))
+            Value::Tensor(t) => {
+                if !t.is_matrix() {
+                    return Err(JsValue::from_str("is_symmetric requires matrix (rank-2 tensor)"));
+                }
+                Ok(achronyme_linalg::is_symmetric(t, tolerance))
             }
-            _ => Err(JsValue::from_str("is_symmetric requires matrix"))
+            _ => Err(JsValue::from_str("is_symmetric requires tensor"))
         }
     })
 }
@@ -327,23 +354,20 @@ pub fn is_positive_definite(handle: Handle) -> Result<bool, JsValue> {
             .ok_or_else(|| JsValue::from_str("Invalid handle"))?;
 
         match value {
-            Value::Matrix(m) => {
-                Ok(achronyme_linalg::is_positive_definite(m))
+            Value::Tensor(t) => {
+                if !t.is_matrix() {
+                    return Err(JsValue::from_str("is_positive_definite requires matrix (rank-2 tensor)"));
+                }
+                Ok(achronyme_linalg::is_positive_definite(t))
             }
-            _ => Err(JsValue::from_str("is_positive_definite requires matrix"))
+            _ => Err(JsValue::from_str("is_positive_definite requires tensor"))
         }
     })
 }
 
 #[wasm_bindgen(js_name = identity)]
 pub fn identity(n: usize) -> Result<Handle, JsValue> {
-    let mut data = vec![0.0; n * n];
-    for i in 0..n {
-        data[i * n + i] = 1.0;
-    }
+    let tensor = RealTensor::eye(n);
 
-    let matrix = Matrix::new(n, n, data)
-        .map_err(|e| JsValue::from_str(&e.to_string()))?;
-
-    Ok(HANDLES.with(|h| h.borrow_mut().create(Value::Matrix(matrix))))
+    Ok(HANDLES.with(|h| h.borrow_mut().create(Value::Tensor(tensor))))
 }

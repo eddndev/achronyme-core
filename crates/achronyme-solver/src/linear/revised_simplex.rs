@@ -1,4 +1,4 @@
-use achronyme_types::matrix::Matrix;
+use achronyme_types::tensor::RealTensor;
 
 /// Resolver un problema de programación lineal usando el método Revised Simplex
 ///
@@ -35,20 +35,23 @@ use achronyme_types::matrix::Matrix;
 /// - Actualización incremental de B⁻¹ (product form)
 /// - Manejo de degeneración (reglas de Bland, etc.)
 /// - Reoptimización periódica para estabilidad numérica
-pub fn solve(c: &[f64], a: &Matrix, b: &[f64], sense: f64) -> Result<Vec<f64>, String> {
+pub fn solve(c: &[f64], a: &RealTensor, b: &[f64], sense: f64) -> Result<Vec<f64>, String> {
     // Validar sense
     if sense != 1.0 && sense != -1.0 {
         return Err("sense must be 1.0 (maximize) or -1.0 (minimize)".to_string());
     }
 
+    if !a.is_matrix() {
+        return Err("`a` must be a matrix".to_string());
+    }
     let n = c.len(); // Variables de decisión
-    let m = a.rows;  // Restricciones
+    let m = a.rows();  // Restricciones
 
     // Validaciones
-    if a.cols != n {
+    if a.cols() != n {
         return Err(format!(
             "Matrix A has {} columns but c has {} elements",
-            a.cols, n
+            a.cols(), n
         ));
     }
     if b.len() != m {
@@ -75,7 +78,7 @@ pub fn solve(c: &[f64], a: &Matrix, b: &[f64], sense: f64) -> Result<Vec<f64>, S
     // Copiar A
     for i in 0..m {
         for j in 0..n {
-            aug_a[i * total_vars + j] = a.data[i * n + j];
+            aug_a[i * total_vars + j] = a.get_matrix(i, j).unwrap();
         }
     }
 
@@ -342,7 +345,7 @@ mod tests {
         //   3x₁ + 2x₂ ≤ 18
 
         let c = vec![3.0, 5.0];
-        let a = Matrix::new(3, 2, vec![1.0, 0.0, 0.0, 2.0, 3.0, 2.0]).unwrap();
+        let a = RealTensor::matrix(3, 2, vec![1.0, 0.0, 0.0, 2.0, 3.0, 2.0]).unwrap();
         let b = vec![4.0, 12.0, 18.0];
 
         let solution = solve(&c, &a, &b, 1.0).unwrap();

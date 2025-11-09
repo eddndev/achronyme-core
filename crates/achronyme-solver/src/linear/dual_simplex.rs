@@ -1,4 +1,4 @@
-use achronyme_types::matrix::Matrix;
+use achronyme_types::tensor::RealTensor;
 use super::tableau::Tableau;
 
 /// Resolver un problema de programación lineal usando el método Dual Simplex
@@ -21,7 +21,7 @@ use super::tableau::Tableau;
 /// Returns:
 ///   - Ok(x): vector solución óptima (n elementos)
 ///   - Err: mensaje de error (infactible, etc.)
-pub fn solve(c: &[f64], a: &Matrix, b: &[f64], sense: f64) -> Result<Vec<f64>, String> {
+pub fn solve(c: &[f64], a: &RealTensor, b: &[f64], sense: f64) -> Result<Vec<f64>, String> {
     // Validar sense
     if sense != 1.0 && sense != -1.0 {
         return Err("sense must be 1.0 (maximize) or -1.0 (minimize)".to_string());
@@ -168,7 +168,7 @@ mod tests {
         //   3x₁ + 2x₂ ≤ 18
 
         let c = vec![3.0, 5.0];
-        let a = Matrix::new(3, 2, vec![1.0, 0.0, 0.0, 2.0, 3.0, 2.0]).unwrap();
+        let a = RealTensor::matrix(3, 2, vec![1.0, 0.0, 0.0, 2.0, 3.0, 2.0]).unwrap();
         let b = vec![4.0, 12.0, 18.0];
 
         let solution = solve(&c, &a, &b, 1.0).unwrap();

@@ -1,6 +1,6 @@
 use achronyme_parser::ast::AstNode;
 use achronyme_types::complex::Complex;
-use achronyme_types::matrix::Matrix;
+use achronyme_types::tensor::RealTensor;
 use achronyme_types::value::Value;
 
 use crate::evaluator::Evaluator;
@@ -25,8 +25,8 @@ pub fn evaluate_complex(re: f64, im: f64) -> Result<Value, String> {
     Ok(Value::Complex(Complex::new(re, im)))
 }
 
-/// Evaluate a vector literal
-pub fn evaluate_vector(evaluator: &mut Evaluator, elements: &[AstNode]) -> Result<Value, String> {
+/// Evaluate an array literal (unified handler for vectors, matrices, and N-D tensors)
+pub fn evaluate_array(evaluator: &mut Evaluator, elements: &[AstNode]) -> Result<Value, String> {
     if elements.is_empty() {
         return Ok(Value::Vector(vec![]));
     }
@@ -38,7 +38,24 @@ pub fn evaluate_vector(evaluator: &mut Evaluator, elements: &[AstNode]) -> Resul
         values.push(value);
     }
 
-    // Validate type homogeneity and apply type promotion
+    // Check if all elements are tensors - if so, combine them into higher-dimensional tensor
+    if values.iter().all(|v| matches!(v, Value::Tensor(_))) {
+        return combine_tensors_to_higher_dimension(values);
+    }
+
+    // Check if all elements are numbers - create tensor directly
+    if values.iter().all(|v| matches!(v, Value::Number(_))) {
+        let nums: Vec<f64> = values.iter().map(|v| {
+            if let Value::Number(n) = v {
+                *n
+            } else {
+                unreachable!()
+            }
+        }).collect();
+        return Ok(Value::Tensor(RealTensor::vector(nums)));
+    }
+
+    // Otherwise, validate type homogeneity and apply type promotion for generic vectors
     validate_and_promote_vector(values)
 }
 
@@ -46,6 +63,11 @@ pub fn evaluate_vector(evaluator: &mut Evaluator, elements: &[AstNode]) -> Resul
 fn validate_and_promote_vector(values: Vec<Value>) -> Result<Value, String> {
     if values.is_empty() {
         return Ok(Value::Vector(vec![]));
+    }
+
+    // Special case: if all elements are tensors with the same shape, combine into higher-dimensional tensor
+    if values.iter().all(|v| matches!(v, Value::Tensor(_))) {
+        return combine_tensors_to_higher_dimension(values);
     }
 
     // Categorize the types in the vector
@@ -56,7 +78,8 @@ fn validate_and_promote_vector(values: Vec<Value>) -> Result<Value, String> {
     let has_string = values.iter().any(|v| matches!(v, Value::String(_)));
     let has_boolean = values.iter().any(|v| matches!(v, Value::Boolean(_)));
     let has_function = values.iter().any(|v| matches!(v, Value::Function(_)));
-    let has_matrix = values.iter().any(|v| matches!(v, Value::Matrix(_)));
+    let has_tensor = values.iter().any(|v| matches!(v, Value::Tensor(_)));
+    let has_complex_tensor = values.iter().any(|v| matches!(v, Value::ComplexTensor(_)));
     let has_vector = values.iter().any(|v| matches!(v, Value::Vector(_)));
 
     // Count how many different type categories we have
@@ -66,7 +89,8 @@ fn validate_and_promote_vector(values: Vec<Value>) -> Result<Value, String> {
         has_string,
         has_boolean,
         has_function,
-        has_matrix,
+        has_tensor,
+        has_complex_tensor,
         has_vector,
     ];
     let non_numeric_types = type_categories.iter().filter(|&&x| x).count();
@@ -99,32 +123,43 @@ fn validate_and_promote_vector(values: Vec<Value>) -> Result<Value, String> {
     }
 }
 
-/// Evaluate a matrix literal
-pub fn evaluate_matrix(evaluator: &mut Evaluator, rows: &[Vec<AstNode>]) -> Result<Value, String> {
-    if rows.is_empty() {
-        return Err("Matrix cannot be empty".to_string());
+/// Combine tensors of the same shape into a higher-dimensional tensor
+fn combine_tensors_to_higher_dimension(tensors: Vec<Value>) -> Result<Value, String> {
+    if tensors.is_empty() {
+        return Err("Cannot combine empty tensor list".to_string());
     }
 
-    let num_rows = rows.len();
-    let num_cols = rows[0].len();
+    // Extract first tensor shape
+    let first_shape = match &tensors[0] {
+        Value::Tensor(t) => t.shape().to_vec(),
+        _ => unreachable!(),
+    };
 
-    // Flatten matrix data (row-major)
-    let mut data = Vec::new();
+    let n = tensors.len();
 
-    for row in rows {
-        for element in row {
-            let value = evaluator.evaluate(element)?;
-
-            // For now, only support numbers in matrices
-            match value {
-                Value::Number(n) => data.push(n),
-                _ => return Err("Matrix elements must be numbers".to_string()),
+    // Collect all data and verify shapes
+    let mut all_data = Vec::new();
+    for (i, tensor_value) in tensors.into_iter().enumerate() {
+        match tensor_value {
+            Value::Tensor(t) => {
+                if t.shape() != &first_shape[..] {
+                    return Err(format!(
+                        "Cannot combine tensors with different shapes: tensor 0 has shape {:?} but tensor {} has shape {:?}",
+                        first_shape, i, t.shape()
+                    ));
+                }
+                all_data.extend_from_slice(t.data());
             }
+            _ => unreachable!(),
         }
     }
 
-    Matrix::new(num_rows, num_cols, data)
-        .map(Value::Matrix)
+    // Build new shape: [n, ...first_shape]
+    let mut new_shape = vec![n];
+    new_shape.extend_from_slice(&first_shape);
+
+    RealTensor::new(all_data, new_shape)
+        .map(Value::Tensor)
         .map_err(|e| e.to_string())
 }
 

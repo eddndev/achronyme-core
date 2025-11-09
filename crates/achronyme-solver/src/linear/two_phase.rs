@@ -1,4 +1,4 @@
-use achronyme_types::matrix::Matrix;
+use achronyme_types::tensor::RealTensor;
 use super::tableau::Tableau;
 use super::simplex;
 
@@ -34,7 +34,7 @@ use super::simplex;
 /// # Ejemplo
 ///
 /// ```
-/// use achronyme_types::matrix::Matrix;
+/// use achronyme_types::tensor::RealTensor;
 /// use achronyme_solver::linear::two_phase::solve;
 ///
 /// // Problema con restricción de igualdad:
@@ -47,14 +47,14 @@ use super::simplex;
 /// // Para este ejemplo, convertimos = a ≤ y ≥
 /// // Pero Two-Phase Simplex lo maneja automáticamente
 /// ```
-pub fn solve(c: &[f64], a: &Matrix, b: &[f64], sense: f64) -> Result<Vec<f64>, String> {
+pub fn solve(c: &[f64], a: &RealTensor, b: &[f64], sense: f64) -> Result<Vec<f64>, String> {
     // Validar sense
     if sense != 1.0 && sense != -1.0 {
         return Err("sense must be 1.0 (maximize) or -1.0 (minimize)".to_string());
     }
 
     let n = c.len(); // Variables originales
-    let m = a.rows;  // Restricciones
+    let m = a.rows();  // Restricciones
 
     // Verificar si necesitamos Two-Phase
     // Si todos los b[i] son no negativos, podemos usar Simplex estándar
@@ -149,12 +149,12 @@ pub fn solve(c: &[f64], a: &Matrix, b: &[f64], sense: f64) -> Result<Vec<f64>, S
 /// Objetivo: minimizar suma de variables artificiales
 fn build_phase1_tableau(
     _c: &[f64],
-    a: &Matrix,
+    a: &RealTensor,
     b: &[f64],
     _sense: f64,
 ) -> Result<Tableau, String> {
-    let n = a.cols;
-    let m = a.rows;
+    let n = a.cols();
+    let m = a.rows();
 
     // Contar restricciones que necesitan artificiales
     let num_artificials = b.iter().filter(|&&bi| bi < 0.0).count();
@@ -169,7 +169,7 @@ fn build_phase1_tableau(
     for i in 0..m {
         // Copiar coeficientes de x
         for j in 0..n {
-            data[i][j] = a.data[i * n + j];
+            data[i][j] = a.get_matrix(i, j).unwrap();
         }
 
         // Variable de holgura
@@ -296,7 +296,7 @@ mod tests {
         // Solución: x₁ = 2, x₂ = 0 (o x₁ = 0, x₂ = 2, etc.)
 
         let c = vec![1.0, 1.0];
-        let a = Matrix::new(2, 2, vec![-1.0, -1.0, 1.0, 1.0]).unwrap();
+        let a = RealTensor::matrix(2, 2, vec![-1.0, -1.0, 1.0, 1.0]).unwrap();
         let b = vec![-2.0, 5.0];
 
         let solution = solve(&c, &a, &b, 1.0).unwrap();
@@ -311,7 +311,7 @@ mod tests {
     fn test_two_phase_fallback_to_simplex() {
         // Problema sin b[i] < 0, debería usar Simplex directamente
         let c = vec![3.0, 5.0];
-        let a = Matrix::new(3, 2, vec![1.0, 0.0, 0.0, 2.0, 3.0, 2.0]).unwrap();
+        let a = RealTensor::matrix(3, 2, vec![1.0, 0.0, 0.0, 2.0, 3.0, 2.0]).unwrap();
         let b = vec![4.0, 12.0, 18.0];
 
         let solution = solve(&c, &a, &b, 1.0).unwrap();

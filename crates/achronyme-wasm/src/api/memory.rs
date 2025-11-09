@@ -2,7 +2,7 @@ use wasm_bindgen::prelude::*;
 use crate::state::{HANDLES, Handle};
 use achronyme_types::value::Value;
 use achronyme_types::complex::Complex;
-use achronyme_types::matrix::Matrix;
+use achronyme_types::tensor::RealTensor;
 
 // ============================================================================
 // Handle-Based API (Fast Path - Same as C++)
@@ -42,9 +42,9 @@ pub fn get_vector(handle: Handle) -> Result<Vec<f64>, JsValue> {
                 }
                 Ok(result)
             }
-            Some(Value::Matrix(m)) => {
-                // También permitir obtener datos de matrices (aplanados)
-                Ok(m.data.clone())
+            Some(Value::Tensor(t)) => {
+                // También permitir obtener datos de tensores (aplanados)
+                Ok(t.data().to_vec())
             }
             Some(_) => Err(JsValue::from_str("Handle does not reference a vector or matrix")),
             None => Err(JsValue::from_str("Invalid handle")),
@@ -58,10 +58,13 @@ pub fn get_matrix(handle: Handle) -> Result<JsValue, JsValue> {
     HANDLES.with(|handles| {
         let h = handles.borrow();
         match h.get(handle) {
-            Some(Value::Matrix(m)) => {
-                let data = m.data.clone();
-                let rows = m.rows;
-                let cols = m.cols;
+            Some(Value::Tensor(t)) => {
+                if !t.is_matrix() {
+                    return Err(JsValue::from_str("Handle does not reference a matrix (rank-2 tensor)"));
+                }
+                let data = t.data().to_vec();
+                let rows = t.rows();
+                let cols = t.cols();
 
                 // Return as JavaScript object
                 let obj = js_sys::Object::new();
@@ -71,7 +74,7 @@ pub fn get_matrix(handle: Handle) -> Result<JsValue, JsValue> {
 
                 Ok(obj.into())
             }
-            Some(_) => Err(JsValue::from_str("Handle does not reference a matrix")),
+            Some(_) => Err(JsValue::from_str("Handle does not reference a tensor")),
             None => Err(JsValue::from_str("Invalid handle")),
         }
     })
@@ -86,9 +89,9 @@ pub fn create_matrix(data: Vec<f64>, rows: usize, cols: usize) -> Result<Handle,
             data.len(), rows, cols
         )));
     }
-    let matrix = Matrix::new(rows, cols, data)
+    let tensor = RealTensor::matrix(rows, cols, data)
         .map_err(|e| JsValue::from_str(&e.to_string()))?;
-    Ok(HANDLES.with(|h| h.borrow_mut().create(Value::Matrix(matrix))))
+    Ok(HANDLES.with(|h| h.borrow_mut().create(Value::Tensor(tensor))))
 }
 
 #[wasm_bindgen(js_name = createMatrixFromBuffer)]
@@ -96,9 +99,9 @@ pub fn create_matrix_from_buffer(data_ptr: *const f64, rows: usize, cols: usize)
     unsafe {
         let len = rows * cols;
         let data = std::slice::from_raw_parts(data_ptr, len).to_vec();
-        let matrix = Matrix::new(rows, cols, data)
+        let tensor = RealTensor::matrix(rows, cols, data)
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
-        Ok(HANDLES.with(|h| h.borrow_mut().create(Value::Matrix(matrix))))
+        Ok(HANDLES.with(|h| h.borrow_mut().create(Value::Tensor(tensor))))
     }
 }
 

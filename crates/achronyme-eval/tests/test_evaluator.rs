@@ -418,8 +418,8 @@ fn test_pest_matrix() {
     let mut evaluator = Evaluator::new();
     let result = evaluator.eval_str("[[1, 2], [3, 4]]").unwrap();
     match result {
-        Value::Matrix(_) => {}, // Success
-        _ => panic!("Expected matrix"),
+        Value::Tensor(t) if t.is_matrix() => {}, // Success - rank-2 tensor
+        _ => panic!("Expected matrix (rank-2 tensor)"),
     }
 }
 

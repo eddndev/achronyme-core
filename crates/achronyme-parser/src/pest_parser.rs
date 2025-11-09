@@ -400,8 +400,9 @@ fn build_primary(pair: Pair<Rule>) -> Result<AstNode, String> {
         Rule::identifier => {
             Ok(AstNode::VariableRef(inner.as_str().to_string()))
         }
-        Rule::vector => build_vector(inner),
-        Rule::matrix => build_matrix(inner),
+        Rule::array => build_array(inner),
+        Rule::vector => build_array(inner),  // Alias for array
+        Rule::matrix => build_array(inner),  // Alias for array
         Rule::record => build_record(inner),
         Rule::lambda => build_lambda(inner),
         Rule::function_call => build_function_call(inner),
@@ -410,26 +411,15 @@ fn build_primary(pair: Pair<Rule>) -> Result<AstNode, String> {
     }
 }
 
-fn build_vector(pair: Pair<Rule>) -> Result<AstNode, String> {
-    let elements: Result<Vec<AstNode>, String> = pair
+/// Build array from pest pair - handles vectors, matrices, and N-dimensional tensors
+/// Now returns unified ArrayLiteral for all dimensions
+fn build_array(pair: Pair<Rule>) -> Result<AstNode, String> {
+    let elements: Vec<AstNode> = pair
         .into_inner()
         .map(|p| build_ast_from_expr(p))
-        .collect();
+        .collect::<Result<Vec<_>, _>>()?;
 
-    Ok(AstNode::VectorLiteral(elements?))
-}
-
-fn build_matrix(pair: Pair<Rule>) -> Result<AstNode, String> {
-    let rows: Result<Vec<Vec<AstNode>>, String> = pair
-        .into_inner()
-        .map(|row_pair| {
-            row_pair.into_inner()
-                .map(|elem| build_ast_from_expr(elem))
-                .collect()
-        })
-        .collect();
-
-    Ok(AstNode::MatrixLiteral(rows?))
+    Ok(AstNode::ArrayLiteral(elements))
 }
 
 fn build_record(pair: Pair<Rule>) -> Result<AstNode, String> {
@@ -518,7 +508,7 @@ fn build_function_call(pair: Pair<Rule>) -> Result<AstNode, String> {
 
         for (i, arg) in args.iter().enumerate() {
             match arg {
-                AstNode::VectorLiteral(elems) => {
+                AstNode::ArrayLiteral(elems) => {
                     // This is a [condition, value] case
                     if elems.len() != 2 {
                         return Err(format!(
@@ -605,7 +595,7 @@ mod tests {
     fn test_parse_vector() {
         let result = parse("[1, 2, 3]").unwrap();
         assert_eq!(result.len(), 1);
-        assert!(matches!(result[0], AstNode::VectorLiteral(_)));
+        assert!(matches!(result[0], AstNode::ArrayLiteral(_)));
     }
 
     #[test]

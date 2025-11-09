@@ -1,16 +1,16 @@
-use achronyme_types::matrix::Matrix;
-use achronyme_types::vector::Vector;
+use achronyme_types::tensor::RealTensor;
 use faer::prelude::*;
 
-/// Convert Achronyme Matrix to faer Mat
-fn matrix_to_faer(matrix: &Matrix) -> Mat<f64> {
-    let rows = matrix.rows;
-    let cols = matrix.cols;
-    Mat::from_fn(rows, cols, |i, j| matrix.data[i * cols + j])
+/// Convert Achronyme RealTensor (matrix) to faer Mat
+fn tensor_to_faer_mat(tensor: &RealTensor) -> Mat<f64> {
+    assert!(tensor.is_matrix());
+    let rows = tensor.rows();
+    let cols = tensor.cols();
+    Mat::from_fn(rows, cols, |i, j| tensor.get_matrix(i, j).unwrap())
 }
 
-/// Convert faer Mat to Achronyme Matrix
-fn faer_to_matrix(mat: Mat<f64>) -> Result<Matrix, String> {
+/// Convert faer Mat to Achronyme RealTensor (matrix)
+fn faer_mat_to_tensor(mat: Mat<f64>) -> Result<RealTensor, String> {
     let rows = mat.nrows();
     let cols = mat.ncols();
     let mut data = Vec::with_capacity(rows * cols);
@@ -21,19 +21,20 @@ fn faer_to_matrix(mat: Mat<f64>) -> Result<Matrix, String> {
         }
     }
 
-    Matrix::new(rows, cols, data).map_err(|e| e.to_string())
+    RealTensor::matrix(rows, cols, data).map_err(|e| e.to_string())
 }
 
-/// Convert Achronyme Vector to faer Col
-fn vector_to_faer(vector: &Vector) -> Col<f64> {
-    let data = vector.data();
+/// Convert Achronyme RealTensor (vector) to faer Col
+fn tensor_to_faer_col(tensor: &RealTensor) -> Col<f64> {
+    assert!(tensor.is_vector());
+    let data = tensor.data();
     Col::from_fn(data.len(), |i| data[i])
 }
 
-/// Convert faer Col to Achronyme Vector
-fn faer_to_vector(col: Col<f64>) -> Vector {
+/// Convert faer Col to Achronyme RealTensor (vector)
+fn faer_col_to_tensor(col: Col<f64>) -> RealTensor {
     let data: Vec<f64> = (0..col.nrows()).map(|i| col.read(i)).collect();
-    Vector::new(data)
+    RealTensor::vector(data)
 }
 
 /// Compute determinant of a square matrix (NxN)
@@ -41,7 +42,7 @@ fn faer_to_vector(col: Col<f64>) -> Vector {
 /// Uses LU decomposition for efficient computation on any size.
 ///
 /// # Arguments
-/// * `matrix` - Square matrix
+/// * `tensor` - Square matrix (rank-2 tensor)
 ///
 /// # Returns
 /// Determinant value
@@ -49,9 +50,9 @@ fn faer_to_vector(col: Col<f64>) -> Vector {
 /// # Example
 /// ```
 /// use achronyme_linalg::determinant_nd;
-/// use achronyme_types::matrix::Matrix;
+/// use achronyme_types::tensor::RealTensor;
 ///
-/// let a = Matrix::new(3, 3, vec![
+/// let a = RealTensor::matrix(3, 3, vec![
 ///     1.0, 2.0, 3.0,
 ///     0.0, 1.0, 4.0,
 ///     5.0, 6.0, 0.0
@@ -59,12 +60,12 @@ fn faer_to_vector(col: Col<f64>) -> Vector {
 ///
 /// let det = determinant_nd(&a).unwrap();
 /// ```
-pub fn determinant_nd(matrix: &Matrix) -> Result<f64, String> {
-    if matrix.rows != matrix.cols {
+pub fn determinant_nd(tensor: &RealTensor) -> Result<f64, String> {
+    if !tensor.is_square() {
         return Err("Determinant requires square matrix".to_string());
     }
 
-    let mat = matrix_to_faer(matrix);
+    let mat = tensor_to_faer_mat(tensor);
 
     // Use LU decomposition to compute determinant
     let lu = mat.partial_piv_lu();
@@ -108,7 +109,7 @@ pub fn determinant_nd(matrix: &Matrix) -> Result<f64, String> {
 /// Returns the multiplicative inverse A^(-1) such that A * A^(-1) = I
 ///
 /// # Arguments
-/// * `matrix` - Square, non-singular matrix
+/// * `tensor` - Square, non-singular matrix (rank-2 tensor)
 ///
 /// # Returns
 /// Inverse matrix
@@ -116,21 +117,21 @@ pub fn determinant_nd(matrix: &Matrix) -> Result<f64, String> {
 /// # Example
 /// ```
 /// use achronyme_linalg::inverse;
-/// use achronyme_types::matrix::Matrix;
+/// use achronyme_types::tensor::RealTensor;
 ///
-/// let a = Matrix::new(2, 2, vec![
+/// let a = RealTensor::matrix(2, 2, vec![
 ///     4.0, 7.0,
 ///     2.0, 6.0
 /// ]).unwrap();
 ///
 /// let a_inv = inverse(&a).unwrap();
 /// ```
-pub fn inverse(matrix: &Matrix) -> Result<Matrix, String> {
-    if matrix.rows != matrix.cols {
+pub fn inverse(tensor: &RealTensor) -> Result<RealTensor, String> {
+    if !tensor.is_square() {
         return Err("Inverse requires square matrix".to_string());
     }
 
-    let mat = matrix_to_faer(matrix);
+    let mat = tensor_to_faer_mat(tensor);
     let n = mat.nrows();
 
     // Create identity matrix
@@ -140,7 +141,7 @@ pub fn inverse(matrix: &Matrix) -> Result<Matrix, String> {
     let lu = mat.partial_piv_lu();
     let inv = lu.solve(&identity);
 
-    faer_to_matrix(inv)
+    faer_mat_to_tensor(inv)
 }
 
 /// Solve a linear system Ax = b
@@ -148,62 +149,65 @@ pub fn inverse(matrix: &Matrix) -> Result<Matrix, String> {
 /// Finds vector x that satisfies A * x = b
 ///
 /// # Arguments
-/// * `a` - Coefficient matrix (m x n)
-/// * `b` - Right-hand side vector (length m)
+/// * `a` - Coefficient matrix (m x n rank-2 tensor)
+/// * `b` - Right-hand side vector (rank-1 tensor)
 ///
 /// # Returns
-/// Solution vector x (length n)
+/// Solution vector x (rank-1 tensor)
 ///
 /// # Example
 /// ```
 /// use achronyme_linalg::solve_system;
-/// use achronyme_types::{matrix::Matrix, vector::Vector};
+/// use achronyme_types::tensor::RealTensor;
 ///
-/// let a = Matrix::new(2, 2, vec![
+/// let a = RealTensor::matrix(2, 2, vec![
 ///     3.0, 1.0,
 ///     1.0, 2.0
 /// ]).unwrap();
 ///
-/// let b = Vector::new(vec![9.0, 8.0]);
+/// let b = RealTensor::vector(vec![9.0, 8.0]).unwrap();
 ///
 /// let x = solve_system(&a, &b).unwrap();
 /// // x should be [2.0, 3.0]
 /// ```
-pub fn solve_system(a: &Matrix, b: &Vector) -> Result<Vector, String> {
-    if a.rows != b.len() {
+pub fn solve_system(a: &RealTensor, b: &RealTensor) -> Result<RealTensor, String> {
+    if !a.is_matrix() || !b.is_vector() {
+        return Err("`a` must be a matrix and `b` must be a vector".to_string());
+    }
+    if a.rows() != b.size() {
         return Err(format!(
             "Dimension mismatch: matrix has {} rows but vector has {} elements",
-            a.rows,
-            b.len()
+            a.rows(),
+            b.size()
         ));
     }
 
-    let a_mat = matrix_to_faer(a);
-    let b_col = vector_to_faer(b);
+    let a_mat = tensor_to_faer_mat(a);
+    let b_col = tensor_to_faer_col(b);
 
     // Use LU decomposition to solve the system
     let lu = a_mat.partial_piv_lu();
     let x = lu.solve(&b_col);
 
-    Ok(faer_to_vector(x))
+    Ok(faer_col_to_tensor(x))
 }
 
 /// Check if a matrix is symmetric within a tolerance
 ///
 /// # Arguments
-/// * `matrix` - Square matrix to check
+/// * `tensor` - Square matrix (rank-2 tensor) to check
 /// * `tolerance` - Maximum allowed difference between matrix[i,j] and matrix[j,i]
 ///
 /// # Returns
 /// True if symmetric, false otherwise
-pub fn is_symmetric(matrix: &Matrix, tolerance: f64) -> bool {
-    if matrix.rows != matrix.cols {
+pub fn is_symmetric(tensor: &RealTensor, tolerance: f64) -> bool {
+    if !tensor.is_square() {
         return false;
     }
 
-    for i in 0..matrix.rows {
-        for j in (i + 1)..matrix.cols {
-            let diff = (matrix.get(i, j).unwrap() - matrix.get(j, i).unwrap()).abs();
+    for i in 0..tensor.rows() {
+        for j in (i + 1)..tensor.cols() {
+            let diff = (tensor.get_matrix(i, j).unwrap() - tensor.get_matrix(j, i).unwrap()).abs();
             if diff > tolerance {
                 return false;
             }
@@ -219,16 +223,16 @@ pub fn is_symmetric(matrix: &Matrix, tolerance: f64) -> bool {
 /// if and only if it has a Cholesky decomposition.
 ///
 /// # Arguments
-/// * `matrix` - Square symmetric matrix to check
+/// * `tensor` - Square symmetric matrix (rank-2 tensor) to check
 ///
 /// # Returns
 /// True if positive definite, false otherwise
-pub fn is_positive_definite(matrix: &Matrix) -> bool {
-    if matrix.rows != matrix.cols {
+pub fn is_positive_definite(tensor: &RealTensor) -> bool {
+    if !tensor.is_square() {
         return false;
     }
 
-    let mat = matrix_to_faer(matrix);
+    let mat = tensor_to_faer_mat(tensor);
 
     // Try Cholesky decomposition
     mat.cholesky(faer::Side::Lower).is_ok()
@@ -241,7 +245,7 @@ mod tests {
 
     #[test]
     fn test_determinant_2x2() {
-        let a = Matrix::new(2, 2, vec![
+        let a = RealTensor::matrix(2, 2, vec![
             4.0, 7.0,
             2.0, 6.0
         ]).unwrap();
@@ -253,7 +257,7 @@ mod tests {
 
     #[test]
     fn test_determinant_3x3() {
-        let a = Matrix::new(3, 3, vec![
+        let a = RealTensor::matrix(3, 3, vec![
             1.0, 2.0, 3.0,
             0.0, 1.0, 4.0,
             5.0, 6.0, 0.0
@@ -265,7 +269,7 @@ mod tests {
 
     #[test]
     fn test_inverse_2x2() {
-        let a = Matrix::new(2, 2, vec![
+        let a = RealTensor::matrix(2, 2, vec![
             4.0, 7.0,
             2.0, 6.0
         ]).unwrap();
@@ -273,14 +277,14 @@ mod tests {
         let a_inv = inverse(&a).unwrap();
 
         // Check that A * A_inv = I
-        let product = a.mul(&a_inv).unwrap();
-        let identity = Matrix::identity(2);
+        let product = a.matmul(&a_inv).unwrap();
+        let identity = RealTensor::eye(2);
 
         for i in 0..2 {
             for j in 0..2 {
                 assert_relative_eq!(
-                    product.get(i, j).unwrap(),
-                    identity.get(i, j).unwrap(),
+                    product.get_matrix(i, j).unwrap(),
+                    identity.get_matrix(i, j).unwrap(),
                     epsilon = 1e-10
                 );
             }
@@ -292,26 +296,26 @@ mod tests {
         // System: 3x + y = 9
         //         x + 2y = 8
         // Solution: x = 2, y = 3
-        let a = Matrix::new(2, 2, vec![
+        let a = RealTensor::matrix(2, 2, vec![
             3.0, 1.0,
             1.0, 2.0
         ]).unwrap();
-        let b = Vector::new(vec![9.0, 8.0]);
+        let b = RealTensor::vector(vec![9.0, 8.0]);
 
         let x = solve_system(&a, &b).unwrap();
 
-        assert_eq!(x.len(), 2);
+        assert_eq!(x.size(), 2);
         assert_relative_eq!(x.data()[0], 2.0, epsilon = 1e-10);
         assert_relative_eq!(x.data()[1], 3.0, epsilon = 1e-10);
     }
 
     #[test]
     fn test_solve_system_dimension_mismatch() {
-        let a = Matrix::new(2, 2, vec![
+        let a = RealTensor::matrix(2, 2, vec![
             1.0, 2.0,
             3.0, 4.0
         ]).unwrap();
-        let b = Vector::new(vec![1.0, 2.0, 3.0]); // Wrong size
+        let b = RealTensor::vector(vec![1.0, 2.0, 3.0]); // Wrong size
 
         let result = solve_system(&a, &b);
         assert!(result.is_err());
@@ -320,7 +324,7 @@ mod tests {
     #[test]
     fn test_inverse_singular_fails() {
         // Singular matrix (determinant = 0)
-        let a = Matrix::new(2, 2, vec![
+        let a = RealTensor::matrix(2, 2, vec![
             1.0, 2.0,
             2.0, 4.0
         ]).unwrap();

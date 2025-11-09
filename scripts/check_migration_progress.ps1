@@ -6,12 +6,7 @@ Write-Host "ANÁLISIS DE CÓDIGO LEGACY" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
-function Count-Pattern {
-    param(
-        [string]$Pattern,
-        [string]$Description,
-        [string]$Path = "crates\"
-    )
+function Count-Pattern($Pattern, $Description, $Path = "crates\") {
 
     Write-Host $Description -ForegroundColor Yellow
 
@@ -40,6 +35,7 @@ function Count-Pattern {
     return $count
 }
 
+# ... rest of the script ...
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "1. BÚSQUEDA DE Matrix" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
@@ -83,8 +79,7 @@ $affectedFiles = Get-ChildItem -Path "crates\" -Filter "*.rs" -Recurse -File |
 
 Write-Host "Archivos con más referencias a Matrix:"
 foreach ($file in $affectedFiles) {
-    $relativePath = $file.Name -replace [regex]::Escape((Get-Location).Path + "\"), ""
-    Write-Host "  $($file.Count) - $relativePath"
+    Write-Host "  $($file.Count) - $($file.Name)"
 }
 
 Write-Host ""

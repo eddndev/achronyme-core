@@ -24,19 +24,6 @@ pub fn format_value(value: &Value) -> String {
                 .collect();
             format!("[{}]", elements.join(", "))
         }
-        Value::Matrix(m) => {
-            let mut rows = Vec::new();
-            for i in 0..m.rows {
-                let mut row_elements = Vec::new();
-                for j in 0..m.cols {
-                    if let Ok(val) = m.get(i, j) {
-                        row_elements.push(format!("{:.6}", val));
-                    }
-                }
-                rows.push(format!("[{}]", row_elements.join(", ")));
-            }
-            format!("[{}]", rows.join(", "))
-        }
         Value::Tensor(t) => {
             // Format tensor based on rank
             match t.rank() {

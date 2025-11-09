@@ -42,8 +42,13 @@ pub fn simplex(
             }?;
 
             let a = match handles.get(a_handle) {
-                Some(Value::Matrix(m)) => Ok(m.clone()),
-                _ => Err(JsValue::from_str("simplex: A must be a matrix")),
+                Some(Value::Tensor(t)) => {
+                    if !t.is_matrix() {
+                        return Err(JsValue::from_str("simplex: A must be a matrix (rank-2 tensor)"));
+                    }
+                    Ok(t.clone())
+                }
+                _ => Err(JsValue::from_str("simplex: A must be a tensor")),
             }?;
 
             let b = match handles.get(b_handle) {
@@ -97,8 +102,13 @@ pub fn linprog(
             }?;
 
             let a = match handles.get(a_handle) {
-                Some(Value::Matrix(m)) => Ok(m.clone()),
-                _ => Err(JsValue::from_str("linprog: A must be a matrix")),
+                Some(Value::Tensor(t)) => {
+                    if !t.is_matrix() {
+                        return Err(JsValue::from_str("linprog: A must be a matrix (rank-2 tensor)"));
+                    }
+                    Ok(t.clone())
+                }
+                _ => Err(JsValue::from_str("linprog: A must be a tensor")),
             }?;
 
             let b = match handles.get(b_handle) {
@@ -150,8 +160,13 @@ pub fn dual_simplex(
             }?;
 
             let a = match handles.get(a_handle) {
-                Some(Value::Matrix(m)) => Ok(m.clone()),
-                _ => Err(JsValue::from_str("dualSimplex: A must be a matrix")),
+                Some(Value::Tensor(t)) => {
+                    if !t.is_matrix() {
+                        return Err(JsValue::from_str("dualSimplex: A must be a matrix (rank-2 tensor)"));
+                    }
+                    Ok(t.clone())
+                }
+                _ => Err(JsValue::from_str("dualSimplex: A must be a tensor")),
             }?;
 
             let b = match handles.get(b_handle) {
@@ -203,8 +218,13 @@ pub fn two_phase_simplex(
             }?;
 
             let a = match handles.get(a_handle) {
-                Some(Value::Matrix(m)) => Ok(m.clone()),
-                _ => Err(JsValue::from_str("twoPhaseSimplex: A must be a matrix")),
+                Some(Value::Tensor(t)) => {
+                    if !t.is_matrix() {
+                        return Err(JsValue::from_str("twoPhaseSimplex: A must be a matrix (rank-2 tensor)"));
+                    }
+                    Ok(t.clone())
+                }
+                _ => Err(JsValue::from_str("twoPhaseSimplex: A must be a tensor")),
             }?;
 
             let b = match handles.get(b_handle) {
@@ -256,8 +276,13 @@ pub fn revised_simplex(
             }?;
 
             let a = match handles.get(a_handle) {
-                Some(Value::Matrix(m)) => Ok(m.clone()),
-                _ => Err(JsValue::from_str("revisedSimplex: A must be a matrix")),
+                Some(Value::Tensor(t)) => {
+                    if !t.is_matrix() {
+                        return Err(JsValue::from_str("revisedSimplex: A must be a matrix (rank-2 tensor)"));
+                    }
+                    Ok(t.clone())
+                }
+                _ => Err(JsValue::from_str("revisedSimplex: A must be a tensor")),
             }?;
 
             let b = match handles.get(b_handle) {
@@ -356,8 +381,13 @@ pub fn shadow_price(
             }?;
 
             let a = match handles.get(a_handle) {
-                Some(Value::Matrix(m)) => Ok(m.clone()),
-                _ => Err(JsValue::from_str("shadowPrice: A must be a matrix")),
+                Some(Value::Tensor(t)) => {
+                    if !t.is_matrix() {
+                        return Err(JsValue::from_str("shadowPrice: A must be a matrix (rank-2 tensor)"));
+                    }
+                    Ok(t.clone())
+                }
+                _ => Err(JsValue::from_str("shadowPrice: A must be a tensor")),
             }?;
 
             let b = match handles.get(b_handle) {
@@ -412,8 +442,13 @@ pub fn sensitivity_c(
             }?;
 
             let a = match handles.get(a_handle) {
-                Some(Value::Matrix(m)) => Ok(m.clone()),
-                _ => Err(JsValue::from_str("sensitivityC: A must be a matrix")),
+                Some(Value::Tensor(t)) => {
+                    if !t.is_matrix() {
+                        return Err(JsValue::from_str("sensitivityC: A must be a matrix (rank-2 tensor)"));
+                    }
+                    Ok(t.clone())
+                }
+                _ => Err(JsValue::from_str("sensitivityC: A must be a tensor")),
             }?;
 
             let b = match handles.get(b_handle) {
@@ -468,8 +503,13 @@ pub fn sensitivity_b(
             }?;
 
             let a = match handles.get(a_handle) {
-                Some(Value::Matrix(m)) => Ok(m.clone()),
-                _ => Err(JsValue::from_str("sensitivityB: A must be a matrix")),
+                Some(Value::Tensor(t)) => {
+                    if !t.is_matrix() {
+                        return Err(JsValue::from_str("sensitivityB: A must be a matrix (rank-2 tensor)"));
+                    }
+                    Ok(t.clone())
+                }
+                _ => Err(JsValue::from_str("sensitivityB: A must be a tensor")),
             }?;
 
             let b = match handles.get(b_handle) {
@@ -550,8 +590,13 @@ pub fn intlinprog(
             }?;
 
             let a = match handles.get(a_handle) {
-                Some(Value::Matrix(m)) => Ok(m.clone()),
-                _ => Err(JsValue::from_str("intlinprog: A must be a matrix")),
+                Some(Value::Tensor(t)) => {
+                    if !t.is_matrix() {
+                        return Err(JsValue::from_str("intlinprog: A must be a matrix (rank-2 tensor)"));
+                    }
+                    Ok(t.clone())
+                }
+                _ => Err(JsValue::from_str("intlinprog: A must be a tensor")),
             }?;
 
             let b = match handles.get(b_handle) {
@@ -641,8 +686,13 @@ pub fn binary_linprog(
             }?;
 
             let a = match handles.get(a_handle) {
-                Some(Value::Matrix(m)) => Ok(m.clone()),
-                _ => Err(JsValue::from_str("binaryLinprog: A must be a matrix")),
+                Some(Value::Tensor(t)) => {
+                    if !t.is_matrix() {
+                        return Err(JsValue::from_str("binaryLinprog: A must be a matrix (rank-2 tensor)"));
+                    }
+                    Ok(t.clone())
+                }
+                _ => Err(JsValue::from_str("binaryLinprog: A must be a tensor")),
             }?;
 
             let b = match handles.get(b_handle) {

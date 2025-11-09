@@ -685,10 +685,25 @@ impl RealTensor {
         RealTensor::new(data, self.shape.clone()).unwrap()
     }
 
+    /// Scalar subtraction (tensor - scalar)
+    pub fn sub_scalar(&self, scalar: f64) -> RealTensor {
+        let data: Vec<f64> = self.data.iter().map(|x| x - scalar).collect();
+        RealTensor::new(data, self.shape.clone()).unwrap()
+    }
+
     /// Scalar multiplication
     pub fn mul_scalar(&self, scalar: f64) -> RealTensor {
         let data: Vec<f64> = self.data.iter().map(|x| x * scalar).collect();
         RealTensor::new(data, self.shape.clone()).unwrap()
+    }
+
+    /// Scalar division (tensor / scalar)
+    pub fn div_scalar(&self, scalar: f64) -> Result<RealTensor, String> {
+        if scalar == 0.0 {
+            return Err("Division by zero".to_string());
+        }
+        let data: Vec<f64> = self.data.iter().map(|x| x / scalar).collect();
+        Ok(RealTensor::new(data, self.shape.clone()).unwrap())
     }
 
     /// Negate all elements
@@ -771,10 +786,31 @@ impl ComplexTensor {
         ComplexTensor::new(data, self.shape.clone())
     }
 
+    /// Scalar addition
+    pub fn add_scalar(&self, scalar: Complex) -> ComplexTensor {
+        let data: Vec<Complex> = self.data.iter().map(|x| *x + scalar).collect();
+        ComplexTensor::new(data, self.shape.clone()).unwrap()
+    }
+
+    /// Scalar subtraction (tensor - scalar)
+    pub fn sub_scalar(&self, scalar: Complex) -> ComplexTensor {
+        let data: Vec<Complex> = self.data.iter().map(|x| *x - scalar).collect();
+        ComplexTensor::new(data, self.shape.clone()).unwrap()
+    }
+
     /// Scalar multiplication
     pub fn mul_scalar(&self, scalar: Complex) -> ComplexTensor {
         let data: Vec<Complex> = self.data.iter().map(|x| *x * scalar).collect();
         ComplexTensor::new(data, self.shape.clone()).unwrap()
+    }
+
+    /// Scalar division (tensor / scalar)
+    pub fn div_scalar(&self, scalar: Complex) -> Result<ComplexTensor, String> {
+        if scalar.re == 0.0 && scalar.im == 0.0 {
+            return Err("Division by zero".to_string());
+        }
+        let data: Vec<Complex> = self.data.iter().map(|x| *x / scalar).collect();
+        Ok(ComplexTensor::new(data, self.shape.clone()).unwrap())
     }
 
     /// Negate all elements

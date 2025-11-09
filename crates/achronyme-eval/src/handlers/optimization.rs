@@ -44,8 +44,13 @@ pub fn handle_simplex(evaluator: &mut Evaluator, args: &[AstNode]) -> Result<Val
 
     // Evaluate A (constraint matrix)
     let a_mat = match evaluator.evaluate(&args[1])? {
-        Value::Matrix(m) => m,
-        _ => return Err("simplex: A must be a matrix".to_string()),
+        Value::Tensor(t) => {
+            if !t.is_matrix() {
+                return Err("simplex: A must be a matrix (rank-2 tensor)".to_string());
+            }
+            t
+        }
+        _ => return Err("simplex: A must be a tensor".to_string()),
     };
 
     // Evaluate b (bounds vector)
@@ -63,16 +68,16 @@ pub fn handle_simplex(evaluator: &mut Evaluator, args: &[AstNode]) -> Result<Val
     };
 
     // Validations
-    if a_mat.cols != c_vec.len() {
+    if a_mat.cols() != c_vec.len() {
         return Err(format!(
             "simplex: matrix A has {} columns but c has {} elements",
-            a_mat.cols, c_vec.len()
+            a_mat.cols(), c_vec.len()
         ));
     }
-    if a_mat.rows != b_vec.len() {
+    if a_mat.rows() != b_vec.len() {
         return Err(format!(
             "simplex: matrix A has {} rows but b has {} elements",
-            a_mat.rows, b_vec.len()
+            a_mat.rows(), b_vec.len()
         ));
     }
 
@@ -98,8 +103,13 @@ pub fn handle_linprog(evaluator: &mut Evaluator, args: &[AstNode]) -> Result<Val
 
     // Evaluate A (constraint matrix)
     let a_mat = match evaluator.evaluate(&args[1])? {
-        Value::Matrix(m) => m,
-        _ => return Err("linprog: A must be a matrix".to_string()),
+        Value::Tensor(t) => {
+            if !t.is_matrix() {
+                return Err("linprog: A must be a matrix (rank-2 tensor)".to_string());
+            }
+            t
+        }
+        _ => return Err("linprog: A must be a tensor".to_string()),
     };
 
     // Evaluate b (bounds vector)
@@ -117,16 +127,16 @@ pub fn handle_linprog(evaluator: &mut Evaluator, args: &[AstNode]) -> Result<Val
     };
 
     // Validations
-    if a_mat.cols != c_vec.len() {
+    if a_mat.cols() != c_vec.len() {
         return Err(format!(
             "linprog: matrix A has {} columns but c has {} elements",
-            a_mat.cols, c_vec.len()
+            a_mat.cols(), c_vec.len()
         ));
     }
-    if a_mat.rows != b_vec.len() {
+    if a_mat.rows() != b_vec.len() {
         return Err(format!(
             "linprog: matrix A has {} rows but b has {} elements",
-            a_mat.rows, b_vec.len()
+            a_mat.rows(), b_vec.len()
         ));
     }
 
@@ -174,8 +184,13 @@ pub fn handle_dual_simplex(evaluator: &mut Evaluator, args: &[AstNode]) -> Resul
     let c_vec = value_to_f64_vec(&evaluator.evaluate(&args[0])?)?;
 
     let a_mat = match evaluator.evaluate(&args[1])? {
-        Value::Matrix(m) => m,
-        _ => return Err("dual_simplex: A must be a matrix".to_string()),
+        Value::Tensor(t) => {
+            if !t.is_matrix() {
+                return Err("dual_simplex: A must be a matrix (rank-2 tensor)".to_string());
+            }
+            t
+        }
+        _ => return Err("dual_simplex: A must be a tensor".to_string()),
     };
 
     let b_vec = value_to_f64_vec(&evaluator.evaluate(&args[2])?)?;
@@ -191,16 +206,16 @@ pub fn handle_dual_simplex(evaluator: &mut Evaluator, args: &[AstNode]) -> Resul
     };
 
     // Validations
-    if a_mat.cols != c_vec.len() {
+    if a_mat.cols() != c_vec.len() {
         return Err(format!(
             "dual_simplex: matrix A has {} columns but c has {} elements",
-            a_mat.cols, c_vec.len()
+            a_mat.cols(), c_vec.len()
         ));
     }
-    if a_mat.rows != b_vec.len() {
+    if a_mat.rows() != b_vec.len() {
         return Err(format!(
             "dual_simplex: matrix A has {} rows but b has {} elements",
-            a_mat.rows, b_vec.len()
+            a_mat.rows(), b_vec.len()
         ));
     }
 
@@ -226,8 +241,13 @@ pub fn handle_two_phase_simplex(evaluator: &mut Evaluator, args: &[AstNode]) -> 
     let c_vec = value_to_f64_vec(&evaluator.evaluate(&args[0])?)?;
 
     let a_mat = match evaluator.evaluate(&args[1])? {
-        Value::Matrix(m) => m,
-        _ => return Err("two_phase_simplex: A must be a matrix".to_string()),
+        Value::Tensor(t) => {
+            if !t.is_matrix() {
+                return Err("two_phase_simplex: A must be a matrix (rank-2 tensor)".to_string());
+            }
+            t
+        }
+        _ => return Err("two_phase_simplex: A must be a tensor".to_string()),
     };
 
     let b_vec = value_to_f64_vec(&evaluator.evaluate(&args[2])?)?;
@@ -243,16 +263,16 @@ pub fn handle_two_phase_simplex(evaluator: &mut Evaluator, args: &[AstNode]) -> 
     };
 
     // Validations
-    if a_mat.cols != c_vec.len() {
+    if a_mat.cols() != c_vec.len() {
         return Err(format!(
             "two_phase_simplex: matrix A has {} columns but c has {} elements",
-            a_mat.cols, c_vec.len()
+            a_mat.cols(), c_vec.len()
         ));
     }
-    if a_mat.rows != b_vec.len() {
+    if a_mat.rows() != b_vec.len() {
         return Err(format!(
             "two_phase_simplex: matrix A has {} rows but b has {} elements",
-            a_mat.rows, b_vec.len()
+            a_mat.rows(), b_vec.len()
         ));
     }
 
@@ -279,8 +299,13 @@ pub fn handle_revised_simplex(evaluator: &mut Evaluator, args: &[AstNode]) -> Re
     let c_vec = value_to_f64_vec(&evaluator.evaluate(&args[0])?)?;
 
     let a_mat = match evaluator.evaluate(&args[1])? {
-        Value::Matrix(m) => m,
-        _ => return Err("revised_simplex: A must be a matrix".to_string()),
+        Value::Tensor(t) => {
+            if !t.is_matrix() {
+                return Err("revised_simplex: A must be a matrix (rank-2 tensor)".to_string());
+            }
+            t
+        }
+        _ => return Err("revised_simplex: A must be a tensor".to_string()),
     };
 
     let b_vec = value_to_f64_vec(&evaluator.evaluate(&args[2])?)?;
@@ -296,16 +321,16 @@ pub fn handle_revised_simplex(evaluator: &mut Evaluator, args: &[AstNode]) -> Re
     };
 
     // Validations
-    if a_mat.cols != c_vec.len() {
+    if a_mat.cols() != c_vec.len() {
         return Err(format!(
             "revised_simplex: matrix A has {} columns but c has {} elements",
-            a_mat.cols, c_vec.len()
+            a_mat.cols(), c_vec.len()
         ));
     }
-    if a_mat.rows != b_vec.len() {
+    if a_mat.rows() != b_vec.len() {
         return Err(format!(
             "revised_simplex: matrix A has {} rows but b has {} elements",
-            a_mat.rows, b_vec.len()
+            a_mat.rows(), b_vec.len()
         ));
     }
 
@@ -332,8 +357,13 @@ pub fn handle_shadow_price(evaluator: &mut Evaluator, args: &[AstNode]) -> Resul
     let c_vec = value_to_f64_vec(&evaluator.evaluate(&args[0])?)?;
 
     let a_mat = match evaluator.evaluate(&args[1])? {
-        Value::Matrix(m) => m,
-        _ => return Err("shadow_price: A must be a matrix".to_string()),
+        Value::Tensor(t) => {
+            if !t.is_matrix() {
+                return Err("shadow_price: A must be a matrix (rank-2 tensor)".to_string());
+            }
+            t
+        }
+        _ => return Err("shadow_price: A must be a tensor".to_string()),
     };
 
     let b_vec = value_to_f64_vec(&evaluator.evaluate(&args[2])?)?;
@@ -365,8 +395,13 @@ pub fn handle_sensitivity_c(evaluator: &mut Evaluator, args: &[AstNode]) -> Resu
     let c_vec = value_to_f64_vec(&evaluator.evaluate(&args[0])?)?;
 
     let a_mat = match evaluator.evaluate(&args[1])? {
-        Value::Matrix(m) => m,
-        _ => return Err("sensitivity_c: A must be a matrix".to_string()),
+        Value::Tensor(t) => {
+            if !t.is_matrix() {
+                return Err("sensitivity_c: A must be a matrix (rank-2 tensor)".to_string());
+            }
+            t
+        }
+        _ => return Err("sensitivity_c: A must be a tensor".to_string()),
     };
 
     let b_vec = value_to_f64_vec(&evaluator.evaluate(&args[2])?)?;
@@ -393,8 +428,13 @@ pub fn handle_sensitivity_b(evaluator: &mut Evaluator, args: &[AstNode]) -> Resu
     let c_vec = value_to_f64_vec(&evaluator.evaluate(&args[0])?)?;
 
     let a_mat = match evaluator.evaluate(&args[1])? {
-        Value::Matrix(m) => m,
-        _ => return Err("sensitivity_b: A must be a matrix".to_string()),
+        Value::Tensor(t) => {
+            if !t.is_matrix() {
+                return Err("sensitivity_b: A must be a matrix (rank-2 tensor)".to_string());
+            }
+            t
+        }
+        _ => return Err("sensitivity_b: A must be a tensor".to_string()),
     };
 
     let b_vec = value_to_f64_vec(&evaluator.evaluate(&args[2])?)?;

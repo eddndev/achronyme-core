@@ -1,13 +1,14 @@
-use achronyme_types::matrix::Matrix;
+use achronyme_types::tensor::RealTensor;
 use achronyme_types::complex::Complex;
 use faer::prelude::*;
 use faer::complex_native::c64;
 
-/// Convert Achronyme Matrix to faer Mat
-fn matrix_to_faer(matrix: &Matrix) -> Mat<f64> {
-    let rows = matrix.rows;
-    let cols = matrix.cols;
-    Mat::from_fn(rows, cols, |i, j| matrix.data[i * cols + j])
+/// Convert Achronyme RealTensor to faer Mat
+fn tensor_to_faer_mat(tensor: &RealTensor) -> Mat<f64> {
+    assert!(tensor.is_matrix());
+    let rows = tensor.rows();
+    let cols = tensor.cols();
+    Mat::from_fn(rows, cols, |i, j| tensor.get_matrix(i, j).unwrap())
 }
 
 /// Compute eigenvalues of a square matrix
@@ -15,7 +16,7 @@ fn matrix_to_faer(matrix: &Matrix) -> Mat<f64> {
 /// Returns the eigenvalues (potentially complex) of the matrix.
 ///
 /// # Arguments
-/// * `matrix` - Square matrix
+/// * `tensor` - Square matrix (rank-2 tensor)
 ///
 /// # Returns
 /// Vector of complex eigenvalues
@@ -23,21 +24,21 @@ fn matrix_to_faer(matrix: &Matrix) -> Mat<f64> {
 /// # Example
 /// ```
 /// use achronyme_linalg::eigenvalues;
-/// use achronyme_types::matrix::Matrix;
+/// use achronyme_types::tensor::RealTensor;
 ///
-/// let a = Matrix::new(2, 2, vec![
+/// let a = RealTensor::matrix(2, 2, vec![
 ///     1.0, 2.0,
 ///     3.0, 4.0
 /// ]).unwrap();
 ///
 /// let eigs = eigenvalues(&a).unwrap();
 /// ```
-pub fn eigenvalues(matrix: &Matrix) -> Result<Vec<Complex>, String> {
-    if matrix.rows != matrix.cols {
+pub fn eigenvalues(tensor: &RealTensor) -> Result<Vec<Complex>, String> {
+    if !tensor.is_square() {
         return Err("Eigenvalue computation requires square matrix".to_string());
     }
 
-    let mat = matrix_to_faer(matrix);
+    let mat = tensor_to_faer_mat(tensor);
 
     // Compute eigenvalue decomposition
     let evd = mat.eigendecomposition::<c64>();
@@ -59,7 +60,7 @@ pub fn eigenvalues(matrix: &Matrix) -> Result<Vec<Complex>, String> {
 /// Returns both eigenvalues and corresponding eigenvectors.
 ///
 /// # Arguments
-/// * `matrix` - Square matrix
+/// * `tensor` - Square matrix (rank-2 tensor)
 ///
 /// # Returns
 /// Tuple of (eigenvalues, eigenvectors_matrix) where each column
@@ -68,21 +69,21 @@ pub fn eigenvalues(matrix: &Matrix) -> Result<Vec<Complex>, String> {
 /// # Example
 /// ```
 /// use achronyme_linalg::eigenvectors;
-/// use achronyme_types::matrix::Matrix;
+/// use achronyme_types::tensor::RealTensor;
 ///
-/// let a = Matrix::new(2, 2, vec![
+/// let a = RealTensor::matrix(2, 2, vec![
 ///     4.0, 1.0,
 ///     2.0, 3.0
 /// ]).unwrap();
 ///
 /// let (eigs, vecs) = eigenvectors(&a).unwrap();
 /// ```
-pub fn eigenvectors(matrix: &Matrix) -> Result<(Vec<Complex>, Matrix), String> {
-    if matrix.rows != matrix.cols {
+pub fn eigenvectors(tensor: &RealTensor) -> Result<(Vec<Complex>, RealTensor), String> {
+    if !tensor.is_square() {
         return Err("Eigenvector computation requires square matrix".to_string());
     }
 
-    let mat = matrix_to_faer(matrix);
+    let mat = tensor_to_faer_mat(tensor);
 
     // Compute eigenvalue decomposition
     let evd = mat.eigendecomposition::<c64>();
@@ -109,9 +110,9 @@ pub fn eigenvectors(matrix: &Matrix) -> Result<(Vec<Complex>, Matrix), String> {
         }
     }
 
-    let vecs_matrix = Matrix::new(n, m, real_vecs).map_err(|e| e.to_string())?;
+    let vecs_tensor = RealTensor::matrix(n, m, real_vecs).map_err(|e| e.to_string())?;
 
-    Ok((eigs, vecs_matrix))
+    Ok((eigs, vecs_tensor))
 }
 
 /// Power iteration method for finding dominant eigenvalue
@@ -119,18 +120,18 @@ pub fn eigenvectors(matrix: &Matrix) -> Result<(Vec<Complex>, Matrix), String> {
 /// Iteratively computes the largest eigenvalue (by magnitude) and its eigenvector.
 ///
 /// # Arguments
-/// * `matrix` - Square matrix
+/// * `tensor` - Square matrix (rank-2 tensor)
 /// * `max_iterations` - Maximum number of iterations
 /// * `tolerance` - Convergence tolerance
 ///
 /// # Returns
-/// Tuple of (eigenvalue, eigenvector as Matrix column vector)
-pub fn power_iteration(matrix: &Matrix, max_iterations: usize, tolerance: f64) -> Result<(f64, Matrix), String> {
-    if matrix.rows != matrix.cols {
+/// Tuple of (eigenvalue, eigenvector as RealTensor column vector)
+pub fn power_iteration(tensor: &RealTensor, max_iterations: usize, tolerance: f64) -> Result<(f64, RealTensor), String> {
+    if !tensor.is_square() {
         return Err("Power iteration requires square matrix".to_string());
     }
 
-    let mat = matrix_to_faer(matrix);
+    let mat = tensor_to_faer_mat(tensor);
     let n = mat.nrows();
 
     // Initialize with random vector
@@ -158,9 +159,9 @@ pub fn power_iteration(matrix: &Matrix, max_iterations: usize, tolerance: f64) -
         eigenvalue = new_eigenvalue;
     }
 
-    // Convert eigenvector to matrix
+    // Convert eigenvector to tensor
     let eigenvector_data: Vec<f64> = (0..n).map(|i| v.read(i)).collect();
-    let eigenvector = Matrix::new(n, 1, eigenvector_data).map_err(|e| e.to_string())?;
+    let eigenvector = RealTensor::matrix(n, 1, eigenvector_data).map_err(|e| e.to_string())?;
 
     Ok((eigenvalue, eigenvector))
 }
@@ -170,18 +171,18 @@ pub fn power_iteration(matrix: &Matrix, max_iterations: usize, tolerance: f64) -
 /// Uses QR iteration to find all eigenvalues of a matrix.
 ///
 /// # Arguments
-/// * `matrix` - Square matrix
+/// * `tensor` - Square matrix (rank-2 tensor)
 /// * `max_iterations` - Maximum number of iterations
 /// * `tolerance` - Convergence tolerance
 ///
 /// # Returns
 /// Vector of real eigenvalues (imaginary parts discarded)
-pub fn qr_eigenvalues(matrix: &Matrix, max_iterations: usize, tolerance: f64) -> Result<Vec<f64>, String> {
-    if matrix.rows != matrix.cols {
+pub fn qr_eigenvalues(tensor: &RealTensor, max_iterations: usize, tolerance: f64) -> Result<Vec<f64>, String> {
+    if !tensor.is_square() {
         return Err("QR eigenvalue algorithm requires square matrix".to_string());
     }
 
-    let mut a = matrix_to_faer(matrix);
+    let mut a = tensor_to_faer_mat(tensor);
 
     for _ in 0..max_iterations {
         let qr = a.qr();
@@ -217,20 +218,20 @@ pub fn qr_eigenvalues(matrix: &Matrix, max_iterations: usize, tolerance: f64) ->
 /// Computes eigenvalues and eigenvectors for symmetric matrices using QR algorithm.
 ///
 /// # Arguments
-/// * `matrix` - Symmetric square matrix
+/// * `tensor` - Symmetric square matrix (rank-2 tensor)
 /// * `max_iterations` - Maximum number of iterations
 /// * `tolerance` - Convergence tolerance
 ///
 /// # Returns
 /// Tuple of (eigenvalues vector, eigenvectors matrix)
-pub fn eigen_symmetric(matrix: &Matrix, _max_iterations: usize, _tolerance: f64) -> Result<(Vec<f64>, Matrix), String> {
-    if matrix.rows != matrix.cols {
+pub fn eigen_symmetric(tensor: &RealTensor, _max_iterations: usize, _tolerance: f64) -> Result<(Vec<f64>, RealTensor), String> {
+    if !tensor.is_square() {
         return Err("Symmetric eigendecomposition requires square matrix".to_string());
     }
 
     // For now, use the general eigendecomposition
     // TODO: Implement specialized symmetric algorithm for better performance
-    let (eigs, vecs) = eigenvectors(matrix)?;
+    let (eigs, vecs) = eigenvectors(tensor)?;
 
     // Extract real parts only
     let eigenvalues: Vec<f64> = eigs.iter().map(|c| c.re).collect();
@@ -246,7 +247,7 @@ mod tests {
     #[test]
     fn test_eigenvalues_2x2() {
         // Matrix with known eigenvalues
-        let a = Matrix::new(2, 2, vec![
+        let a = RealTensor::matrix(2, 2, vec![
             4.0, 1.0,
             2.0, 3.0
         ]).unwrap();
@@ -268,7 +269,7 @@ mod tests {
     #[test]
     fn test_eigenvalues_3x3() {
         // Identity matrix has eigenvalues all equal to 1
-        let a = Matrix::identity(3);
+        let a = RealTensor::eye(3);
 
         let result = eigenvalues(&a);
         assert!(result.is_ok());
@@ -284,7 +285,7 @@ mod tests {
 
     #[test]
     fn test_eigenvectors() {
-        let a = Matrix::new(2, 2, vec![
+        let a = RealTensor::matrix(2, 2, vec![
             4.0, 1.0,
             2.0, 3.0
         ]).unwrap();
@@ -294,13 +295,13 @@ mod tests {
 
         let (eigs, vecs) = result.unwrap();
         assert_eq!(eigs.len(), 2);
-        assert_eq!(vecs.rows, 2);
-        assert_eq!(vecs.cols, 2);
+        assert_eq!(vecs.rows(), 2);
+        assert_eq!(vecs.cols(), 2);
     }
 
     #[test]
     fn test_eigenvalues_nonsquare_fails() {
-        let a = Matrix::new(2, 3, vec![
+        let a = RealTensor::matrix(2, 3, vec![
             1.0, 2.0, 3.0,
             4.0, 5.0, 6.0
         ]).unwrap();
