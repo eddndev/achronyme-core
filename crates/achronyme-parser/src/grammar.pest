@@ -145,7 +145,7 @@ unary = {
 // Operators as separate rules (not silent, so they're captured)
 mult_op = { "*" | "/" | "%" }
 add_op = { "+" | "-" }
-edge_op = { "->" | "--" }
+edge_op = { "->" | "<>" }
 cmp_op = { "==" | "!=" | ">=" | "<=" | ">" | "<" }
 logical_and_op = { "&&" }
 logical_or_op = { "||" }

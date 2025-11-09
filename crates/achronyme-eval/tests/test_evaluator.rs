@@ -374,7 +374,7 @@ fn test_pest_vector() {
     let result = evaluator.eval_str("[1, 2, 3]").unwrap();
     match result {
         Value::Vector(v) => {
-            assert_eq!(v, &vec![Value::Number(1.0), Value::Number(2.0), Value::Number(3.0)]);
+            assert_eq!(v, vec![Value::Number(1.0), Value::Number(2.0), Value::Number(3.0)]);
         }
         _ => panic!("Expected vector"),
     }

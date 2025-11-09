@@ -1,7 +1,6 @@
 use wasm_bindgen::prelude::*;
 use crate::state::{Handle, HANDLES};
 use achronyme_types::value::Value;
-use achronyme_types::vector::Vector;
 
 // ============================================================================
 // Linear Programming and Optimization

@@ -1,6 +1,5 @@
 use crate::state::{Handle, HANDLES};
 use achronyme_types::value::Value;
-use achronyme_types::vector::Vector;
 use wasm_bindgen::prelude::*;
 
 // ============================================================================
@@ -21,15 +20,7 @@ pub fn format_value(value: &Value) -> String {
         }
         Value::Vector(v) => {
             let elements: Vec<String> = v.iter()
-                .filter_map(|val| match val {
-                    Value::Number(n) => Some(format!("{:.6}", n)),
-                    Value::Complex(c) => Some(if c.im >= 0.0 {
-                        format!("{}+{}i", c.re, c.im)
-                    } else {
-                        format!("{}{}i", c.re, c.im)
-                    }),
-                    _ => None,
-                })
+                .map(|val| format_value(val))
                 .collect();
             format!("[{}]", elements.join(", "))
         }
@@ -54,7 +45,7 @@ pub fn format_value(value: &Value) -> String {
             format!("{{ {} }}", fields.join(", "))
         }
         Value::Edge { from, to, directed, properties } => {
-            let arrow = if *directed { "->" } else { "--" };
+            let arrow = if *directed { "->" } else { "<>" };
             if properties.is_empty() {
                 format!("{} {} {}", from, arrow, to)
             } else {

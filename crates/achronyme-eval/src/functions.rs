@@ -34,6 +34,7 @@ impl FunctionRegistry {
         function_modules::dsp::register_functions(self);
         function_modules::strings::register_functions(self);
         function_modules::records::register_functions(self);
+        function_modules::graphs::register_functions(self);
     }
 
     /// Register a function
@@ -80,7 +81,7 @@ impl Default for FunctionRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use achronyme_types::vector::Vector;
+    
 
     #[test]
     fn test_sin() {
@@ -127,14 +128,23 @@ mod tests {
     #[test]
     fn test_sin_vector() {
         let registry = FunctionRegistry::new();
-        let vec = Vector::new(vec![0.0, std::f64::consts::PI / 2.0, std::f64::consts::PI]);
+        let vec = vec![
+            Value::Number(0.0),
+            Value::Number(std::f64::consts::PI / 2.0),
+            Value::Number(std::f64::consts::PI)
+        ];
         let args = vec![Value::Vector(vec)];
         let result = registry.call("sin", &args).unwrap();
         match result {
             Value::Vector(v) => {
-                assert!((v.data()[0] - 0.0).abs() < 1e-10);
-                assert!((v.data()[1] - 1.0).abs() < 1e-10);
-                assert!((v.data()[2] - 0.0).abs() < 1e-10);
+                match (&v[0], &v[1], &v[2]) {
+                    (Value::Number(n0), Value::Number(n1), Value::Number(n2)) => {
+                        assert!((n0 - 0.0).abs() < 1e-10);
+                        assert!((n1 - 1.0).abs() < 1e-10);
+                        assert!((n2 - 0.0).abs() < 1e-10);
+                    }
+                    _ => panic!("Expected numeric values"),
+                }
             }
             _ => panic!("Expected vector"),
         }

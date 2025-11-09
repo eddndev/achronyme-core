@@ -15,6 +15,14 @@ fn eval(source: &str) -> Result<Value, String> {
     Ok(result)
 }
 
+/// Helper to extract f64 vector from Value::Vector
+fn to_f64_vec(vec: &[Value]) -> Vec<f64> {
+    vec.iter().filter_map(|v| match v {
+        Value::Number(n) => Some(*n),
+        _ => None,
+    }).collect()
+}
+
 /// Helper function for tests that need to maintain state across multiple eval calls
 fn eval_with_evaluator(evaluator: &mut Evaluator, source: &str) -> Result<Value, String> {
     let statements = parse(source)?;
@@ -75,21 +83,21 @@ fn test_shadowing_pipeline_transformation() {
     eval_with_evaluator(&mut evaluator, "let v = [1, 2, 3, 4]").unwrap();
     assert_eq!(
         eval_with_evaluator(&mut evaluator, "v").unwrap(),
-        Value::Vector(achronyme_types::vector::Vector::new(vec![1.0, 2.0, 3.0, 4.0]))
+        Value::Vector(vec![Value::Number(1.0), Value::Number(2.0), Value::Number(3.0), Value::Number(4.0)])
     );
 
     // Transform: square each element
     eval_with_evaluator(&mut evaluator, "let v = map(x => x^2, v)").unwrap();
     assert_eq!(
         eval_with_evaluator(&mut evaluator, "v").unwrap(),
-        Value::Vector(achronyme_types::vector::Vector::new(vec![1.0, 4.0, 9.0, 16.0]))
+        Value::Vector(vec![Value::Number(1.0), Value::Number(4.0), Value::Number(9.0), Value::Number(16.0)])
     );
 
     // Transform again: add 1 to each
     eval_with_evaluator(&mut evaluator, "let v = map(x => x + 1, v)").unwrap();
     assert_eq!(
         eval_with_evaluator(&mut evaluator, "v").unwrap(),
-        Value::Vector(achronyme_types::vector::Vector::new(vec![2.0, 5.0, 10.0, 17.0]))
+        Value::Vector(vec![Value::Number(2.0), Value::Number(5.0), Value::Number(10.0), Value::Number(17.0)])
     );
 }
 
@@ -151,7 +159,7 @@ fn test_shadowing_with_map() {
 
     match result {
         Value::Vector(v) => {
-            assert_eq!(v.data(), &[2.0, 4.0, 6.0]); // Uses parameter, not outer x=100
+            assert_eq!(to_f64_vec(&v), vec![2.0, 4.0, 6.0]); // Uses parameter, not outer x=100
         }
         _ => panic!("Expected vector"),
     }
@@ -172,7 +180,7 @@ fn test_shadowing_with_filter() {
 
     match result {
         Value::Vector(v) => {
-            assert_eq!(v.data(), &[3.0, 4.0]); // Uses parameter
+            assert_eq!(to_f64_vec(&v), vec![3.0, 4.0]); // Uses parameter
         }
         _ => panic!("Expected vector"),
     }
@@ -208,7 +216,7 @@ fn test_memory_efficiency_with_shadowing() {
     // Should have the transformed value
     match eval_with_evaluator(&mut evaluator, "v").unwrap() {
         Value::Vector(vec) => {
-            assert_eq!(vec.data(), &[2.0, 4.0, 6.0, 8.0, 10.0]);
+            assert_eq!(to_f64_vec(&vec), vec![2.0, 4.0, 6.0, 8.0, 10.0]);
         }
         _ => panic!("Expected vector"),
     }

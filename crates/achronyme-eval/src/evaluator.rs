@@ -129,7 +129,19 @@ impl Evaluator {
                             .cloned()
                             .ok_or_else(|| format!("Field '{}' not found in record", field))
                     }
-                    _ => Err(format!("Cannot access field '{}' on non-record value", field)),
+                    Value::Edge { from, to, directed, properties } => {
+                        // Handle special fields
+                        match field.as_str() {
+                            "from" => Ok(Value::String(from.clone())),
+                            "to" => Ok(Value::String(to.clone())),
+                            "directed" => Ok(Value::Boolean(directed)),
+                            // Otherwise, look in properties
+                            _ => properties.get(field)
+                                .cloned()
+                                .ok_or_else(|| format!("Field '{}' not found in edge", field))
+                        }
+                    }
+                    _ => Err(format!("Cannot access field '{}' on non-record/edge value", field)),
                 }
             }
 

@@ -1,9 +1,7 @@
 use achronyme_parser::ast::AstNode;
 use achronyme_types::complex::Complex;
-use achronyme_types::complex_vector::ComplexVector;
 use achronyme_types::matrix::Matrix;
 use achronyme_types::value::Value;
-use achronyme_types::vector::Vector;
 
 use crate::evaluator::Evaluator;
 

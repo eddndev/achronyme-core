@@ -129,7 +129,7 @@ fn build_edge(pair: Pair<Rule>) -> Result<AstNode, String> {
         Rule::edge_op => {
             match pairs[1].as_str() {
                 "->" => true,
-                "--" => false,
+                "<>" => false,
                 _ => return Err(format!("Unknown edge operator: {}", pairs[1].as_str()))
             }
         }

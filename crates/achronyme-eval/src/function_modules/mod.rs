@@ -2,6 +2,7 @@ pub mod common;
 pub mod complex;
 pub mod dsp;
 pub mod exponential;
+pub mod graphs;
 pub mod matrix;
 pub mod records;
 pub mod rounding;

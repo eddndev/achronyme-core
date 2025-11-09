@@ -306,20 +306,8 @@ fn format_value(value: &achronyme_types::value::Value) -> String {
             }
         }
         Value::Vector(v) => {
-            let elements: Vec<String> = v.data().iter()
-                .map(|x| format!("{}", x))
-                .collect();
-            format!("[{}]", elements.join(", "))
-        }
-        Value::ComplexVector(cv) => {
-            let elements: Vec<String> = cv.data().iter()
-                .map(|c| {
-                    if c.im >= 0.0 {
-                        format!("{}+{}i", c.re, c.im)
-                    } else {
-                        format!("{}{}i", c.re, c.im)
-                    }
-                })
+            let elements: Vec<String> = v.iter()
+                .map(|val| format_value(val))
                 .collect();
             format!("[{}]", elements.join(", "))
         }
@@ -342,6 +330,17 @@ fn format_value(value: &achronyme_types::value::Value) -> String {
                 .collect();
             fields.sort(); // Sort for consistent output
             format!("{{ {} }}", fields.join(", "))
+        }
+        Value::Edge { from, to, directed, properties } => {
+            let arrow = if *directed { "->" } else { "<>" };
+            if properties.is_empty() {
+                format!("{} {} {}", from, arrow, to)
+            } else {
+                let props: Vec<String> = properties.iter()
+                    .map(|(k, v)| format!("{}: {}", k, format_value(v)))
+                    .collect();
+                format!("{} {} {}: {{ {} }}", from, arrow, to, props.join(", "))
+            }
         }
         Value::Function(_) => "<function>".to_string(),
     }

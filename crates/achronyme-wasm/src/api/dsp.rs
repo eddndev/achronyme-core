@@ -1,8 +1,6 @@
 use wasm_bindgen::prelude::*;
 use crate::state::{Handle, HANDLES};
 use achronyme_types::value::Value;
-use achronyme_types::matrix::Matrix;
-use achronyme_types::complex::Complex;
 use achronyme_types::complex_vector::ComplexVector;
 
 // ============================================================================
