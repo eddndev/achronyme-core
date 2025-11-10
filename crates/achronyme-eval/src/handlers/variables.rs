@@ -16,7 +16,6 @@ pub fn evaluate_declaration(
     // Define the variable in the environment
     evaluator.environment_mut().define(name.to_string(), value.clone())?;
 
-    // Return the value (so "let x = 5" evaluates to 5)
     Ok(value)
 }
 

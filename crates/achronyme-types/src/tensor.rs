@@ -484,21 +484,53 @@ impl fmt::Display for RealTensor {
                 write!(f, "]")
             }
             _ => {
-                // Higher-order tensor
-                write!(f, "Tensor(shape: {:?}, data: [", self.shape)?;
-                for (i, val) in self.data.iter().enumerate() {
-                    if i > 0 {
-                        write!(f, ", ")?;
-                    }
-                    if i >= 10 {
-                        write!(f, "...")?;
-                        break;
-                    }
-                    write!(f, "{}", val)?;
-                }
-                write!(f, "])")
+                // Higher-order tensor (3D+)
+                format_nd_tensor(f, &self.data, &self.shape, 0, 0)
             }
         }
+    }
+}
+
+/// Recursively format N-dimensional tensors
+fn format_nd_tensor(
+    f: &mut fmt::Formatter<'_>,
+    data: &[f64],
+    shape: &[usize],
+    depth: usize,
+    offset: usize,
+) -> fmt::Result {
+    if shape.is_empty() {
+        return write!(f, "{}", data[offset]);
+    }
+
+    if shape.len() == 1 {
+        // Last dimension - print as vector
+        write!(f, "[")?;
+        for i in 0..shape[0] {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{}", data[offset + i])?;
+        }
+        write!(f, "]")
+    } else {
+        // Multiple dimensions remaining
+        let current_dim = shape[0];
+        let stride: usize = shape[1..].iter().product();
+
+        write!(f, "[")?;
+        for i in 0..current_dim {
+            if i > 0 {
+                write!(f, ",")?;
+                // Add newline and indentation for readability
+                write!(f, "\n")?;
+                for _ in 0..=depth {
+                    write!(f, " ")?;
+                }
+            }
+            format_nd_tensor(f, data, &shape[1..], depth + 1, offset + i * stride)?;
+        }
+        write!(f, "]")
     }
 }
 
@@ -521,22 +553,74 @@ impl fmt::Display for ComplexTensor {
                 }
                 write!(f, "]")
             }
-            _ => {
-                // Matrix or higher-order tensor
-                write!(f, "ComplexTensor(shape: {:?}, data: [", self.shape)?;
-                for (i, val) in self.data.iter().enumerate() {
+            2 => {
+                // Matrix
+                let rows = self.shape[0];
+                let cols = self.shape[1];
+                write!(f, "[")?;
+                for i in 0..rows {
                     if i > 0 {
-                        write!(f, ", ")?;
+                        write!(f, "\n ")?;
                     }
-                    if i >= 10 {
-                        write!(f, "...")?;
-                        break;
+                    write!(f, "[")?;
+                    for j in 0..cols {
+                        if j > 0 {
+                            write!(f, ", ")?;
+                        }
+                        write!(f, "{}", self.data[i * cols + j])?;
                     }
-                    write!(f, "{}", val)?;
+                    write!(f, "]")?;
                 }
-                write!(f, "])")
+                write!(f, "]")
+            }
+            _ => {
+                // Higher-order tensor (3D+)
+                format_nd_complex_tensor(f, &self.data, &self.shape, 0, 0)
             }
         }
+    }
+}
+
+/// Recursively format N-dimensional complex tensors
+fn format_nd_complex_tensor(
+    f: &mut fmt::Formatter<'_>,
+    data: &[Complex],
+    shape: &[usize],
+    depth: usize,
+    offset: usize,
+) -> fmt::Result {
+    if shape.is_empty() {
+        return write!(f, "{}", data[offset]);
+    }
+
+    if shape.len() == 1 {
+        // Last dimension - print as vector
+        write!(f, "[")?;
+        for i in 0..shape[0] {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{}", data[offset + i])?;
+        }
+        write!(f, "]")
+    } else {
+        // Multiple dimensions remaining
+        let current_dim = shape[0];
+        let stride: usize = shape[1..].iter().product();
+
+        write!(f, "[")?;
+        for i in 0..current_dim {
+            if i > 0 {
+                write!(f, ",")?;
+                // Add newline and indentation for readability
+                write!(f, "\n")?;
+                for _ in 0..=depth {
+                    write!(f, " ")?;
+                }
+            }
+            format_nd_complex_tensor(f, data, &shape[1..], depth + 1, offset + i * stride)?;
+        }
+        write!(f, "]")
     }
 }
 
@@ -604,6 +688,34 @@ impl<T: Clone> Tensor<T> {
         result.reverse();
         Ok(result)
     }
+
+    /// Convert a flat index to multi-dimensional indices given a shape
+    fn unravel_index(flat_idx: usize, shape: &[usize], strides: &[usize]) -> Vec<usize> {
+        let mut indices = Vec::with_capacity(shape.len());
+        let mut remaining = flat_idx;
+
+        for &stride in strides.iter() {
+            indices.push(remaining / stride);
+            remaining %= stride;
+        }
+
+        indices
+    }
+
+    /// Adjust multi-dimensional indices for broadcasting
+    /// Maps indices from result shape to indices in original shape
+    fn broadcast_index(result_indices: &[usize], original_shape: &[usize], result_shape: &[usize]) -> Vec<usize> {
+        let rank_diff = result_shape.len() - original_shape.len();
+        let mut adjusted = Vec::with_capacity(original_shape.len());
+
+        for i in 0..original_shape.len() {
+            let result_idx = result_indices[i + rank_diff];
+            // If the original dimension is 1, always use index 0 (broadcasting)
+            adjusted.push(if original_shape[i] == 1 { 0 } else { result_idx });
+        }
+
+        adjusted
+    }
 }
 
 // ============================================================================
@@ -611,72 +723,128 @@ impl<T: Clone> Tensor<T> {
 // ============================================================================
 
 impl RealTensor {
-    /// Element-wise addition
+    /// Element-wise addition with broadcasting
     pub fn add(&self, other: &RealTensor) -> Result<RealTensor, TensorError> {
-        if self.shape != other.shape {
-            return Err(TensorError::DimensionMismatch {
-                expected: self.shape.clone(),
-                got: other.shape.clone(),
-            });
+        // Fast path: if shapes are identical, use direct element-wise operation
+        if self.shape == other.shape {
+            let data: Vec<f64> = self.data.iter()
+                .zip(other.data.iter())
+                .map(|(a, b)| a + b)
+                .collect();
+            return RealTensor::new(data, self.shape.clone());
         }
 
-        let data: Vec<f64> = self.data.iter()
-            .zip(other.data.iter())
-            .map(|(a, b)| a + b)
-            .collect();
+        // Broadcasting path
+        let result_shape = Tensor::<f64>::broadcast_shape(&self.shape, &other.shape)?;
+        let result_strides = Tensor::<f64>::compute_strides(&result_shape);
+        let result_size: usize = result_shape.iter().product();
 
-        RealTensor::new(data, self.shape.clone())
+        let mut data = Vec::with_capacity(result_size);
+
+        for flat_idx in 0..result_size {
+            let result_indices = Tensor::<f64>::unravel_index(flat_idx, &result_shape, &result_strides);
+            let self_indices = Tensor::<f64>::broadcast_index(&result_indices, &self.shape, &result_shape);
+            let other_indices = Tensor::<f64>::broadcast_index(&result_indices, &other.shape, &result_shape);
+
+            let a = self.get(&self_indices)?;
+            let b = other.get(&other_indices)?;
+            data.push(a + b);
+        }
+
+        RealTensor::new(data, result_shape)
     }
 
-    /// Element-wise subtraction
+    /// Element-wise subtraction with broadcasting
     pub fn sub(&self, other: &RealTensor) -> Result<RealTensor, TensorError> {
-        if self.shape != other.shape {
-            return Err(TensorError::DimensionMismatch {
-                expected: self.shape.clone(),
-                got: other.shape.clone(),
-            });
+        // Fast path: if shapes are identical, use direct element-wise operation
+        if self.shape == other.shape {
+            let data: Vec<f64> = self.data.iter()
+                .zip(other.data.iter())
+                .map(|(a, b)| a - b)
+                .collect();
+            return RealTensor::new(data, self.shape.clone());
         }
 
-        let data: Vec<f64> = self.data.iter()
-            .zip(other.data.iter())
-            .map(|(a, b)| a - b)
-            .collect();
+        // Broadcasting path
+        let result_shape = Tensor::<f64>::broadcast_shape(&self.shape, &other.shape)?;
+        let result_strides = Tensor::<f64>::compute_strides(&result_shape);
+        let result_size: usize = result_shape.iter().product();
 
-        RealTensor::new(data, self.shape.clone())
+        let mut data = Vec::with_capacity(result_size);
+
+        for flat_idx in 0..result_size {
+            let result_indices = Tensor::<f64>::unravel_index(flat_idx, &result_shape, &result_strides);
+            let self_indices = Tensor::<f64>::broadcast_index(&result_indices, &self.shape, &result_shape);
+            let other_indices = Tensor::<f64>::broadcast_index(&result_indices, &other.shape, &result_shape);
+
+            let a = self.get(&self_indices)?;
+            let b = other.get(&other_indices)?;
+            data.push(a - b);
+        }
+
+        RealTensor::new(data, result_shape)
     }
 
-    /// Element-wise multiplication (Hadamard product)
+    /// Element-wise multiplication (Hadamard product) with broadcasting
     pub fn mul(&self, other: &RealTensor) -> Result<RealTensor, TensorError> {
-        if self.shape != other.shape {
-            return Err(TensorError::DimensionMismatch {
-                expected: self.shape.clone(),
-                got: other.shape.clone(),
-            });
+        // Fast path: if shapes are identical, use direct element-wise operation
+        if self.shape == other.shape {
+            let data: Vec<f64> = self.data.iter()
+                .zip(other.data.iter())
+                .map(|(a, b)| a * b)
+                .collect();
+            return RealTensor::new(data, self.shape.clone());
         }
 
-        let data: Vec<f64> = self.data.iter()
-            .zip(other.data.iter())
-            .map(|(a, b)| a * b)
-            .collect();
+        // Broadcasting path
+        let result_shape = Tensor::<f64>::broadcast_shape(&self.shape, &other.shape)?;
+        let result_strides = Tensor::<f64>::compute_strides(&result_shape);
+        let result_size: usize = result_shape.iter().product();
 
-        RealTensor::new(data, self.shape.clone())
+        let mut data = Vec::with_capacity(result_size);
+
+        for flat_idx in 0..result_size {
+            let result_indices = Tensor::<f64>::unravel_index(flat_idx, &result_shape, &result_strides);
+            let self_indices = Tensor::<f64>::broadcast_index(&result_indices, &self.shape, &result_shape);
+            let other_indices = Tensor::<f64>::broadcast_index(&result_indices, &other.shape, &result_shape);
+
+            let a = self.get(&self_indices)?;
+            let b = other.get(&other_indices)?;
+            data.push(a * b);
+        }
+
+        RealTensor::new(data, result_shape)
     }
 
-    /// Element-wise division
+    /// Element-wise division with broadcasting
     pub fn div(&self, other: &RealTensor) -> Result<RealTensor, TensorError> {
-        if self.shape != other.shape {
-            return Err(TensorError::DimensionMismatch {
-                expected: self.shape.clone(),
-                got: other.shape.clone(),
-            });
+        // Fast path: if shapes are identical, use direct element-wise operation
+        if self.shape == other.shape {
+            let data: Vec<f64> = self.data.iter()
+                .zip(other.data.iter())
+                .map(|(a, b)| a / b)
+                .collect();
+            return RealTensor::new(data, self.shape.clone());
         }
 
-        let data: Vec<f64> = self.data.iter()
-            .zip(other.data.iter())
-            .map(|(a, b)| a / b)
-            .collect();
+        // Broadcasting path
+        let result_shape = Tensor::<f64>::broadcast_shape(&self.shape, &other.shape)?;
+        let result_strides = Tensor::<f64>::compute_strides(&result_shape);
+        let result_size: usize = result_shape.iter().product();
 
-        RealTensor::new(data, self.shape.clone())
+        let mut data = Vec::with_capacity(result_size);
+
+        for flat_idx in 0..result_size {
+            let result_indices = Tensor::<f64>::unravel_index(flat_idx, &result_shape, &result_strides);
+            let self_indices = Tensor::<f64>::broadcast_index(&result_indices, &self.shape, &result_shape);
+            let other_indices = Tensor::<f64>::broadcast_index(&result_indices, &other.shape, &result_shape);
+
+            let a = self.get(&self_indices)?;
+            let b = other.get(&other_indices)?;
+            data.push(a / b);
+        }
+
+        RealTensor::new(data, result_shape)
     }
 
     /// Scalar addition
@@ -718,72 +886,128 @@ impl RealTensor {
 // ============================================================================
 
 impl ComplexTensor {
-    /// Element-wise addition
+    /// Element-wise addition with broadcasting
     pub fn add(&self, other: &ComplexTensor) -> Result<ComplexTensor, TensorError> {
-        if self.shape != other.shape {
-            return Err(TensorError::DimensionMismatch {
-                expected: self.shape.clone(),
-                got: other.shape.clone(),
-            });
+        // Fast path: if shapes are identical, use direct element-wise operation
+        if self.shape == other.shape {
+            let data: Vec<Complex> = self.data.iter()
+                .zip(other.data.iter())
+                .map(|(a, b)| *a + *b)
+                .collect();
+            return ComplexTensor::new(data, self.shape.clone());
         }
 
-        let data: Vec<Complex> = self.data.iter()
-            .zip(other.data.iter())
-            .map(|(a, b)| *a + *b)
-            .collect();
+        // Broadcasting path
+        let result_shape = Tensor::<Complex>::broadcast_shape(&self.shape, &other.shape)?;
+        let result_strides = Tensor::<Complex>::compute_strides(&result_shape);
+        let result_size: usize = result_shape.iter().product();
 
-        ComplexTensor::new(data, self.shape.clone())
+        let mut data = Vec::with_capacity(result_size);
+
+        for flat_idx in 0..result_size {
+            let result_indices = Tensor::<Complex>::unravel_index(flat_idx, &result_shape, &result_strides);
+            let self_indices = Tensor::<Complex>::broadcast_index(&result_indices, &self.shape, &result_shape);
+            let other_indices = Tensor::<Complex>::broadcast_index(&result_indices, &other.shape, &result_shape);
+
+            let a = self.get(&self_indices)?;
+            let b = other.get(&other_indices)?;
+            data.push(*a + *b);
+        }
+
+        ComplexTensor::new(data, result_shape)
     }
 
-    /// Element-wise subtraction
+    /// Element-wise subtraction with broadcasting
     pub fn sub(&self, other: &ComplexTensor) -> Result<ComplexTensor, TensorError> {
-        if self.shape != other.shape {
-            return Err(TensorError::DimensionMismatch {
-                expected: self.shape.clone(),
-                got: other.shape.clone(),
-            });
+        // Fast path: if shapes are identical, use direct element-wise operation
+        if self.shape == other.shape {
+            let data: Vec<Complex> = self.data.iter()
+                .zip(other.data.iter())
+                .map(|(a, b)| *a - *b)
+                .collect();
+            return ComplexTensor::new(data, self.shape.clone());
         }
 
-        let data: Vec<Complex> = self.data.iter()
-            .zip(other.data.iter())
-            .map(|(a, b)| *a - *b)
-            .collect();
+        // Broadcasting path
+        let result_shape = Tensor::<Complex>::broadcast_shape(&self.shape, &other.shape)?;
+        let result_strides = Tensor::<Complex>::compute_strides(&result_shape);
+        let result_size: usize = result_shape.iter().product();
 
-        ComplexTensor::new(data, self.shape.clone())
+        let mut data = Vec::with_capacity(result_size);
+
+        for flat_idx in 0..result_size {
+            let result_indices = Tensor::<Complex>::unravel_index(flat_idx, &result_shape, &result_strides);
+            let self_indices = Tensor::<Complex>::broadcast_index(&result_indices, &self.shape, &result_shape);
+            let other_indices = Tensor::<Complex>::broadcast_index(&result_indices, &other.shape, &result_shape);
+
+            let a = self.get(&self_indices)?;
+            let b = other.get(&other_indices)?;
+            data.push(*a - *b);
+        }
+
+        ComplexTensor::new(data, result_shape)
     }
 
-    /// Element-wise multiplication
+    /// Element-wise multiplication with broadcasting
     pub fn mul(&self, other: &ComplexTensor) -> Result<ComplexTensor, TensorError> {
-        if self.shape != other.shape {
-            return Err(TensorError::DimensionMismatch {
-                expected: self.shape.clone(),
-                got: other.shape.clone(),
-            });
+        // Fast path: if shapes are identical, use direct element-wise operation
+        if self.shape == other.shape {
+            let data: Vec<Complex> = self.data.iter()
+                .zip(other.data.iter())
+                .map(|(a, b)| *a * *b)
+                .collect();
+            return ComplexTensor::new(data, self.shape.clone());
         }
 
-        let data: Vec<Complex> = self.data.iter()
-            .zip(other.data.iter())
-            .map(|(a, b)| *a * *b)
-            .collect();
+        // Broadcasting path
+        let result_shape = Tensor::<Complex>::broadcast_shape(&self.shape, &other.shape)?;
+        let result_strides = Tensor::<Complex>::compute_strides(&result_shape);
+        let result_size: usize = result_shape.iter().product();
 
-        ComplexTensor::new(data, self.shape.clone())
+        let mut data = Vec::with_capacity(result_size);
+
+        for flat_idx in 0..result_size {
+            let result_indices = Tensor::<Complex>::unravel_index(flat_idx, &result_shape, &result_strides);
+            let self_indices = Tensor::<Complex>::broadcast_index(&result_indices, &self.shape, &result_shape);
+            let other_indices = Tensor::<Complex>::broadcast_index(&result_indices, &other.shape, &result_shape);
+
+            let a = self.get(&self_indices)?;
+            let b = other.get(&other_indices)?;
+            data.push(*a * *b);
+        }
+
+        ComplexTensor::new(data, result_shape)
     }
 
-    /// Element-wise division
+    /// Element-wise division with broadcasting
     pub fn div(&self, other: &ComplexTensor) -> Result<ComplexTensor, TensorError> {
-        if self.shape != other.shape {
-            return Err(TensorError::DimensionMismatch {
-                expected: self.shape.clone(),
-                got: other.shape.clone(),
-            });
+        // Fast path: if shapes are identical, use direct element-wise operation
+        if self.shape == other.shape {
+            let data: Vec<Complex> = self.data.iter()
+                .zip(other.data.iter())
+                .map(|(a, b)| *a / *b)
+                .collect();
+            return ComplexTensor::new(data, self.shape.clone());
         }
 
-        let data: Vec<Complex> = self.data.iter()
-            .zip(other.data.iter())
-            .map(|(a, b)| *a / *b)
-            .collect();
+        // Broadcasting path
+        let result_shape = Tensor::<Complex>::broadcast_shape(&self.shape, &other.shape)?;
+        let result_strides = Tensor::<Complex>::compute_strides(&result_shape);
+        let result_size: usize = result_shape.iter().product();
 
-        ComplexTensor::new(data, self.shape.clone())
+        let mut data = Vec::with_capacity(result_size);
+
+        for flat_idx in 0..result_size {
+            let result_indices = Tensor::<Complex>::unravel_index(flat_idx, &result_shape, &result_strides);
+            let self_indices = Tensor::<Complex>::broadcast_index(&result_indices, &self.shape, &result_shape);
+            let other_indices = Tensor::<Complex>::broadcast_index(&result_indices, &other.shape, &result_shape);
+
+            let a = self.get(&self_indices)?;
+            let b = other.get(&other_indices)?;
+            data.push(*a / *b);
+        }
+
+        ComplexTensor::new(data, result_shape)
     }
 
     /// Scalar addition
@@ -1529,5 +1753,183 @@ mod tests {
         let abs_tensor = c.abs();
         assert_eq!(abs_tensor.data()[0], 5.0);   // sqrt(3^2 + 4^2)
         assert_eq!(abs_tensor.data()[1], 13.0);  // sqrt(5^2 + 12^2)
+    }
+
+    // ========================================================================
+    // N-Dimensional Broadcasting Tests
+    // ========================================================================
+
+    #[test]
+    fn test_broadcast_vector_to_matrix() {
+        // Matrix [2, 3] + Vector [3] → broadcast to [2, 3]
+        let m = RealTensor::matrix(2, 3, vec![
+            1.0, 2.0, 3.0,
+            4.0, 5.0, 6.0,
+        ]).unwrap();
+
+        let v = RealTensor::vector(vec![10.0, 20.0, 30.0]);
+
+        let result = m.add(&v).unwrap();
+
+        assert_eq!(result.shape(), &[2, 3]);
+        // First row: [1+10, 2+20, 3+30] = [11, 22, 33]
+        assert_eq!(*result.get(&[0, 0]).unwrap(), 11.0);
+        assert_eq!(*result.get(&[0, 1]).unwrap(), 22.0);
+        assert_eq!(*result.get(&[0, 2]).unwrap(), 33.0);
+        // Second row: [4+10, 5+20, 6+30] = [14, 25, 36]
+        assert_eq!(*result.get(&[1, 0]).unwrap(), 14.0);
+        assert_eq!(*result.get(&[1, 1]).unwrap(), 25.0);
+        assert_eq!(*result.get(&[1, 2]).unwrap(), 36.0);
+    }
+
+    #[test]
+    fn test_broadcast_column_to_matrix() {
+        // Matrix [2, 3] + Column [2, 1] → broadcast to [2, 3]
+        let m = RealTensor::matrix(2, 3, vec![
+            1.0, 2.0, 3.0,
+            4.0, 5.0, 6.0,
+        ]).unwrap();
+
+        let col = RealTensor::matrix(2, 1, vec![100.0, 200.0]).unwrap();
+
+        let result = m.add(&col).unwrap();
+
+        assert_eq!(result.shape(), &[2, 3]);
+        // First row: [1+100, 2+100, 3+100] = [101, 102, 103]
+        assert_eq!(*result.get(&[0, 0]).unwrap(), 101.0);
+        assert_eq!(*result.get(&[0, 1]).unwrap(), 102.0);
+        assert_eq!(*result.get(&[0, 2]).unwrap(), 103.0);
+        // Second row: [4+200, 5+200, 6+200] = [204, 205, 206]
+        assert_eq!(*result.get(&[1, 0]).unwrap(), 204.0);
+        assert_eq!(*result.get(&[1, 1]).unwrap(), 205.0);
+        assert_eq!(*result.get(&[1, 2]).unwrap(), 206.0);
+    }
+
+    #[test]
+    fn test_broadcast_3d_tensor() {
+        // Tensor [2, 2, 1] + Tensor [2, 1, 3] → broadcast to [2, 2, 3]
+        let t1 = RealTensor::new(vec![1.0, 2.0, 3.0, 4.0], vec![2, 2, 1]).unwrap();
+        let t2 = RealTensor::new(vec![10.0, 20.0, 30.0, 40.0, 50.0, 60.0], vec![2, 1, 3]).unwrap();
+
+        let result = t1.add(&t2).unwrap();
+
+        assert_eq!(result.shape(), &[2, 2, 3]);
+        assert_eq!(result.size(), 12);
+
+        // Check a few key elements
+        assert_eq!(*result.get(&[0, 0, 0]).unwrap(), 11.0); // 1 + 10
+        assert_eq!(*result.get(&[0, 0, 1]).unwrap(), 21.0); // 1 + 20
+        assert_eq!(*result.get(&[0, 0, 2]).unwrap(), 31.0); // 1 + 30
+    }
+
+    #[test]
+    fn test_broadcast_subtraction() {
+        // Test broadcasting with subtraction
+        let m = RealTensor::matrix(3, 2, vec![
+            10.0, 20.0,
+            30.0, 40.0,
+            50.0, 60.0,
+        ]).unwrap();
+
+        let v = RealTensor::vector(vec![1.0, 2.0]);
+
+        let result = m.sub(&v).unwrap();
+
+        assert_eq!(result.shape(), &[3, 2]);
+        assert_eq!(*result.get(&[0, 0]).unwrap(), 9.0);   // 10 - 1
+        assert_eq!(*result.get(&[0, 1]).unwrap(), 18.0);  // 20 - 2
+        assert_eq!(*result.get(&[1, 0]).unwrap(), 29.0);  // 30 - 1
+        assert_eq!(*result.get(&[1, 1]).unwrap(), 38.0);  // 40 - 2
+    }
+
+    #[test]
+    fn test_broadcast_multiplication() {
+        // Test broadcasting with multiplication
+        let m = RealTensor::matrix(2, 3, vec![
+            1.0, 2.0, 3.0,
+            4.0, 5.0, 6.0,
+        ]).unwrap();
+
+        let v = RealTensor::vector(vec![10.0, 100.0, 1000.0]);
+
+        let result = m.mul(&v).unwrap();
+
+        assert_eq!(result.shape(), &[2, 3]);
+        assert_eq!(*result.get(&[0, 0]).unwrap(), 10.0);    // 1 * 10
+        assert_eq!(*result.get(&[0, 1]).unwrap(), 200.0);   // 2 * 100
+        assert_eq!(*result.get(&[0, 2]).unwrap(), 3000.0);  // 3 * 1000
+        assert_eq!(*result.get(&[1, 0]).unwrap(), 40.0);    // 4 * 10
+        assert_eq!(*result.get(&[1, 1]).unwrap(), 500.0);   // 5 * 100
+        assert_eq!(*result.get(&[1, 2]).unwrap(), 6000.0);  // 6 * 1000
+    }
+
+    #[test]
+    fn test_broadcast_division() {
+        // Test broadcasting with division
+        let m = RealTensor::matrix(2, 2, vec![
+            100.0, 200.0,
+            300.0, 400.0,
+        ]).unwrap();
+
+        let v = RealTensor::vector(vec![10.0, 20.0]);
+
+        let result = m.div(&v).unwrap();
+
+        assert_eq!(result.shape(), &[2, 2]);
+        assert_eq!(*result.get(&[0, 0]).unwrap(), 10.0);  // 100 / 10
+        assert_eq!(*result.get(&[0, 1]).unwrap(), 10.0);  // 200 / 20
+        assert_eq!(*result.get(&[1, 0]).unwrap(), 30.0);  // 300 / 10
+        assert_eq!(*result.get(&[1, 1]).unwrap(), 20.0);  // 400 / 20
+    }
+
+    #[test]
+    fn test_broadcast_complex_tensors() {
+        // Test broadcasting with complex tensors
+        let m = ComplexTensor::new(vec![
+            Complex::new(1.0, 1.0),
+            Complex::new(2.0, 2.0),
+            Complex::new(3.0, 3.0),
+            Complex::new(4.0, 4.0),
+        ], vec![2, 2]).unwrap();
+
+        let v = ComplexTensor::vector(vec![
+            Complex::new(10.0, 0.0),
+            Complex::new(20.0, 0.0),
+        ]);
+
+        let result = m.add(&v).unwrap();
+
+        assert_eq!(result.shape(), &[2, 2]);
+        assert_eq!(*result.get(&[0, 0]).unwrap(), Complex::new(11.0, 1.0));  // (1+1i) + 10
+        assert_eq!(*result.get(&[0, 1]).unwrap(), Complex::new(22.0, 2.0));  // (2+2i) + 20
+    }
+
+    #[test]
+    fn test_broadcast_incompatible_shapes() {
+        // Test that incompatible shapes fail properly
+        let m1 = RealTensor::matrix(2, 3, vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]).unwrap();
+        let m2 = RealTensor::matrix(2, 4, vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]).unwrap();
+
+        let result = m1.add(&m2);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_broadcast_higher_rank() {
+        // Test broadcasting from lower to higher rank
+        // [3, 4, 5] + [5] → should broadcast to [3, 4, 5]
+        let t1 = RealTensor::ones(vec![3, 4, 5]);
+        let t2 = RealTensor::vector(vec![1.0, 2.0, 3.0, 4.0, 5.0]);
+
+        let result = t1.add(&t2).unwrap();
+
+        assert_eq!(result.shape(), &[3, 4, 5]);
+
+        // Every element in the last dimension should be offset by the vector
+        assert_eq!(*result.get(&[0, 0, 0]).unwrap(), 2.0);  // 1 + 1
+        assert_eq!(*result.get(&[0, 0, 1]).unwrap(), 3.0);  // 1 + 2
+        assert_eq!(*result.get(&[0, 0, 2]).unwrap(), 4.0);  // 1 + 3
+        assert_eq!(*result.get(&[0, 0, 3]).unwrap(), 5.0);  // 1 + 4
+        assert_eq!(*result.get(&[0, 0, 4]).unwrap(), 6.0);  // 1 + 5
     }
 }

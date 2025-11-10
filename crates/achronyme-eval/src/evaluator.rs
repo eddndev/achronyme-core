@@ -118,6 +118,18 @@ impl Evaluator {
                 handlers::variables::evaluate_declaration(self, name, initializer)
             }
             AstNode::VariableRef(name) => handlers::variables::evaluate_reference(self, name),
+            AstNode::SelfReference => {
+                // Look up 'self' in the environment
+                self.env.get("self").map_err(|_| {
+                    "'self' can only be used inside record methods".to_string()
+                })
+            }
+            AstNode::RecReference => {
+                // Look up 'rec' in the environment
+                self.env.get("rec").map_err(|_| {
+                    "'rec' can only be used inside functions".to_string()
+                })
+            }
 
             // Field access
             AstNode::FieldAccess { record, field } => {

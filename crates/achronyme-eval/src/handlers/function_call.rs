@@ -9,6 +9,62 @@ use crate::evaluator::Evaluator;
 /// routing them to the appropriate handler based on the function name.
 
 pub fn dispatch(evaluator: &mut Evaluator, name: &str, args: &[AstNode]) -> Result<Value, String> {
+    // Check if name contains a dot (field access like "record.field")
+    if name.contains('.') {
+        let parts: Vec<&str> = name.split('.').collect();
+        if parts.len() >= 2 {
+            // Get the record from the first part
+            let record_name = parts[0];
+
+            if evaluator.environment().has(record_name) {
+                let mut current_value = evaluator.environment().get(record_name)?;
+                let mut parent_record = None; // Track the record containing the method
+
+                // Navigate through nested fields
+                for &field_name in parts[1..].iter() {
+                    match current_value {
+                        Value::Record(ref map) => {
+                            // This record might be the parent of the method we're calling
+                            parent_record = Some(Value::Record(map.clone()));
+
+                            current_value = map.get(field_name)
+                                .cloned()
+                                .ok_or_else(|| format!("Field '{}' not found in record", field_name))?;
+                        }
+                        _ => return Err(format!("Cannot access field '{}' on non-record value", field_name)),
+                    }
+                }
+
+                // If the final value is a function, call it with 'self' injected
+                if let Value::Function(ref func) = current_value {
+                    let mut arg_values = Vec::new();
+                    for arg in args {
+                        arg_values.push(evaluator.evaluate(arg)?);
+                    }
+
+                    // If we have a parent record, inject it as 'self'
+                    if let Some(record) = parent_record {
+                        // Push a new scope, define 'self', call function, then pop scope
+                        evaluator.environment_mut().push_scope();
+                        evaluator.environment_mut().define("self".to_string(), record)?;
+
+                        let func_clone = func.clone();
+                        let result = evaluator.apply_lambda(&func_clone, arg_values);
+
+                        evaluator.environment_mut().pop_scope();
+                        return result;
+                    } else {
+                        // No parent record, call normally
+                        let func_clone = func.clone();
+                        return evaluator.apply_lambda(&func_clone, arg_values);
+                    }
+                }
+
+                return Err(format!("'{}' is not a function", name));
+            }
+        }
+    }
+
     // Check if it's a constant (zero arguments)
     if args.is_empty() {
         if evaluator.constants().has(name) {

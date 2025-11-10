@@ -339,40 +339,14 @@ fn format_value(value: &achronyme_types::value::Value) -> String {
                     format!("[{}]", row_strings.join(",\n "))
                 }
                 _ => {
-                    // Higher-order tensor
-                    format!("Tensor(shape: {:?})", t.shape())
+                    // Higher-order tensor (3D+) - use Display trait
+                    format!("{}", t)
                 }
             }
         }
         Value::ComplexTensor(ct) => {
-            // Format complex tensor
-            match ct.rank() {
-                0 => {
-                    let c = &ct.data()[0];
-                    if c.im >= 0.0 {
-                        format!("{}+{}i", c.re, c.im)
-                    } else {
-                        format!("{}{}i", c.re, c.im)
-                    }
-                }
-                1 => {
-                    // Complex vector
-                    let elements: Vec<String> = ct.data().iter()
-                        .map(|c| {
-                            if c.im >= 0.0 {
-                                format!("{}+{}i", c.re, c.im)
-                            } else {
-                                format!("{}{}i", c.re, c.im)
-                            }
-                        })
-                        .collect();
-                    format!("[{}]", elements.join(", "))
-                }
-                _ => {
-                    // Higher-order complex tensor
-                    format!("ComplexTensor(shape: {:?})", ct.shape())
-                }
-            }
+            // Format complex tensor - use Display trait
+            format!("{}", ct)
         }
         Value::Record(map) => {
             let mut fields: Vec<String> = map.iter()

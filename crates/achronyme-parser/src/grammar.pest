@@ -54,9 +54,12 @@ string_char = {
   | "\\" ~ ("\"" | "\\" | "n" | "t" | "r")
 }
 
-// Identifiers: x, foo, my_var, PI, sin
+// Reserved keywords
+keyword = _{ "let" | "rec" | "self" | "true" | "false" }
+
+// Identifiers: x, foo, my_var, PI, sin (but not keywords)
 identifier = @{
-    (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")*
+    !keyword ~ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")*
 }
 
 // ============================================================================
@@ -86,10 +89,10 @@ record_field = {
 // Lambda Functions
 // ============================================================================
 
-// Lambda parameters: x or (x, y, z)
+// Lambda parameters: x or (x, y, z) or ()
 lambda_params = {
-    identifier                                      // Single param: x
-  | ("(" ~ identifier ~ ("," ~ identifier)* ~ ")") // Multi param: (x, y)
+    identifier                                       // Single param: x
+  | ("(" ~ (identifier ~ ("," ~ identifier)*)? ~ ")") // Multi param or no params: (x, y) or ()
 }
 
 // Lambda: x => x^2 or (x, y) => x + y
@@ -101,14 +104,26 @@ lambda = {
 // Function Calls
 // ============================================================================
 
-// Function call: sin(x), map(f, v), linprog(c, A, b, 1)
+// Callable path: identifier or field access path (sin, f.add, obj.nested.method)
+// Also allows 'rec' and 'self' for function calls like rec(x) or self.method()
+callable = @{
+    (identifier | "rec" | "self") ~ ("." ~ identifier)*
+}
+
+// Function call: sin(x), map(f, v), f.add(1), obj.method(x, y)
 function_call = {
-    identifier ~ "(" ~ (expr ~ ("," ~ expr)*)? ~ ")"
+    callable ~ "(" ~ (expr ~ ("," ~ expr)*)? ~ ")"
 }
 
 // ============================================================================
 // Expressions (with operator precedence)
 // ============================================================================
+
+// Self-reference (for use in records)
+self_ref = { "self" }
+
+// Rec-reference (for recursive function calls)
+rec_ref = { "rec" }
 
 // Primary expressions (highest precedence)
 primary = {
@@ -120,6 +135,8 @@ primary = {
   | array          // Arrays/tensors (vectors, matrices, and higher-dimensional)
   | lambda
   | function_call
+  | self_ref       // Self-reference in records
+  | rec_ref        // Rec-reference for recursive calls
   | identifier
   | "(" ~ expr ~ ")"
 }

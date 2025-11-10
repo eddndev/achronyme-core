@@ -69,6 +69,8 @@ pub enum AstNode {
         initializer: Box<AstNode>,
     },
     VariableRef(String),
+    SelfReference, // 'self' keyword for use in records
+    RecReference,  // 'rec' keyword for recursive function calls
     Lambda {
         params: Vec<String>,
         body: Box<AstNode>,

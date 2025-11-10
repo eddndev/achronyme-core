@@ -70,6 +70,7 @@ fn build_ast_from_statement(pair: Pair<Rule>) -> Result<AstNode, String> {
 fn build_let_statement(pair: Pair<Rule>) -> Result<AstNode, String> {
     let mut inner = pair.into_inner();
 
+    // Grammar: "let" ~ identifier ~ "=" ~ expr
     let identifier = inner.next()
         .ok_or("Missing identifier in let statement")?
         .as_str()
@@ -400,6 +401,12 @@ fn build_primary(pair: Pair<Rule>) -> Result<AstNode, String> {
         Rule::identifier => {
             Ok(AstNode::VariableRef(inner.as_str().to_string()))
         }
+        Rule::self_ref => {
+            Ok(AstNode::SelfReference)
+        }
+        Rule::rec_ref => {
+            Ok(AstNode::RecReference)
+        }
         Rule::array => build_array(inner),
         Rule::vector => build_array(inner),  // Alias for array
         Rule::matrix => build_array(inner),  // Alias for array
@@ -463,11 +470,8 @@ fn extract_lambda_params(pair: Pair<Rule>) -> Result<Vec<String>, String> {
         .map(|p| p.as_str().to_string())
         .collect();
 
-    if params.is_empty() {
-        Err("Lambda must have at least one parameter".to_string())
-    } else {
-        Ok(params)
-    }
+    // Allow empty parameter lists for lambdas like () => expr
+    Ok(params)
 }
 
 fn build_function_call(pair: Pair<Rule>) -> Result<AstNode, String> {

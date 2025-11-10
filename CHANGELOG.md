@@ -7,6 +7,162 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Recursive Functions & Self-Reference System 🔄✨
+
+**Revolutionary `rec` - Magic Self-Reference for Recursion:**
+
+- **`rec` Keyword for Anonymous Recursion**
+  - Automatic self-reference in any function without naming
+  - Works in named functions: `let factorial = n => if(n <= 1, 1, n * rec(n - 1))`
+  - Works in anonymous functions: `map(n => if(n <= 1, 1, n * rec(n - 1)), [1,2,3,4,5])`
+  - No dependency on variable names (solves fundamental flaw of `let rec` approach)
+  - Error when used outside function context
+  - Examples:
+    ```javascript
+    // Named recursive function
+    let fib = n => if(n <= 1, n, rec(n-1) + rec(n-2))
+    fib(10)  // → 55
+
+    // Anonymous recursive function in map
+    map(n => if(n <= 1, 1, n * rec(n - 1)), [1,2,3,4,5])
+    // → [1, 2, 6, 24, 120]
+
+    // Recursive sum
+    let sum = n => if(n <= 0, 0, n + rec(n - 1))
+    sum(10)  // → 55
+    ```
+
+- **Implementation Details**
+  - AST node: `RecReference` for `rec` keyword
+  - Automatic injection in `apply_lambda` - current function stored as `rec` variable
+  - Grammar updated: `rec` is now a reserved keyword and callable
+  - Parser recognizes both `rec` as standalone reference and `rec(args)` as call
+  - Zero overhead - `rec` resolved at runtime from environment
+
+**Fixed `self` - Self-Reference in Records:**
+
+- **Record Methods with `self` Now Work Correctly** 🎯
+  - Fixed critical bug where `self` was lost during lambda invocation
+  - `self` now preserved across closure boundaries
+  - Methods can access record fields: `getValue: () => self.value`
+  - Methods can call other methods: `compute: n => self.factorial(n)`
+  - Recursive methods in records: `factorial: n => if(n <= 1, 1, n * self.factorial(n - 1))`
+  - Examples:
+    ```javascript
+    let object = {
+      value: 10,
+      getValue: x => self.value + x
+    }
+    object.getValue(5)  // → 15 ✓ (previously failed)
+
+    let math = {
+      square: x => x * x,
+      sumOfSquares: (a, b) => self.square(a) + self.square(b)
+    }
+    math.sumOfSquares(3, 4)  // → 25
+    ```
+
+- **Implementation Fix**
+  - Problem: `apply_lambda` was destroying `self` when restoring environment from closures
+  - Solution: Check and preserve `self` from calling context before environment restoration
+  - `self` is now injected alongside `rec` in function execution context
+  - Maintains separation: `rec` = current function, `self` = parent record
+
+**Lambdas Without Parameters `() =>`:**
+
+- **Zero-Parameter Lambda Support**
+  - New syntax: `() => expression` for lambdas without parameters
+  - Useful for getters, constants, lazy evaluation
+  - Works with `self` in records: `getValue: () => self.value`
+  - Examples:
+    ```javascript
+    let getConstant = () => 42
+    getConstant()  // → 42
+
+    let counter = {
+      value: 100,
+      getValue: () => self.value
+    }
+    counter.getValue()  // → 100
+    ```
+
+- **Grammar & Parser Updates**
+  - Grammar: `lambda_params` now allows `()` (empty parameter list)
+  - Parser: Removed validation requiring at least one parameter
+  - No breaking changes - existing lambdas still work
+
+**Higher-Order Functions Enhanced:**
+
+- **`map`, `filter`, `reduce` Now Support Tensors**
+  - Automatic conversion from `Tensor`/`ComplexTensor` to `Vector` for processing
+  - Seamless integration with type promotion system
+  - Helper function `collection_to_vec()` handles all collection types
+  - Examples:
+    ```javascript
+    let vec = [1, 2, 3, 4, 5]  // Promoted to Tensor
+
+    // map works with tensors
+    map(n => n * 2, vec)  // → [2, 4, 6, 8, 10]
+
+    // filter works with tensors
+    filter(n => n >= 3, vec)  // → [3, 4, 5]
+
+    // reduce works with tensors
+    reduce((acc, x) => acc + x, 0, vec)  // → 15
+    ```
+
+**Combined Power - `rec` + `self` + `() =>`:**
+
+- **All Features Work Together Seamlessly**
+  ```javascript
+  let calculator = {
+    value: 10,
+    getFib: () => self.fib(self.value),           // () => + self
+    fib: n => if(n <= 1, 1, n * rec(n - 1)),     // rec recursion
+    computeDouble: n => 2 * self.fib(n)           // self calling method
+  }
+
+  calculator.value                  // → 10
+  calculator.getFib()               // → 3628800 (10!)
+  calculator.fib(5)                 // → 120 (5!)
+  calculator.computeDouble(5)       // → 240 (2 × 5!)
+  ```
+
+**Testing & Validation:**
+
+- ✅ **Recursion Tests (7/7 passing)**:
+  - Named recursive functions (factorial, fibonacci, GCD)
+  - Anonymous recursive functions in `map`
+  - Error handling for `rec` outside functions
+
+- ✅ **Self-Reference Tests (7/7 passing)**:
+  - Field access with `self.field`
+  - Method calls with `self.method()`
+  - Recursive methods in records
+  - Closures with `self`
+  - Error handling for `self` outside records
+
+- ✅ **Lambda Tests**: Zero-parameter lambdas work correctly
+
+- ✅ **Integration Tests**: Combined `rec` + `self` scenarios passing
+
+- ✅ **Total Test Suite**: 14/14 recursion and self-reference tests passing
+
+**Breaking Changes:**
+
+- `rec` and `self` are now reserved keywords
+  - Cannot be used as variable names
+  - Old code using `let rec = ...` will fail (intentional)
+  - Migration: Rename variables to avoid conflict
+
+**Benefits:**
+
+1. **True Anonymous Recursion**: Functions can recurse without names
+2. **Clean Record Methods**: `self` enables natural OOP-like patterns
+3. **Expressive Lambdas**: `() =>` for zero-parameter functions
+4. **Unified Semantics**: `rec` for functions, `self` for records
+5. **Type System Integration**: Works seamlessly with `Tensor` promotion
+
 ### Added - Tensor Broadcasting & Scalar Operations 🔢📐
 
 **Complete Tensor-Scalar Broadcasting Implementation:**

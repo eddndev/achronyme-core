@@ -38,8 +38,20 @@ pub fn apply_lambda(
     // Save current environment
     let saved_env = evaluator.environment().clone();
 
+    // Check if 'self' is defined in the current environment (for record methods)
+    let self_value = saved_env.get("self").ok();
+
     // Create new environment from closure
     *evaluator.environment_mut() = Environment::from_snapshot(function.captured_vars.clone());
+
+    // Inject the current function as 'rec' for recursive calls
+    // This allows any function to reference itself using 'rec'
+    evaluator.environment_mut().define("rec".to_string(), Value::Function(function.clone()))?;
+
+    // If 'self' was available in the calling context, inject it (for record methods)
+    if let Some(self_val) = self_value {
+        evaluator.environment_mut().define("self".to_string(), self_val)?;
+    }
 
     // Push a new scope for lambda parameters (enables shadowing)
     evaluator.environment_mut().push_scope();
