@@ -1,0 +1,22 @@
+// Test IIFE (Immediately Invoked Function Expressions)
+
+// Test 1: Simple IIFE
+let result1 = (x => x * 2)(5)
+
+// Test 2: IIFE without parameters
+let result2 = (() => 42)()
+
+// Test 3: IIFE with multiple parameters
+let result3 = ((a, b) => a + b)(10, 20)
+
+// Test 4: IIFE with rec (recursive factorial)
+let result4 = (n => if(n <= 1, 1, n * rec(n - 1)))(5)
+
+// Test 5: Your original example - inline factorial in record
+let n = {
+    value: 10,
+    getFac: () => (n => if(n <= 1, 1, n * rec(n - 1)))(self.value)
+}
+
+// Show all results
+[result1, result2, result3, result4, n.getFac()]

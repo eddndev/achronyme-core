@@ -477,16 +477,29 @@ fn extract_lambda_params(pair: Pair<Rule>) -> Result<Vec<String>, String> {
 fn build_function_call(pair: Pair<Rule>) -> Result<AstNode, String> {
     let mut inner = pair.into_inner();
 
-    let name = inner.next()
-        .ok_or("Missing function name")?
-        .as_str()
-        .to_string();
+    let first = inner.next()
+        .ok_or("Missing function name or expression")?;
+
+    // Check if this is a callable (identifier/self/rec) or an expression (IIFE)
+    let is_callable = first.as_rule() == Rule::callable;
 
     let args: Result<Vec<AstNode>, String> = inner
         .map(|p| build_ast_from_expr(p))
         .collect();
 
     let args = args?;
+
+    // If it's an expression (IIFE), return CallExpression
+    if !is_callable {
+        let callee = build_ast_from_expr(first)?;
+        return Ok(AstNode::CallExpression {
+            callee: Box::new(callee),
+            args,
+        });
+    }
+
+    // Otherwise, it's a normal function call
+    let name = first.as_str().to_string();
 
     // Special handling for if() function
     if name == "if" {

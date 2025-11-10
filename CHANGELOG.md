@@ -91,6 +91,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Parser: Removed validation requiring at least one parameter
   - No breaking changes - existing lambdas still work
 
+**IIFE (Immediately Invoked Function Expressions):**
+
+- **Full IIFE Support** 🎯
+  - Call lambda expressions immediately: `(lambda)(args)`
+  - Enables inline function execution without naming
+  - Works with all lambda features: `rec`, `self`, closures
+  - Examples:
+    ```javascript
+    // Basic IIFE
+    (x => x * 2)(21)  // → 42
+
+    // IIFE without parameters
+    (() => 100)()  // → 100
+
+    // IIFE with multiple parameters
+    ((a, b, c) => a + b * c)(2, 3, 4)  // → 14
+
+    // IIFE with rec (recursive factorial inline)
+    (n => if(n <= 1, 1, n * rec(n - 1)))(5)  // → 120
+
+    // IIFE in record with self
+    let obj = {
+      value: 10,
+      getFac: () => (n => if(n <= 1, 1, n * rec(n - 1)))(self.value)
+    }
+    obj.getFac()  // → 3628800 (10!)
+
+    // Nested IIFE
+    ((x => x + 1)((y => y * 2)(5)))  // → 11
+
+    // IIFE returning IIFE (currying)
+    ((x => y => x + y)(10))(5)  // → 15
+    ```
+
+- **Implementation Details**
+  - New AST node: `CallExpression { callee, args }`
+  - Keeps existing `FunctionCall` for named calls (backward compatible)
+  - Grammar: `function_call` accepts `(expr)(args)` pattern
+  - Parser: Detects callable vs expression and routes appropriately
+  - Evaluator: Evaluates callee expression then applies as function
+
+- **Use Cases Unlocked**
+  1. **Inline Computation**: Execute logic without polluting scope
+  2. **Scoped Variables**: Create local scope for temporary variables
+  3. **Factory Pattern**: Generate values with immediate execution
+  4. **Recursive Inline**: Recursion without declaring separate function
+  5. **Functional Composition**: Nest IIFEs for complex transformations
+
 **Higher-Order Functions Enhanced:**
 
 - **`map`, `filter`, `reduce` Now Support Tensors**
@@ -144,9 +192,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - ✅ **Lambda Tests**: Zero-parameter lambdas work correctly
 
-- ✅ **Integration Tests**: Combined `rec` + `self` scenarios passing
+- ✅ **IIFE Tests (9/9 passing)**:
+  - Basic IIFE with parameters
+  - IIFE without parameters `(() => expr)()`
+  - Multi-parameter IIFE
+  - Nested IIFE
+  - IIFE with `rec` (recursive inline)
+  - IIFE in records with `self`
+  - IIFE with closure capture
+  - IIFE returning IIFE (currying)
 
-- ✅ **Total Test Suite**: 14/14 recursion and self-reference tests passing
+- ✅ **Integration Tests**: Combined `rec` + `self` + IIFE scenarios passing
+
+- ✅ **Total Test Suite**: 14/14 recursion and self-reference tests + 9/9 IIFE tests passing
 
 **Breaking Changes:**
 
@@ -157,11 +215,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Benefits:**
 
-1. **True Anonymous Recursion**: Functions can recurse without names
+1. **True Anonymous Recursion**: Functions can recurse without names via `rec`
 2. **Clean Record Methods**: `self` enables natural OOP-like patterns
 3. **Expressive Lambdas**: `() =>` for zero-parameter functions
-4. **Unified Semantics**: `rec` for functions, `self` for records
-5. **Type System Integration**: Works seamlessly with `Tensor` promotion
+4. **IIFE Power**: Inline execution without polluting namespace
+5. **Unified Semantics**: `rec` for functions, `self` for records
+6. **Type System Integration**: Works seamlessly with `Tensor` promotion
+7. **Functional Programming**: Full support for higher-order patterns (closures, currying, IIFE)
 
 ### Added - Tensor Broadcasting & Scalar Operations 🔢📐
 

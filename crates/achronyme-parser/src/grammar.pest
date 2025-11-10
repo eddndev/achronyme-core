@@ -111,8 +111,9 @@ callable = @{
 }
 
 // Function call: sin(x), map(f, v), f.add(1), obj.method(x, y)
+// Also supports IIFE: (n => n * 2)(5), (() => 42)()
 function_call = {
-    callable ~ "(" ~ (expr ~ ("," ~ expr)*)? ~ ")"
+    (callable | ("(" ~ expr ~ ")")) ~ "(" ~ (expr ~ ("," ~ expr)*)? ~ ")"
 }
 
 // ============================================================================

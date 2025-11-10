@@ -181,6 +181,26 @@ impl Evaluator {
             AstNode::FunctionCall { name, args } => {
                 handlers::function_call::dispatch(self, name, args)
             }
+            AstNode::CallExpression { callee, args } => {
+                // Evaluate callee to get the function
+                let func_value = self.evaluate(callee)?;
+
+                // Must be a function
+                match func_value {
+                    Value::Function(ref func) => {
+                        // Evaluate arguments
+                        let mut arg_values = Vec::new();
+                        for arg in args {
+                            arg_values.push(self.evaluate(arg)?);
+                        }
+
+                        // Apply the function
+                        let func_clone = func.clone();
+                        self.apply_lambda(&func_clone, arg_values)
+                    }
+                    _ => Err("CallExpression requires a function, got non-function value".to_string()),
+                }
+            }
             AstNode::Lambda { params, body } => {
                 handlers::functions::evaluate_lambda(self, params, body)
             }

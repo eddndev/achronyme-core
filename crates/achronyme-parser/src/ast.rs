@@ -54,6 +54,10 @@ pub enum AstNode {
         name: String,
         args: Vec<AstNode>,
     },
+    CallExpression {
+        callee: Box<AstNode>,  // Expression that evaluates to a function (for IIFE)
+        args: Vec<AstNode>,
+    },
     ComplexLiteral {
         re: f64,
         im: f64,
