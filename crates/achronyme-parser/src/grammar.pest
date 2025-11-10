@@ -35,8 +35,9 @@ COMMENT = _{ "//" ~ (!"\n" ~ ANY)* }
 boolean = { "true" | "false" }
 
 // Numbers: 123, 3.14, -42, 1.5e-10, 2.5E+3
+// Use negative lookahead to prevent matching "5." when followed by another "." (for ranges like "5..")
 number = @{
-    "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)?
+    "-"? ~ ASCII_DIGIT+ ~ ("." ~ !"." ~ ASCII_DIGIT+)? ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)?
 }
 
 // Complex numbers: 3i, -2i
@@ -142,9 +143,30 @@ primary = {
   | "(" ~ expr ~ ")"
 }
 
+// Range expression for slicing: start..end, start.., ..end, ..
+// We need to be explicit to avoid ambiguity with the greedy PEG parser
+range_expr = {
+    expr ~ ".." ~ expr  // start..end
+  | expr ~ ".."          // start..
+  | ".." ~ expr          // ..end
+  | ".."                 // ..
+}
+
+// Access argument: can be an index expression or a range for slicing
+// Try range_expr first since it's more specific
+access_arg = {
+    range_expr | expr
+}
+
+// Index/slice access: tensor[0, 1, 2], tensor[0, .., ..], tensor[0][1]
+access = {
+    primary ~ ("[" ~ access_arg ~ ("," ~ access_arg)* ~ "]")*
+}
+
 // Field access: record.field, record.nested.field
+// Updated to use 'access' as base to support combined indexing and field access
 field_access = {
-    primary ~ ("." ~ identifier)*
+    access ~ ("." ~ identifier)*
 }
 
 // Power (right-associative): 2^3^4 = 2^(3^4)

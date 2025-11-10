@@ -7,6 +7,130 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Tensor Indexing & Slicing 🎯✂️
+
+**Complete N-Dimensional Tensor Indexing:**
+
+- **Single Element Access**
+  - Access individual elements using bracket notation: `tensor[i, j, k]`
+  - Supports negative indexing (Python-style): `v[(-1)]` accesses last element
+  - Works with vectors (1D), matrices (2D), and N-dimensional tensors
+  - Examples:
+    ```javascript
+    let v = [10, 20, 30, 40, 50]
+    v[0]      // → 10
+    v[2]      // → 30
+    v[(-1)]   // → 50 (last element, requires parentheses)
+
+    let m = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+    m[0, 0]   // → 1
+    m[1, 2]   // → 6
+    m[2, 1]   // → 8
+
+    let t3d = [[[1, 2], [3, 4]], [[5, 6], [7, 8]]]
+    t3d[0, 0, 0]  // → 1
+    t3d[1, 1, 1]  // → 8
+    ```
+
+- **Range Slicing**
+  - Extract sub-tensors using range notation: `start..end`, `start..`, `..end`, `..`
+  - Reduces dimensionality when slicing: matrix → vector, 3D → 2D, etc.
+  - Full range `..` copies entire dimension
+  - Examples:
+    ```javascript
+    let v = [10, 20, 30, 40, 50]
+    v[1..3]   // → [20, 30]
+    v[2..]    // → [30, 40, 50]
+    v[..3]    // → [10, 20, 30]
+    v[..]     // → [10, 20, 30, 40, 50] (copy)
+
+    let m = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+    m[0]          // → [1, 2, 3] (first row)
+    m[.., 0]      // → [1, 4, 7] (first column)
+    m[0..2, 0..2] // → [[1, 2], [4, 5]] (sub-matrix)
+    m[1..3, 1]    // → [5, 8] (column slice)
+    ```
+
+- **Mixed Indexing & Slicing**
+  - Combine single indices and ranges: `tensor[0, .., 1..3]`
+  - Single indices reduce dimension, ranges preserve it
+  - Natural mathematical notation
+  - Examples:
+    ```javascript
+    let t3d = [[[1, 2], [3, 4]], [[5, 6], [7, 8]]]
+    t3d[0]        // → [[1, 2], [3, 4]] (2D slice)
+    t3d[0, 0]     // → [1, 2] (1D slice)
+    t3d[.., 0, 0] // → [1, 5] (extract across first dimension)
+    ```
+
+- **String Indexing & Slicing**
+  - Same syntax works for strings
+  - Character access: `s[0]`, `s[(-1)]`
+  - Substring extraction: `s[1..4]`, `s[2..]`, `s[..3]`
+  - Examples:
+    ```javascript
+    let s = "Hello"
+    s[0]     // → "H"
+    s[(-1)]  // → "o"
+    s[1..4]  // → "ell"
+    s[2..]   // → "llo"
+    ```
+
+- **Chained Indexing**
+  - Index multiple times: `tensor[0][1]`, `nested[i][j][k]`
+  - Useful for irregular/nested structures
+  - Example:
+    ```javascript
+    let nested = [[10, 20], [30, 40]]
+    nested[0][1]  // → 20
+    nested[1][0]  // → 30
+    ```
+
+**Implementation Details:**
+
+- **Grammar Updates** (grammar.pest)
+  - New rules: `range_expr`, `access_arg`, `access`
+  - Range expression: `expr? ~ ".." ~ expr?` supports all range forms
+  - Access replaces primary in field_access hierarchy
+  - Supports chained access: `a[i][j].field`
+
+- **AST Extensions** (ast.rs)
+  - New node: `IndexAccess { object, indices }`
+  - New enum: `IndexArg::Single` and `IndexArg::Range { start, end }`
+  - Clean separation between index and range operations
+
+- **Parser Logic** (pest_parser.rs)
+  - `build_access()`: Processes bracket notation
+  - `build_access_arg()`: Handles single index vs range detection
+  - `build_field_access()`: Updated to use access as base
+
+- **Indexing Handler** (indexing.rs - new module)
+  - `index_vector()`: Generic vector indexing
+  - `index_tensor()`: N-dimensional tensor indexing
+  - `index_complex_tensor()`: Complex tensor support
+  - `index_string()`: String/character access
+  - `slice_tensor()`: Range-based sub-tensor extraction
+  - `normalize_index()`: Negative index handling
+  - `normalize_range()`: Range boundary resolution
+
+**Known Limitations:**
+
+- **Negative Index Syntax**: Requires parentheses for literals
+  - Correct: `v[(-1)]`, `v[(-2)]`
+  - Incorrect: `v[-1]` (parser ambiguity with subtraction)
+  - Alternative: Use variables `let idx = -1; v[idx]`
+
+**Testing:**
+
+- 40+ test cases covering:
+  - Vector indexing (positive, negative, ranges)
+  - Matrix indexing (rows, columns, sub-matrices)
+  - 3D tensor indexing (element, 2D slices, 1D slices)
+  - String indexing and slicing
+  - Chained indexing
+  - Complex number vectors
+- All tests passing ✓
+
 ### Added - Recursive Functions & Self-Reference System 🔄✨
 
 **Revolutionary `rec` - Magic Self-Reference for Recursion:**

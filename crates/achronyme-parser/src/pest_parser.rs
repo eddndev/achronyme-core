@@ -11,7 +11,7 @@ use pest::Parser;
 use pest::iterators::Pair;
 use pest_derive::Parser;
 
-use crate::ast::{AstNode, BinaryOp, UnaryOp};
+use crate::ast::{AstNode, BinaryOp, UnaryOp, IndexArg};
 
 // ============================================================================
 // Parser Definition
@@ -103,6 +103,7 @@ fn build_ast_from_expr(pair: Pair<Rule>) -> Result<AstNode, String> {
         Rule::power => build_power(pair),
         Rule::primary => build_primary(pair),
         Rule::field_access => build_field_access(pair),
+        Rule::access => build_access(pair),
         _ => Err(format!("Unexpected expression rule: {:?}", rule))
     }
 }
@@ -320,9 +321,120 @@ fn build_power(pair: Pair<Rule>) -> Result<AstNode, String> {
     }
 }
 
+fn build_access(pair: Pair<Rule>) -> Result<AstNode, String> {
+    let mut inner = pair.into_inner();
+    let mut base = build_primary(inner.next().ok_or("Missing primary in access")?)?;
+
+    // Process each index/slice operation (e.g., [0], [0, 1, 2], [0, .., ..])
+    // Since Pest generates consecutive access_arg for comma-separated indices,
+    // we need to accumulate them into a single IndexAccess node
+    let mut indices = Vec::new();
+
+    for index_pair in inner {
+        match index_pair.as_rule() {
+            Rule::access_arg => {
+                // Accumulate all consecutive access_args
+                indices.push(build_access_arg(index_pair)?);
+            }
+            _ => {
+                // If we encounter a non-access_arg rule, apply any accumulated indices first
+                if !indices.is_empty() {
+                    base = AstNode::IndexAccess {
+                        object: Box::new(base),
+                        indices: indices.clone(),
+                    };
+                    indices.clear();
+                }
+
+                // This should be a group of access_args inside brackets
+                // e.g., for tensor[0, 1, 2], we get multiple access_arg children
+                let mut new_indices = Vec::new();
+
+                // The index_pair might be a list of access_arg
+                for arg in index_pair.into_inner() {
+                    if arg.as_rule() == Rule::access_arg {
+                        new_indices.push(build_access_arg(arg)?);
+                    }
+                }
+
+                if !new_indices.is_empty() {
+                    base = AstNode::IndexAccess {
+                        object: Box::new(base),
+                        indices: new_indices,
+                    };
+                }
+            }
+        }
+    }
+
+    // Apply any remaining accumulated indices
+    if !indices.is_empty() {
+        base = AstNode::IndexAccess {
+            object: Box::new(base),
+            indices,
+        };
+    }
+
+    Ok(base)
+}
+
+fn build_access_arg(pair: Pair<Rule>) -> Result<IndexArg, String> {
+    let inner = pair.into_inner().next()
+        .ok_or("Empty access_arg")?;
+
+    match inner.as_rule() {
+        Rule::range_expr => {
+            // Range: start..end, start.., ..end, or ..
+            // The grammar now has explicit alternatives, so we parse accordingly
+            let inner_str = inner.as_str();
+            let range_parts = inner.into_inner();
+
+            // Count how many expressions we have
+            let exprs: Vec<_> = range_parts.collect();
+
+            let (start, end) = if inner_str.starts_with("..") && !inner_str.ends_with("..") {
+                // "..end" case
+                if exprs.len() == 1 {
+                    (None, Some(Box::new(build_ast_from_expr(exprs[0].clone())?)))
+                } else {
+                    return Err("Invalid range expression".to_string());
+                }
+            } else if inner_str.ends_with("..") && !inner_str.starts_with("..") {
+                // "start.." case
+                if exprs.len() == 1 {
+                    (Some(Box::new(build_ast_from_expr(exprs[0].clone())?)), None)
+                } else {
+                    return Err("Invalid range expression".to_string());
+                }
+            } else if inner_str == ".." {
+                // ".." case
+                (None, None)
+            } else {
+                // "start..end" case
+                if exprs.len() == 2 {
+                    (
+                        Some(Box::new(build_ast_from_expr(exprs[0].clone())?)),
+                        Some(Box::new(build_ast_from_expr(exprs[1].clone())?))
+                    )
+                } else {
+                    return Err("Invalid range expression".to_string());
+                }
+            };
+
+            Ok(IndexArg::Range { start, end })
+        }
+        Rule::expr => {
+            // Single index expression
+            Ok(IndexArg::Single(Box::new(build_ast_from_expr(inner)?)))
+        }
+        _ => Err(format!("Unexpected access_arg rule: {:?}", inner.as_rule()))
+    }
+}
+
 fn build_field_access(pair: Pair<Rule>) -> Result<AstNode, String> {
     let mut inner = pair.into_inner();
-    let mut base = build_primary(inner.next().ok_or("Missing primary in field_access")?)?;
+    // Updated to use build_access instead of build_primary
+    let mut base = build_access(inner.next().ok_or("Missing access in field_access")?)?;
 
     // Process each field access (e.g., .field1.field2.field3)
     for field_pair in inner {

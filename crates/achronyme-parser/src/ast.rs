@@ -85,4 +85,19 @@ pub enum AstNode {
         directed: bool,
         metadata: Option<Box<AstNode>>,
     },
+    // Indexing and slicing
+    IndexAccess {
+        object: Box<AstNode>,
+        indices: Vec<IndexArg>,
+    },
+}
+
+/// Represents an indexing argument - can be a single expression or a range
+#[derive(Debug, Clone, PartialEq)]
+pub enum IndexArg {
+    Single(Box<AstNode>),  // Single index: tensor[5]
+    Range {                // Range slice: tensor[1..5], tensor[..5], tensor[1..], tensor[..]
+        start: Option<Box<AstNode>>,
+        end: Option<Box<AstNode>>,
+    },
 }

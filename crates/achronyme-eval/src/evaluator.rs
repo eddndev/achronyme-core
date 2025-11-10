@@ -209,6 +209,11 @@ impl Evaluator {
             AstNode::Edge { from, to, directed, metadata } => {
                 handlers::literals::evaluate_edge(self, from, to, *directed, metadata)
             }
+
+            // Indexing and slicing
+            AstNode::IndexAccess { object, indices } => {
+                handlers::indexing::evaluate_index_access(self, object, indices)
+            }
         }
     }
 
