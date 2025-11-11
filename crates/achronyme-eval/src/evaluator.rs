@@ -2,9 +2,9 @@ use achronyme_parser::ast::AstNode;
 use achronyme_types::function::Function;
 use achronyme_types::value::Value;
 use achronyme_types::LambdaEvaluator;
+use achronyme_types::Environment;
 
 use crate::constants::ConstantsRegistry;
-use crate::environment::Environment;
 use crate::functions::FunctionRegistry;
 use crate::handlers;
 
@@ -182,21 +182,61 @@ impl Evaluator {
                 handlers::function_call::dispatch(self, name, args)
             }
             AstNode::CallExpression { callee, args } => {
-                // Evaluate callee to get the function
+                // Special case: if callee is a field access (record.method), we need to inject 'self'
+                if let AstNode::FieldAccess { record, field } = callee.as_ref() {
+                    let record_value = self.evaluate(record)?;
+
+                    match &record_value {
+                        Value::Record(ref map) => {
+                            let func_value = map.get(field)
+                                .cloned()
+                                .ok_or_else(|| format!("Field '{}' not found in record", field))?;
+
+                            if let Value::Function(ref func) = func_value {
+                                // Evaluate arguments
+                                let mut arg_values = Vec::new();
+                                for arg in args {
+                                    arg_values.push(self.evaluate(arg)?);
+                                }
+
+                                // Inject 'self' for method calls
+                                self.environment_mut().push_scope();
+                                self.environment_mut().define("self".to_string(), record_value)?;
+
+                                let func_clone = func.clone();
+                                let result = self.apply_lambda(&func_clone, arg_values);
+
+                                self.environment_mut().pop_scope();
+                                return result;
+                            } else {
+                                return Err(format!("Field '{}' is not a function", field));
+                            }
+                        }
+                        _ => return Err(format!("Cannot access field '{}' on non-record value", field)),
+                    }
+                }
+
+                // Regular call expression - evaluate callee to get the function
                 let func_value = self.evaluate(callee)?;
 
                 // Must be a function
                 match func_value {
                     Value::Function(ref func) => {
-                        // Evaluate arguments
-                        let mut arg_values = Vec::new();
-                        for arg in args {
-                            arg_values.push(self.evaluate(arg)?);
+                        match func {
+                            achronyme_types::function::Function::UserDefined { .. } => {
+                                // User-defined lambda - evaluate args and apply
+                                let mut arg_values = Vec::new();
+                                for arg in args {
+                                    arg_values.push(self.evaluate(arg)?);
+                                }
+                                let func_clone = func.clone();
+                                self.apply_lambda(&func_clone, arg_values)
+                            }
+                            achronyme_types::function::Function::Builtin(name) => {
+                                // Built-in function - dispatch without evaluating args (let handler do it)
+                                handlers::function_call::dispatch(self, name, args)
+                            }
                         }
-
-                        // Apply the function
-                        let func_clone = func.clone();
-                        self.apply_lambda(&func_clone, arg_values)
                     }
                     _ => Err("CallExpression requires a function, got non-function value".to_string()),
                 }

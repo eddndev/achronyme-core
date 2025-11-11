@@ -101,10 +101,9 @@ fn build_ast_from_expr(pair: Pair<Rule>) -> Result<AstNode, String> {
         Rule::multiplicative => build_binary_op(pair),
         Rule::unary => build_unary(pair),
         Rule::power => build_power(pair),
+        Rule::postfix_expression => build_postfix_expression(pair),
         Rule::primary => build_primary(pair),
-        Rule::field_access => build_field_access(pair),
-        Rule::access => build_access(pair),
-        _ => Err(format!("Unexpected expression rule: {:?}", rule))
+        _ => Err(format!("Unexpected expression rule: {:?} in {}", rule, pair.as_str()))
     }
 }
 
@@ -166,7 +165,7 @@ fn extract_identifier(pair: &Pair<Rule>) -> Result<String, String> {
         match p.as_rule() {
             Rule::identifier => Ok(p.as_str().to_string()),
             Rule::additive | Rule::multiplicative | Rule::unary |
-            Rule::power | Rule::field_access | Rule::primary => {
+            Rule::power | Rule::postfix_expression | Rule::primary => {
                 let inner: Vec<_> = p.clone().into_inner().collect();
                 if inner.len() != 1 {
                     return Err("Edge nodes must be simple identifiers, not expressions".to_string());
@@ -306,7 +305,7 @@ fn build_unary(pair: Pair<Rule>) -> Result<AstNode, String> {
 
 fn build_power(pair: Pair<Rule>) -> Result<AstNode, String> {
     let mut inner = pair.into_inner();
-    let base = build_field_access(inner.next().ok_or("Missing base in power")?)?;
+    let base = build_postfix_expression(inner.next().ok_or("Missing base in power")?)?;
 
     if let Some(exponent_pair) = inner.next() {
         // Right-associative: 2^3^4 = 2^(3^4)
@@ -321,62 +320,7 @@ fn build_power(pair: Pair<Rule>) -> Result<AstNode, String> {
     }
 }
 
-fn build_access(pair: Pair<Rule>) -> Result<AstNode, String> {
-    let mut inner = pair.into_inner();
-    let mut base = build_primary(inner.next().ok_or("Missing primary in access")?)?;
 
-    // Process each index/slice operation (e.g., [0], [0, 1, 2], [0, .., ..])
-    // Since Pest generates consecutive access_arg for comma-separated indices,
-    // we need to accumulate them into a single IndexAccess node
-    let mut indices = Vec::new();
-
-    for index_pair in inner {
-        match index_pair.as_rule() {
-            Rule::access_arg => {
-                // Accumulate all consecutive access_args
-                indices.push(build_access_arg(index_pair)?);
-            }
-            _ => {
-                // If we encounter a non-access_arg rule, apply any accumulated indices first
-                if !indices.is_empty() {
-                    base = AstNode::IndexAccess {
-                        object: Box::new(base),
-                        indices: indices.clone(),
-                    };
-                    indices.clear();
-                }
-
-                // This should be a group of access_args inside brackets
-                // e.g., for tensor[0, 1, 2], we get multiple access_arg children
-                let mut new_indices = Vec::new();
-
-                // The index_pair might be a list of access_arg
-                for arg in index_pair.into_inner() {
-                    if arg.as_rule() == Rule::access_arg {
-                        new_indices.push(build_access_arg(arg)?);
-                    }
-                }
-
-                if !new_indices.is_empty() {
-                    base = AstNode::IndexAccess {
-                        object: Box::new(base),
-                        indices: new_indices,
-                    };
-                }
-            }
-        }
-    }
-
-    // Apply any remaining accumulated indices
-    if !indices.is_empty() {
-        base = AstNode::IndexAccess {
-            object: Box::new(base),
-            indices,
-        };
-    }
-
-    Ok(base)
-}
 
 fn build_access_arg(pair: Pair<Rule>) -> Result<IndexArg, String> {
     let inner = pair.into_inner().next()
@@ -431,22 +375,7 @@ fn build_access_arg(pair: Pair<Rule>) -> Result<IndexArg, String> {
     }
 }
 
-fn build_field_access(pair: Pair<Rule>) -> Result<AstNode, String> {
-    let mut inner = pair.into_inner();
-    // Updated to use build_access instead of build_primary
-    let mut base = build_access(inner.next().ok_or("Missing access in field_access")?)?;
 
-    // Process each field access (e.g., .field1.field2.field3)
-    for field_pair in inner {
-        let field_name = field_pair.as_str().to_string();
-        base = AstNode::FieldAccess {
-            record: Box::new(base),
-            field: field_name,
-        };
-    }
-
-    Ok(base)
-}
 
 /// Process escape sequences in string literals
 fn process_escape_sequences(s: &str) -> String {
@@ -477,6 +406,102 @@ fn process_escape_sequences(s: &str) -> String {
     }
 
     result
+}
+
+fn build_piecewise(args: Vec<AstNode>) -> Result<AstNode, String> {
+    if args.is_empty() {
+        return Err("piecewise() requires at least one argument".to_string());
+    }
+
+    let mut cases = Vec::new();
+    let mut default = None;
+
+    for (i, arg) in args.iter().enumerate() {
+        match arg {
+            AstNode::ArrayLiteral(elems) => {
+                if elems.len() != 2 {
+                    return Err(format!(
+                        "piecewise() case must have exactly 2 elements [condition, value], got {}",
+                        elems.len()
+                    ));
+                }
+                cases.push((
+                    Box::new(elems[0].clone()),
+                    Box::new(elems[1].clone()),
+                ));
+            }
+            _ => {
+                if i != args.len() - 1 {
+                    return Err(format!(
+                        "piecewise() default value must be the last argument (argument {} is not a case)",
+                        i + 1
+                    ));
+                }
+                default = Some(Box::new(arg.clone()));
+            }
+        }
+    }
+
+    Ok(AstNode::Piecewise { cases, default })
+}
+
+fn build_postfix_expression(pair: Pair<Rule>) -> Result<AstNode, String> {
+    let mut inner = pair.into_inner();
+    let mut ast = build_primary(inner.next().ok_or("Expected a primary expression")?)?;
+
+    for op_pair in inner { // These are postfix_op
+        let op_inner = op_pair.into_inner().next().unwrap();
+        match op_inner.as_rule() {
+            Rule::field_op => {
+                let field_name = op_inner.into_inner().next().unwrap().as_str().to_string();
+                ast = AstNode::FieldAccess {
+                    record: Box::new(ast),
+                    field: field_name,
+                };
+            }
+            Rule::index_op => {
+                let indices: Vec<IndexArg> = op_inner
+                    .into_inner()
+                    .map(|p| build_access_arg(p))
+                    .collect::<Result<_, _>>()?;
+                ast = AstNode::IndexAccess {
+                    object: Box::new(ast),
+                    indices,
+                };
+            }
+            Rule::call_op => {
+                let args: Vec<AstNode> = op_inner
+                    .into_inner()
+                    .map(|p| build_ast_from_expr(p))
+                    .collect::<Result<_, _>>()?;
+
+                if let AstNode::VariableRef(ref name) = ast {
+                    if name == "if" {
+                        if args.len() != 3 {
+                            return Err(format!("if() requires 3 arguments, got {}", args.len()));
+                        }
+                        ast = AstNode::If {
+                            condition: Box::new(args[0].clone()),
+                            then_expr: Box::new(args[1].clone()),
+                            else_expr: Box::new(args[2].clone()),
+                        };
+                        continue;
+                    }
+                    if name == "piecewise" {
+                        ast = build_piecewise(args)?;
+                        continue;
+                    }
+                }
+
+                ast = AstNode::CallExpression {
+                    callee: Box::new(ast),
+                    args,
+                };
+            }
+            _ => unreachable!("Unexpected postfix operator: {:?}", op_inner.as_rule()),
+        }
+    }
+    Ok(ast)
 }
 
 fn build_primary(pair: Pair<Rule>) -> Result<AstNode, String> {
@@ -524,7 +549,7 @@ fn build_primary(pair: Pair<Rule>) -> Result<AstNode, String> {
         Rule::matrix => build_array(inner),  // Alias for array
         Rule::record => build_record(inner),
         Rule::lambda => build_lambda(inner),
-        Rule::function_call => build_function_call(inner),
+        
         Rule::expr => build_ast_from_expr(inner),
         _ => Err(format!("Unexpected primary rule: {:?}", inner.as_rule()))
     }
@@ -586,94 +611,7 @@ fn extract_lambda_params(pair: Pair<Rule>) -> Result<Vec<String>, String> {
     Ok(params)
 }
 
-fn build_function_call(pair: Pair<Rule>) -> Result<AstNode, String> {
-    let mut inner = pair.into_inner();
 
-    let first = inner.next()
-        .ok_or("Missing function name or expression")?;
-
-    // Check if this is a callable (identifier/self/rec) or an expression (IIFE)
-    let is_callable = first.as_rule() == Rule::callable;
-
-    let args: Result<Vec<AstNode>, String> = inner
-        .map(|p| build_ast_from_expr(p))
-        .collect();
-
-    let args = args?;
-
-    // If it's an expression (IIFE), return CallExpression
-    if !is_callable {
-        let callee = build_ast_from_expr(first)?;
-        return Ok(AstNode::CallExpression {
-            callee: Box::new(callee),
-            args,
-        });
-    }
-
-    // Otherwise, it's a normal function call
-    let name = first.as_str().to_string();
-
-    // Special handling for if() function
-    if name == "if" {
-        if args.len() != 3 {
-            return Err(format!("if() requires exactly 3 arguments (condition, then, else), got {}", args.len()));
-        }
-
-        return Ok(AstNode::If {
-            condition: Box::new(args[0].clone()),
-            then_expr: Box::new(args[1].clone()),
-            else_expr: Box::new(args[2].clone()),
-        });
-    }
-
-    // Special handling for piecewise() function
-    if name == "piecewise" {
-        if args.is_empty() {
-            return Err("piecewise() requires at least one argument".to_string());
-        }
-
-        let mut cases = Vec::new();
-        let mut default = None;
-
-        for (i, arg) in args.iter().enumerate() {
-            match arg {
-                AstNode::ArrayLiteral(elems) => {
-                    // This is a [condition, value] case
-                    if elems.len() != 2 {
-                        return Err(format!(
-                            "piecewise() case must have exactly 2 elements [condition, value], got {}",
-                            elems.len()
-                        ));
-                    }
-                    cases.push((
-                        Box::new(elems[0].clone()),
-                        Box::new(elems[1].clone()),
-                    ));
-                }
-                _ => {
-                    // This is the default value (must be the last argument)
-                    if i != args.len() - 1 {
-                        return Err(format!(
-                            "piecewise() default value must be the last argument (argument {} is not a case)",
-                            i + 1
-                        ));
-                    }
-                    default = Some(Box::new(arg.clone()));
-                }
-            }
-        }
-
-        return Ok(AstNode::Piecewise {
-            cases,
-            default,
-        });
-    }
-
-    Ok(AstNode::FunctionCall {
-        name,
-        args,
-    })
-}
 
 // ============================================================================
 // Tests

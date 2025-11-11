@@ -55,8 +55,10 @@ string_char = {
   | "\\" ~ ("\"" | "\\" | "n" | "t" | "r")
 }
 
-// Reserved keywords
-keyword = _{ "let" | "rec" | "self" | "true" | "false" }
+// Reserved keywords (use word boundaries to prevent matching prefixes)
+keyword = _{
+    ("let" | "rec" | "self" | "true" | "false") ~ !ASCII_ALPHANUMERIC
+}
 
 // Identifiers: x, foo, my_var, PI, sin (but not keywords)
 identifier = @{
@@ -67,10 +69,11 @@ identifier = @{
 // Composite Literals
 // ============================================================================
 
-// Array (N-dimensional tensor): [1, 2, 3], [[1, 2], [3, 4]], [[[1,2],[3,4]], [[5,6],[7,8]]]
+// Array (N-dimensional tensor): [1, 2, 3], [[1, 2], [3, 4]], [[[1,2],[3,4]], [[5,6],[7,8]]], []
 // This is now recursive to support arbitrary tensor dimensions
+// Allow empty arrays with optional expression list
 array = {
-    "[" ~ expr ~ ("," ~ expr)* ~ "]"
+    "[" ~ (expr ~ ("," ~ expr)*)? ~ "]"
 }
 
 // Vector and Matrix are now aliases for the unified array syntax
@@ -105,27 +108,15 @@ lambda = {
 // Function Calls
 // ============================================================================
 
-// Callable path: identifier or field access path (sin, f.add, obj.nested.method)
-// Also allows 'rec' and 'self' for function calls like rec(x) or self.method()
-callable = @{
-    (identifier | "rec" | "self") ~ ("." ~ identifier)*
-}
-
-// Function call: sin(x), map(f, v), f.add(1), obj.method(x, y)
-// Also supports IIFE: (n => n * 2)(5), (() => 42)()
-function_call = {
-    (callable | ("(" ~ expr ~ ")")) ~ "(" ~ (expr ~ ("," ~ expr)*)? ~ ")"
-}
-
 // ============================================================================
 // Expressions (with operator precedence)
 // ============================================================================
 
-// Self-reference (for use in records)
-self_ref = { "self" }
+// Self-reference (for use in records) - use word boundary
+self_ref = { "self" ~ !ASCII_ALPHANUMERIC }
 
-// Rec-reference (for recursive function calls)
-rec_ref = { "rec" }
+// Rec-reference (for recursive function calls) - use word boundary
+rec_ref = { "rec" ~ !ASCII_ALPHANUMERIC }
 
 // Primary expressions (highest precedence)
 primary = {
@@ -136,7 +127,6 @@ primary = {
   | record         // Record literals { key: value }
   | array          // Arrays/tensors (vectors, matrices, and higher-dimensional)
   | lambda
-  | function_call
   | self_ref       // Self-reference in records
   | rec_ref        // Rec-reference for recursive calls
   | identifier
@@ -158,20 +148,24 @@ access_arg = {
     range_expr | expr
 }
 
-// Index/slice access: tensor[0, 1, 2], tensor[0, .., ..], tensor[0][1]
-access = {
-    primary ~ ("[" ~ access_arg ~ ("," ~ access_arg)* ~ "]")*
+// Postfix Expressions: unified rule for member access, indexing, and function calls.
+// This is the key fix that allows for arbitrary chaining of these operations,
+// e.g., obj.field[index](args), by treating them as left-associative postfix operators.
+postfix_expression = {
+    primary ~ postfix_op*
 }
 
-// Field access: record.field, record.nested.field
-// Updated to use 'access' as base to support combined indexing and field access
-field_access = {
-    access ~ ("." ~ identifier)*
+postfix_op = {
+    call_op | index_op | field_op
 }
+
+call_op = { "(" ~ (expr ~ ("," ~ expr)*)? ~ ")" }
+index_op = { "[" ~ access_arg ~ ("," ~ access_arg)* ~ "]" }
+field_op = { "." ~ identifier }
 
 // Power (right-associative): 2^3^4 = 2^(3^4)
 power = {
-    field_access ~ ("^" ~ power)?
+    postfix_expression ~ ("^" ~ power)?
 }
 
 // Unary operators: -x, !x

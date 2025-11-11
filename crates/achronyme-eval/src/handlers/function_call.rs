@@ -112,6 +112,12 @@ pub fn dispatch(evaluator: &mut Evaluator, name: &str, args: &[AstNode]) -> Resu
         _ => {}
     }
 
+    // Check for debug functions
+    match name {
+        "describe" => return super::debug::handle_describe(evaluator, args),
+        _ => {}
+    }
+
     // Check for optimization functions
     match name {
         "simplex" => return super::optimization::handle_simplex(evaluator, args),

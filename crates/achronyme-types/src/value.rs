@@ -24,7 +24,7 @@ pub enum Value {
     Vector(Vec<Value>),  // Generic vector - can hold any Value type (strings, records, etc.)
     Tensor(RealTensor),  // Optimized N-dimensional array of real numbers
     ComplexTensor(ComplexTensor),  // Optimized N-dimensional array of complex numbers
-    Function(Function),
+    Function(Function),  // Both user-defined lambdas and built-in functions
     String(String),
     Record(HashMap<String, Value>),
     Edge {

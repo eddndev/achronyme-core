@@ -9,6 +9,7 @@ pub mod hof;
 pub mod numerical;
 pub mod optimization;
 pub mod function_call;
+pub mod debug;
 
 // Node evaluation handlers
 pub mod literals;

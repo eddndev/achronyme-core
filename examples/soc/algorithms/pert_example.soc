@@ -29,4 +29,4 @@ let proyecto_prueba = {
     ]
 }
 
-critical_path(proyecto_prueba)
+pert_analysis(proyecto_prueba)
