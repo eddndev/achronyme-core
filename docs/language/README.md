@@ -61,6 +61,7 @@ let point = {
 ### Additional Resources
 24. **[Best Practices](23-best-practices.md)** - Code style and patterns
 25. **[Examples](24-examples.md)** - Complete programs
+26. **[Performance Limitations](25-performance-limitations.md)** - Stack limits and workarounds
 
 ## Quick Reference Card
 

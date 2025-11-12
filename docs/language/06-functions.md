@@ -99,6 +99,34 @@ let fib = n =>
     if(n <= 1, n, rec(n - 1) + rec(n - 2))
 ```
 
+### Recursion Depth Limit
+
+**⚠️ IMPORTANT**: Achronyme currently has a strict limit of approximately **50 recursive calls** before encountering stack overflow.
+
+```javascript
+let factorial = n =>
+    if(n <= 1, 1, n * rec(n - 1))
+
+factorial(10)   // ✅ Works: 3628800
+factorial(40)   // ✅ Works (near limit)
+factorial(50)   // ❌ Stack overflow!
+```
+
+This limitation affects all recursive patterns. For large iterations:
+
+```javascript
+// ❌ Don't use recursion for large n
+let range = n => (
+    (left, current, vector) =>
+        if(left == 0, vector, rec(left - 1, current + 1, [...vector, current]))
+)(n, 0, [])
+
+// ✅ Use built-in functions instead
+let range = n => linspace(0, n - 1, n)
+```
+
+See [Performance Limitations](25-performance-limitations.md) for details and workarounds.
+
 ## Closures
 
 Lambdas can capture variables from their enclosing scope:
