@@ -62,8 +62,8 @@ pub enum AstNode {
         re: f64,
         im: f64,
     },
-    ArrayLiteral(Vec<AstNode>), // Unified array syntax: [1,2,3], [[1,2],[3,4]], [[[...]]], etc.
-    RecordLiteral(Vec<(String, AstNode)>), // Vec of (key, value) pairs
+    ArrayLiteral(Vec<ArrayElement>), // Array elements can be single values or spread expressions
+    RecordLiteral(Vec<RecordFieldOrSpread>), // Record fields or spread expressions
     FieldAccess {
         record: Box<AstNode>,
         field: String,
@@ -102,6 +102,20 @@ pub enum AstNode {
     DoBlock {
         statements: Vec<AstNode>,
     },
+}
+
+/// Represents an array element - can be a single expression or a spread expression
+#[derive(Debug, Clone, PartialEq)]
+pub enum ArrayElement {
+    Single(AstNode),        // Regular element: expr
+    Spread(Box<AstNode>),   // Spread element: ...expr
+}
+
+/// Represents a record field or spread expression
+#[derive(Debug, Clone, PartialEq)]
+pub enum RecordFieldOrSpread {
+    Field { name: String, value: AstNode },  // Regular field: key: value
+    Spread(Box<AstNode>),                     // Spread: ...expr
 }
 
 /// Represents an indexing argument - can be a single expression or a range

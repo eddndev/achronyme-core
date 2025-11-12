@@ -69,11 +69,19 @@ identifier = @{
 // Composite Literals
 // ============================================================================
 
+// Spread expression: ...expr
+spread_expr = {
+    "..." ~ expr
+}
+
 // Array (N-dimensional tensor): [1, 2, 3], [[1, 2], [3, 4]], [[[1,2],[3,4]], [[5,6],[7,8]]], []
 // This is now recursive to support arbitrary tensor dimensions
 // Allow empty arrays with optional expression list
+// Arrays can now contain spread expressions: [1, ...vec, 2]
+array_element = { spread_expr | expr }
+
 array = {
-    "[" ~ (expr ~ ("," ~ expr)*)? ~ "]"
+    "[" ~ (array_element ~ ("," ~ array_element)*)? ~ "]"
 }
 
 // Vector and Matrix are now aliases for the unified array syntax
@@ -81,8 +89,11 @@ vector = { array }
 matrix = { array }
 
 // Record: { name: "Alice", age: 30, city: "Madrid" }
+// Records can now contain spread expressions: { a: 1, ...other, b: 2 }
+record_field_or_spread = { spread_expr | record_field }
+
 record = {
-    "{" ~ (record_field ~ ("," ~ record_field)*)? ~ "}"
+    "{" ~ (record_field_or_spread ~ ("," ~ record_field_or_spread)*)? ~ "}"
 }
 
 record_field = {

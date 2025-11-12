@@ -161,22 +161,36 @@ fn format_ast_node(node: &AstNode, indent: usize) -> String {
         }
 
         AstNode::ArrayLiteral(elements) => {
+            use achronyme_parser::ast::ArrayElement;
+
             if elements.len() > 3 {
                 format!("[{} elements]", elements.len())
             } else {
                 let items: Vec<String> = elements.iter()
-                    .map(|e| format_ast_node(e, indent))
+                    .map(|e| match e {
+                        ArrayElement::Single(node) => format_ast_node(node, indent),
+                        ArrayElement::Spread(node) => format!("...{}", format_ast_node(node, indent)),
+                    })
                     .collect();
                 format!("[{}]", items.join(", "))
             }
         }
 
         AstNode::RecordLiteral(fields) => {
+            use achronyme_parser::ast::RecordFieldOrSpread;
+
             if fields.len() > 3 {
                 format!("{{ {} fields }}", fields.len())
             } else {
                 let items: Vec<String> = fields.iter()
-                    .map(|(k, v)| format!("{}: {}", k, format_ast_node(v, indent)))
+                    .map(|f| match f {
+                        RecordFieldOrSpread::Field { name, value } => {
+                            format!("{}: {}", name, format_ast_node(value, indent))
+                        }
+                        RecordFieldOrSpread::Spread(node) => {
+                            format!("...{}", format_ast_node(node, indent))
+                        }
+                    })
                     .collect();
                 format!("{{ {} }}", items.join(", "))
             }

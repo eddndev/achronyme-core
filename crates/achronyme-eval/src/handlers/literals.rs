@@ -26,16 +26,48 @@ pub fn evaluate_complex(re: f64, im: f64) -> Result<Value, String> {
 }
 
 /// Evaluate an array literal (unified handler for vectors, matrices, and N-D tensors)
-pub fn evaluate_array(evaluator: &mut Evaluator, elements: &[AstNode]) -> Result<Value, String> {
+/// Supports spread syntax: [1, ...vec, 2]
+pub fn evaluate_array(evaluator: &mut Evaluator, elements: &[achronyme_parser::ast::ArrayElement]) -> Result<Value, String> {
+    use achronyme_parser::ast::ArrayElement;
+
     if elements.is_empty() {
         return Ok(Value::Vector(vec![]));
     }
 
-    // Evaluate ALL elements first
+    // Evaluate ALL elements, expanding spreads
     let mut values = Vec::new();
     for element in elements {
-        let value = evaluator.evaluate(element)?;
-        values.push(value);
+        match element {
+            ArrayElement::Single(node) => {
+                let value = evaluator.evaluate(node)?;
+                values.push(value);
+            }
+            ArrayElement::Spread(node) => {
+                let spread_value = evaluator.evaluate(node)?;
+                match spread_value {
+                    Value::Vector(vec) => {
+                        values.extend(vec);
+                    }
+                    Value::Tensor(tensor) => {
+                        if tensor.shape().len() == 1 {
+                            for &val in tensor.data() {
+                                values.push(Value::Number(val));
+                            }
+                        } else {
+                            return Err("Cannot spread multi-dimensional Tensor in array. Use concat() or reshape() instead.".to_string());
+                        }
+                    }
+                    _ => {
+                        return Err(format!("Cannot spread non-iterable value in array context. Got: {:?}", spread_value));
+                    }
+                }
+            }
+        }
+    }
+
+    // Handle empty result after spreading
+    if values.is_empty() {
+        return Ok(Value::Vector(vec![]));
     }
 
     // Check if all elements are tensors - if so, combine them into higher-dimensional tensor
@@ -70,55 +102,23 @@ fn validate_and_promote_vector(values: Vec<Value>) -> Result<Value, String> {
         return combine_tensors_to_higher_dimension(values);
     }
 
-    // Categorize the types in the vector
-    let has_number = values.iter().any(|v| matches!(v, Value::Number(_)));
+    // Apply type promotion for numeric types if applicable
     let has_complex = values.iter().any(|v| matches!(v, Value::Complex(_)));
-    let has_edge = values.iter().any(|v| matches!(v, Value::Edge { .. }));
-    let has_record = values.iter().any(|v| matches!(v, Value::Record(_)));
-    let has_string = values.iter().any(|v| matches!(v, Value::String(_)));
-    let has_boolean = values.iter().any(|v| matches!(v, Value::Boolean(_)));
-    let has_function = values.iter().any(|v| matches!(v, Value::Function(_)));
-    let has_tensor = values.iter().any(|v| matches!(v, Value::Tensor(_)));
-    let has_complex_tensor = values.iter().any(|v| matches!(v, Value::ComplexTensor(_)));
-    let has_vector = values.iter().any(|v| matches!(v, Value::Vector(_)));
 
-    // Count how many different type categories we have
-    let type_categories = vec![
-        has_edge,
-        has_record,
-        has_string,
-        has_boolean,
-        has_function,
-        has_tensor,
-        has_complex_tensor,
-        has_vector,
-    ];
-    let non_numeric_types = type_categories.iter().filter(|&&x| x).count();
+    // Only apply numeric promotion if ALL elements are numeric (Number or Complex)
+    let all_numeric = values.iter().all(|v| matches!(v, Value::Number(_) | Value::Complex(_)));
 
-    // Allow Number and Complex to coexist (they can be promoted)
-    let has_numeric = has_number || has_complex;
-
-    if non_numeric_types > 1 || (non_numeric_types > 0 && has_numeric) {
-        return Err("Vector elements must be of compatible types".to_string());
-    }
-
-    // Apply type promotion for numeric types
-    if has_numeric {
-        if has_complex {
-            // Promote all numbers to complex
-            let promoted: Vec<Value> = values.into_iter()
-                .map(|v| match v {
-                    Value::Number(n) => Value::Complex(Complex::new(n, 0.0)),
-                    v => v,
-                })
-                .collect();
-            Ok(Value::Vector(promoted))
-        } else {
-            // All are numbers, no promotion needed
-            Ok(Value::Vector(values))
-        }
+    if all_numeric && has_complex {
+        // Promote all numbers to complex for consistency
+        let promoted: Vec<Value> = values.into_iter()
+            .map(|v| match v {
+                Value::Number(n) => Value::Complex(Complex::new(n, 0.0)),
+                v => v,
+            })
+            .collect();
+        Ok(Value::Vector(promoted))
     } else {
-        // Non-numeric homogeneous vector (edges, records, strings, etc.)
+        // Heterogeneous vector - allow any mix of types
         Ok(Value::Vector(values))
     }
 }
@@ -164,14 +164,33 @@ fn combine_tensors_to_higher_dimension(tensors: Vec<Value>) -> Result<Value, Str
 }
 
 /// Evaluate a record literal
-pub fn evaluate_record(evaluator: &mut Evaluator, fields: &[(String, AstNode)]) -> Result<Value, String> {
+/// Supports spread syntax: { a: 1, ...other, b: 2 }
+pub fn evaluate_record(evaluator: &mut Evaluator, fields: &[achronyme_parser::ast::RecordFieldOrSpread]) -> Result<Value, String> {
     use std::collections::HashMap;
+    use achronyme_parser::ast::RecordFieldOrSpread;
 
     let mut record = HashMap::new();
 
-    for (key, value_node) in fields {
-        let value = evaluator.evaluate(value_node)?;
-        record.insert(key.clone(), value);
+    for field in fields {
+        match field {
+            RecordFieldOrSpread::Field { name, value } => {
+                let evaluated_value = evaluator.evaluate(value)?;
+                record.insert(name.clone(), evaluated_value);
+            }
+            RecordFieldOrSpread::Spread(node) => {
+                let spread_value = evaluator.evaluate(node)?;
+                match spread_value {
+                    Value::Record(spread_record) => {
+                        for (key, value) in spread_record {
+                            record.insert(key, value);
+                        }
+                    }
+                    _ => {
+                        return Err(format!("Cannot spread non-Record value in record context. Got: {:?}", spread_value));
+                    }
+                }
+            }
+        }
     }
 
     Ok(Value::Record(record))

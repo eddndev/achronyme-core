@@ -445,6 +445,8 @@ fn process_escape_sequences(s: &str) -> String {
 }
 
 fn build_piecewise(args: Vec<AstNode>) -> Result<AstNode, String> {
+    use crate::ast::ArrayElement;
+
     if args.is_empty() {
         return Err("piecewise() requires at least one argument".to_string());
     }
@@ -461,10 +463,22 @@ fn build_piecewise(args: Vec<AstNode>) -> Result<AstNode, String> {
                         elems.len()
                     ));
                 }
-                cases.push((
-                    Box::new(elems[0].clone()),
-                    Box::new(elems[1].clone()),
-                ));
+
+                let first = match &elems[0] {
+                    ArrayElement::Single(node) => node.clone(),
+                    ArrayElement::Spread(_) => {
+                        return Err("piecewise() does not support spread in case arrays".to_string());
+                    }
+                };
+
+                let second = match &elems[1] {
+                    ArrayElement::Single(node) => node.clone(),
+                    ArrayElement::Spread(_) => {
+                        return Err("piecewise() does not support spread in case arrays".to_string());
+                    }
+                };
+
+                cases.push((Box::new(first), Box::new(second)));
             }
             _ => {
                 if i != args.len() - 1 {
@@ -594,29 +608,65 @@ fn build_primary(pair: Pair<Rule>) -> Result<AstNode, String> {
 
 /// Build array from pest pair - handles vectors, matrices, and N-dimensional tensors
 /// Now returns unified ArrayLiteral for all dimensions
+/// Supports spread syntax: [1, ...vec, 2]
 fn build_array(pair: Pair<Rule>) -> Result<AstNode, String> {
-    let elements: Vec<AstNode> = pair
+    use crate::ast::ArrayElement;
+
+    let elements: Vec<ArrayElement> = pair
         .into_inner()
-        .map(|p| build_ast_from_expr(p))
+        .map(|p| {
+            match p.as_rule() {
+                Rule::array_element => {
+                    let inner = p.into_inner().next().ok_or("Empty array_element")?;
+                    match inner.as_rule() {
+                        Rule::spread_expr => {
+                            let spread_inner = inner.into_inner().next().ok_or("Empty spread_expr")?;
+                            Ok(ArrayElement::Spread(Box::new(build_ast_from_expr(spread_inner)?)))
+                        }
+                        Rule::expr => {
+                            Ok(ArrayElement::Single(build_ast_from_expr(inner)?))
+                        }
+                        _ => Err(format!("Unexpected array_element inner rule: {:?}", inner.as_rule()))
+                    }
+                }
+                _ => Err(format!("Unexpected array rule child: {:?}", p.as_rule()))
+            }
+        })
         .collect::<Result<Vec<_>, _>>()?;
 
     Ok(AstNode::ArrayLiteral(elements))
 }
 
 fn build_record(pair: Pair<Rule>) -> Result<AstNode, String> {
-    let fields: Result<Vec<(String, AstNode)>, String> = pair
+    use crate::ast::RecordFieldOrSpread;
+
+    let fields: Result<Vec<RecordFieldOrSpread>, String> = pair
         .into_inner()
-        .map(|field_pair| {
-            // Each field_pair is a record_field: identifier ~ ":" ~ expr
-            let mut field_inner = field_pair.into_inner();
-            let key = field_inner.next()
-                .ok_or("Missing field key")?
-                .as_str()
-                .to_string();
-            let value = build_ast_from_expr(
-                field_inner.next().ok_or("Missing field value")?
-            )?;
-            Ok((key, value))
+        .map(|field_or_spread_pair| {
+            match field_or_spread_pair.as_rule() {
+                Rule::record_field_or_spread => {
+                    let inner = field_or_spread_pair.into_inner().next().ok_or("Empty record_field_or_spread")?;
+                    match inner.as_rule() {
+                        Rule::spread_expr => {
+                            let spread_inner = inner.into_inner().next().ok_or("Empty spread_expr")?;
+                            Ok(RecordFieldOrSpread::Spread(Box::new(build_ast_from_expr(spread_inner)?)))
+                        }
+                        Rule::record_field => {
+                            let mut field_inner = inner.into_inner();
+                            let key = field_inner.next()
+                                .ok_or("Missing field key")?
+                                .as_str()
+                                .to_string();
+                            let value = build_ast_from_expr(
+                                field_inner.next().ok_or("Missing field value")?
+                            )?;
+                            Ok(RecordFieldOrSpread::Field { name: key, value })
+                        }
+                        _ => Err(format!("Unexpected record_field_or_spread inner rule: {:?}", inner.as_rule()))
+                    }
+                }
+                _ => Err(format!("Unexpected record rule child: {:?}", field_or_spread_pair.as_rule()))
+            }
         })
         .collect();
 
