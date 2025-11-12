@@ -90,7 +90,7 @@ record_field = {
 }
 
 // ============================================================================
-// Lambda Functions
+// Lambda Functions and Do Blocks
 // ============================================================================
 
 // Lambda parameters: x or (x, y, z) or ()
@@ -99,9 +99,21 @@ lambda_params = {
   | ("(" ~ (identifier ~ ("," ~ identifier)*)? ~ ")") // Multi param or no params: (x, y) or ()
 }
 
-// Lambda: x => x^2 or (x, y) => x + y
+// Do block: do { let a = 1; let b = 2; a + b }
+// A block that contains a sequence of statements
+do_block = {
+    "do" ~ "{" ~ sequence ~ "}"
+  | "do" ~ "{" ~ statement ~ "}" // Single statement (no semicolon required)
+}
+
+// Lambda body: can be an expression or a do block
+lambda_body = {
+    do_block | expr
+}
+
+// Lambda: x => x^2 or (x, y) => x + y or x => do { ... }
 lambda = {
-    lambda_params ~ "=>" ~ expr
+    lambda_params ~ "=>" ~ lambda_body
 }
 
 // ============================================================================
@@ -126,6 +138,7 @@ primary = {
   | number
   | record         // Record literals { key: value }
   | array          // Arrays/tensors (vectors, matrices, and higher-dimensional)
+  | do_block       // Do blocks (must come before lambda to avoid ambiguity)
   | lambda
   | self_ref       // Self-reference in records
   | rec_ref        // Rec-reference for recursive calls
@@ -232,11 +245,23 @@ statement = {
   | expr
 }
 
+// Sequence: multiple statements separated by semicolons
+// Examples: "let a = 1; let b = 2; a + b" or "1 + 1; 2 + 2"
+// The last statement doesn't need a semicolon
+sequence = {
+    statement ~ (";" ~ statement)+ ~ ";"?
+}
+
+// Top-level expression: either a sequence or a single statement
+top_level_expr = {
+    sequence | statement
+}
+
 // ============================================================================
 // Program (entry point)
 // ============================================================================
 
-// Program: sequence of statements
+// Program: sequence of top-level expressions (for REPL compatibility)
 program = {
-    SOI ~ statement* ~ EOI
+    SOI ~ top_level_expr* ~ EOI
 }

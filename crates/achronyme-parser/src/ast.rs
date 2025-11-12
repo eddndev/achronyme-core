@@ -90,6 +90,18 @@ pub enum AstNode {
         object: Box<AstNode>,
         indices: Vec<IndexArg>,
     },
+    // Sequence: multiple statements separated by semicolons
+    // Example: let a = 1; let b = 2; a + b
+    // The last statement is the value of the sequence
+    Sequence {
+        statements: Vec<AstNode>,
+    },
+    // DoBlock: do { statements }
+    // Similar to Sequence but explicitly wrapped in a do { } block
+    // Used in lambda bodies: x => do { let a = x * 2; a + 10 }
+    DoBlock {
+        statements: Vec<AstNode>,
+    },
 }
 
 /// Represents an indexing argument - can be a single expression or a range

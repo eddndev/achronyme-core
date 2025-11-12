@@ -301,79 +301,264 @@ let classify = n => do {
 
 ## Implementación por Fases
 
-### Fase 1: AST Changes
-- Añadir `AstNode::Block { statements: Vec<AstNode> }`
-- Añadir `AstNode::Return { value: Box<AstNode> }`
-- Añadir `AstNode::LetStatement { name: String, value: Box<AstNode> }`
+### Fase 1: Grammar Changes (pest)
+```pest
+// Añadir regla para bloques do
+do_block = { "do" ~ "{" ~ block_body ~ "}" }
+block_body = { (let_binding | expression) ~ (";" ~ (let_binding | expression))* ~ ";"? }
+let_binding = { "let" ~ identifier ~ "=" ~ expression }
 
-### Fase 2: Parser Changes
-- Detectar `=>` seguido de `{`
-- Analizar contenido para determinar si es record o bloque
-- Parsear múltiples statements separados por `;`
+// Actualizar lambda_body
+lambda_body = { do_block | expression }
+```
 
-### Fase 3: Evaluator Changes
-- Evaluar `Block`: ejecutar statements secuencialmente
-- Evaluar `Return`: retornar inmediatamente
-- Manejar scope local para `let` dentro de bloques
+### Fase 2: AST Changes
+```rust
+pub enum AstNode {
+    // ... existentes
 
-### Fase 4: Testing
-- Tests de bloques simples
-- Tests de desambiguación record vs bloque
-- Tests de closures con bloques
-- Tests de recursión con bloques
+    // Nuevo: Bloque do
+    DoBlock {
+        statements: Vec<AstNode>,  // Todas las expresiones/bindings
+    },
 
-## Ejemplos de Uso
+    // Nuevo: Let binding (solo dentro de bloques)
+    LetBinding {
+        name: String,
+        value: Box<AstNode>,
+    },
+}
+```
 
+**NOTA:** NO necesitamos `Return` porque:
+- La última expresión del bloque es el retorno implícito
+- Sin mutabilidad, no hay early returns útiles
+
+### Fase 3: Parser Changes
+```rust
+// En pest_parser.rs
+fn parse_do_block(pair: Pair<Rule>) -> AstNode {
+    let mut statements = Vec::new();
+
+    for inner_pair in pair.into_inner() {
+        match inner_pair.as_rule() {
+            Rule::let_binding => {
+                statements.push(parse_let_binding(inner_pair));
+            }
+            Rule::expression => {
+                statements.push(parse_expression(inner_pair));
+            }
+            _ => {}
+        }
+    }
+
+    AstNode::DoBlock { statements }
+}
+```
+
+### Fase 4: Evaluator Changes
+```rust
+// En evaluator.rs
+AstNode::DoBlock { statements } => {
+    if statements.is_empty() {
+        return Ok(Value::Number(0.0)); // o error
+    }
+
+    // Crear nuevo scope para el bloque
+    self.environment_mut().push_scope();
+
+    let mut result = Value::Number(0.0);
+
+    for (i, stmt) in statements.iter().enumerate() {
+        match stmt {
+            AstNode::LetBinding { name, value } => {
+                let val = self.evaluate(value)?;
+                self.environment_mut().define(name.clone(), val)?;
+            }
+            _ => {
+                result = self.evaluate(stmt)?;
+            }
+        }
+    }
+
+    // Pop scope
+    self.environment_mut().pop_scope();
+
+    Ok(result)
+}
+```
+
+### Fase 5: Garantizar que `rec` funciona
+```rust
+// En handlers/functions.rs - apply_lambda
+// Ya está implementado: inyectamos 'rec' en cada llamada
+evaluator.environment_mut().define("rec".to_string(), Value::Function(function.clone()))?;
+
+// Esto debe funcionar dentro de bloques do también
+// porque el scope del bloque es hijo del scope donde está 'rec'
+```
+
+### Fase 6: Testing
+1. **Test básico:**
+   ```javascript
+   let test = x => do {
+       let y = x * 2;
+       y + 10
+   }
+   assert(test(5) == 20)
+   ```
+
+2. **Test recursión con `rec`:**
+   ```javascript
+   let factorial = n => do {
+       if(n <= 1, 1, n * rec(n - 1))
+   }
+   assert(factorial(5) == 120)
+   ```
+
+3. **Test shadowing:**
+   ```javascript
+   let shadow = x => do {
+       let x = x + 1;
+       let x = x * 2;
+       x
+   }
+   assert(shadow(5) == 12)  // (5+1)*2
+   ```
+
+4. **Test closures:**
+   ```javascript
+   let makeAdder = n => do {
+       let add = x => n + x;
+       add
+   }
+   let add10 = makeAdder(10);
+   assert(add10(5) == 15)
+   ```
+
+5. **Test bloques vacíos:**
+   ```javascript
+   let empty = () => do {}  // ¿error o retorna unit/0?
+   ```
+
+## Ejemplos de Uso Real (Sin Mutabilidad)
+
+### Ejemplo 1: Pipeline de Datos con Pasos Intermedios
 ```javascript
-// Análisis de datos con pasos intermedios
-let analyzeData = rawData => {
+let analyzeData = rawData => do {
     let cleaned = filter(x => x != null, rawData);
     let normalized = map(x => x / 100, cleaned);
+    let mean = sum(normalized) / length(normalized);
     let stats = {
-        mean: sum(normalized) / length(normalized),
+        mean: mean,
         max: max(normalized),
-        min: min(normalized)
+        min: min(normalized),
+        count: length(normalized)
     };
     stats
 }
+```
 
-// Algoritmo complejo
-let quicksort = arr => {
-    if (length(arr) <= 1) {
-        return arr;
-    };
-
-    let pivot = arr[0];
-    let rest = arr[1..];
-    let less = filter(x => x < pivot, rest);
-    let greater = filter(x => x >= pivot, rest);
-
-    concat(rec(less), [pivot], rec(greater))
+### Ejemplo 2: Quicksort (Recursivo)
+```javascript
+let quicksort = arr => do {
+    if(length(arr) <= 1,
+        arr,
+        do {
+            let pivot = arr[0];
+            let rest = arr[1..];
+            let less = filter(x => x < pivot, rest);
+            let greater = filter(x => x >= pivot, rest);
+            concat(rec(less), [pivot], rec(greater))
+        }
+    )
 }
+```
 
-// Constructor con lógica
-let makeValidator = rules => {
-    let ruleCount = length(rules);
+### Ejemplo 3: Validador con Helpers
+```javascript
+let makeValidator = rules => do {
+    let checkRule = (rule, data) =>
+        if(rule.check(data), [], [rule.message]);
+
+    let validateAll = (ruleList, data, errors) =>
+        if(length(ruleList) == 0,
+            errors,
+            rec(
+                ruleList[1..],
+                data,
+                concat(errors, checkRule(ruleList[0], data))
+            )
+        );
+
     {
-        validate: data => {
-            let errors = [];
-            let i = 0;
-            while (i < ruleCount) {
-                let rule = rules[i];
-                if (!rule.check(data)) {
-                    errors = concat(errors, [rule.message]);
-                };
-                i = i + 1;
-            };
+        validate: data => do {
+            let errors = validateAll(rules, data, []);
             { valid: length(errors) == 0, errors: errors }
         }
     }
 }
 ```
 
-## Notas de Diseño
+### Ejemplo 4: Fibonacci con Tail Recursion
+```javascript
+let fibonacci = n => do {
+    let fib_tail = (a, b, count) =>
+        if(count <= 0, a, rec(b, a + b, count - 1));
 
-- **Ciudadanos de primera clase:** Las funciones con bloques siguen siendo valores
-- **Tipado dinámico:** El tipo de retorno se determina en runtime
-- **Scope léxico:** Variables capturadas correctamente (ya implementado con Rc<Environment>)
-- **No side effects globales:** Usar closures y records para estado mutable
+    fib_tail(0, 1, n)
+}
+```
+
+### Ejemplo 5: Map-Reduce Complejo
+```javascript
+let processOrders = orders => do {
+    let validOrders = filter(o => o.amount > 0, orders);
+    let withTax = map(o => { id: o.id, total: o.amount * 1.21 }, validOrders);
+    let totalRevenue = sum(map(o => o.total, withTax));
+
+    {
+        processed: withTax,
+        revenue: totalRevenue,
+        count: length(withTax)
+    }
+}
+```
+
+### Ejemplo 6: Parser de Expresiones (Recursivo)
+```javascript
+let parseExpr = tokens => do {
+    let first = tokens[0];
+    let rest = tokens[1..];
+
+    let result = if(first == "(",
+        do {
+            let inner = rec(rest);
+            { expr: inner.expr, remaining: inner.remaining[1..] }
+        },
+        { expr: first, remaining: rest }
+    );
+
+    result
+}
+```
+
+## Notas de Diseño Final
+
+### Características Clave:
+- ✅ **Ciudadanos de primera clase:** Las funciones con bloques `do` siguen siendo valores
+- ✅ **Tipado dinámico:** El tipo de retorno se determina en runtime
+- ✅ **Scope léxico:** Variables capturadas correctamente con `Rc<Environment>` (ya optimizado)
+- ✅ **Inmutabilidad:** Solo bindings inmutables con `let` (shadowing permitido)
+- ✅ **Recursión:** `rec` funciona dentro de bloques `do`
+- ✅ **Sin ambigüedad:** `=> do { }` vs `=> { }` son claramente diferentes
+
+### Limitaciones Aceptadas:
+- ❌ **No hay mutación:** Usar recursión y shadowing en su lugar
+- ❌ **No hay return temprano:** La última expresión es siempre el retorno
+- ❌ **No hay loops imperativos:** Usar recursión y funciones de orden superior
+
+### Beneficios:
+- 🚀 **Performance:** El `Rc<Environment>` hace que closures sean O(1)
+- 🧩 **Composabilidad:** Los bloques son expresiones, se pueden anidar
+- 🔒 **Seguridad:** Sin mutación = sin race conditions ni efectos secundarios inesperados

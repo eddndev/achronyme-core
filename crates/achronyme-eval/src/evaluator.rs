@@ -254,6 +254,56 @@ impl Evaluator {
             AstNode::IndexAccess { object, indices } => {
                 handlers::indexing::evaluate_index_access(self, object, indices)
             }
+
+            // Sequence: multiple statements separated by semicolons
+            // Example: let a = 1; let b = 2; a + b
+            // The last statement is the value of the sequence
+            AstNode::Sequence { statements } => {
+                if statements.is_empty() {
+                    return Err("Empty sequence".to_string());
+                }
+
+                // Create a new scope for the sequence
+                self.env.push_scope();
+
+                // Evaluate all statements, keeping the last result
+                // The result can be any type: Number, String, Vector, Function, etc.
+                let mut result = None;
+                for stmt in statements {
+                    result = Some(self.evaluate(stmt)?);
+                }
+
+                // Pop the scope
+                self.env.pop_scope();
+
+                // Return the last evaluated expression
+                result.ok_or_else(|| "Empty sequence (no statements)".to_string())
+            }
+
+            // DoBlock: do { statements }
+            // Example: x => do { let a = x * 2; a + 10 }
+            // Can return any type: Number, Vector, String, Function, Record, etc.
+            AstNode::DoBlock { statements } => {
+                if statements.is_empty() {
+                    return Err("Empty do block".to_string());
+                }
+
+                // Create a new scope for the do block
+                self.env.push_scope();
+
+                // Evaluate all statements, keeping the last result
+                // The result can be any type: Number, String, Vector, Function, etc.
+                let mut result = None;
+                for stmt in statements {
+                    result = Some(self.evaluate(stmt)?);
+                }
+
+                // Pop the scope
+                self.env.pop_scope();
+
+                // Return the last evaluated expression
+                result.ok_or_else(|| "Empty do block (no statements)".to_string())
+            }
         }
     }
 

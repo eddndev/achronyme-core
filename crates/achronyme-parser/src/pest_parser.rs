@@ -37,7 +37,11 @@ pub fn parse(input: &str) -> Result<Vec<AstNode>, String> {
             Rule::program => {
                 for inner_pair in pair.into_inner() {
                     match inner_pair.as_rule() {
+                        Rule::top_level_expr => {
+                            statements.push(build_ast_from_top_level_expr(inner_pair)?);
+                        }
                         Rule::statement => {
+                            // For backward compatibility (shouldn't happen with new grammar)
                             statements.push(build_ast_from_statement(inner_pair)?);
                         }
                         Rule::EOI => {} // End of input, ignore
@@ -50,6 +54,38 @@ pub fn parse(input: &str) -> Result<Vec<AstNode>, String> {
     }
 
     Ok(statements)
+}
+
+// Build AST from top_level_expr (either sequence or statement)
+fn build_ast_from_top_level_expr(pair: Pair<Rule>) -> Result<AstNode, String> {
+    let inner = pair.into_inner().next()
+        .ok_or("Empty top_level_expr")?;
+
+    match inner.as_rule() {
+        Rule::sequence => build_sequence(inner),
+        Rule::statement => build_ast_from_statement(inner),
+        _ => Err(format!("Unexpected top_level_expr rule: {:?}", inner.as_rule()))
+    }
+}
+
+// Build AST from sequence
+fn build_sequence(pair: Pair<Rule>) -> Result<AstNode, String> {
+    let mut statements = Vec::new();
+
+    for inner_pair in pair.into_inner() {
+        match inner_pair.as_rule() {
+            Rule::statement => {
+                statements.push(build_ast_from_statement(inner_pair)?);
+            }
+            _ => {}
+        }
+    }
+
+    if statements.is_empty() {
+        return Err("Empty sequence".to_string());
+    }
+
+    Ok(AstNode::Sequence { statements })
 }
 
 // ============================================================================
@@ -548,8 +584,9 @@ fn build_primary(pair: Pair<Rule>) -> Result<AstNode, String> {
         Rule::vector => build_array(inner),  // Alias for array
         Rule::matrix => build_array(inner),  // Alias for array
         Rule::record => build_record(inner),
+        Rule::do_block => build_do_block(inner),
         Rule::lambda => build_lambda(inner),
-        
+
         Rule::expr => build_ast_from_expr(inner),
         _ => Err(format!("Unexpected primary rule: {:?}", inner.as_rule()))
     }
@@ -593,7 +630,19 @@ fn build_lambda(pair: Pair<Rule>) -> Result<AstNode, String> {
     let params = extract_lambda_params(params_pair)?;
 
     let body_pair = inner.next().ok_or("Missing lambda body")?;
-    let body = build_ast_from_expr(body_pair)?;
+
+    // Lambda body can be either a do_block or an expression
+    let body = match body_pair.as_rule() {
+        Rule::lambda_body => {
+            let inner_body = body_pair.into_inner().next().ok_or("Empty lambda body")?;
+            match inner_body.as_rule() {
+                Rule::do_block => build_do_block(inner_body)?,
+                Rule::expr => build_ast_from_expr(inner_body)?,
+                _ => return Err(format!("Unexpected lambda body rule: {:?}", inner_body.as_rule()))
+            }
+        }
+        _ => return Err(format!("Expected lambda_body, got {:?}", body_pair.as_rule()))
+    };
 
     Ok(AstNode::Lambda {
         params,
@@ -609,6 +658,35 @@ fn extract_lambda_params(pair: Pair<Rule>) -> Result<Vec<String>, String> {
 
     // Allow empty parameter lists for lambdas like () => expr
     Ok(params)
+}
+
+// Build do block: do { statements }
+fn build_do_block(pair: Pair<Rule>) -> Result<AstNode, String> {
+    let mut statements = Vec::new();
+
+    for inner_pair in pair.into_inner() {
+        match inner_pair.as_rule() {
+            Rule::sequence => {
+                // Extract statements from the sequence
+                for stmt_pair in inner_pair.into_inner() {
+                    if stmt_pair.as_rule() == Rule::statement {
+                        statements.push(build_ast_from_statement(stmt_pair)?);
+                    }
+                }
+            }
+            Rule::statement => {
+                // Single statement (no semicolon)
+                statements.push(build_ast_from_statement(inner_pair)?);
+            }
+            _ => {}
+        }
+    }
+
+    if statements.is_empty() {
+        return Err("Empty do block".to_string());
+    }
+
+    Ok(AstNode::DoBlock { statements })
 }
 
 

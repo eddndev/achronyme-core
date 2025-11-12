@@ -1,0 +1,8 @@
+// Test 1: básico
+let a = 1; let b = 2; a + b
+
+// Test 2: con funciones
+let double = x => x * 2; let triple = x => x * 3; double(5) + triple(5)
+
+// Test 3: shadowing
+let x = 10; let x = x + 5; let x = x * 2; x
