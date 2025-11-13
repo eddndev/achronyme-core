@@ -11,7 +11,7 @@ use pest::Parser;
 use pest::iterators::Pair;
 use pest_derive::Parser;
 
-use crate::ast::{AstNode, BinaryOp, UnaryOp, IndexArg};
+use crate::ast::{AstNode, BinaryOp, UnaryOp, IndexArg, ImportItem};
 
 // ============================================================================
 // Parser Definition
@@ -97,12 +97,105 @@ fn build_ast_from_statement(pair: Pair<Rule>) -> Result<AstNode, String> {
         .ok_or("Empty statement")?;
 
     match inner.as_rule() {
+        Rule::import_statement => build_import_statement(inner),
+        Rule::export_statement => build_export_statement(inner),
         Rule::let_statement => build_let_statement(inner),
         Rule::mut_statement => build_mut_statement(inner),
         Rule::assignment => build_assignment(inner),
         Rule::expr => build_ast_from_expr(inner),
         _ => Err(format!("Unexpected statement rule: {:?}", inner.as_rule()))
     }
+}
+
+fn build_import_statement(pair: Pair<Rule>) -> Result<AstNode, String> {
+    let mut inner = pair.into_inner();
+
+    // Grammar: "import" ~ import_list ~ "from" ~ module_path
+    let import_list = inner.next()
+        .ok_or("Missing import list in import statement")?;
+
+    let module_path_pair = inner.next()
+        .ok_or("Missing module path in import statement")?;
+
+    // Extract items from import_list
+    let items = build_import_list(import_list)?;
+
+    // Extract module path (it's a string_literal)
+    let module_path = extract_string_literal(module_path_pair)?;
+
+    Ok(AstNode::Import {
+        items,
+        module_path,
+    })
+}
+
+fn build_export_statement(pair: Pair<Rule>) -> Result<AstNode, String> {
+    let mut inner = pair.into_inner();
+
+    // Grammar: "export" ~ import_list
+    let import_list = inner.next()
+        .ok_or("Missing export list in export statement")?;
+
+    // Extract items from import_list (reuse same structure)
+    let items = build_import_list(import_list)?;
+
+    Ok(AstNode::Export {
+        items,
+    })
+}
+
+fn build_import_list(pair: Pair<Rule>) -> Result<Vec<ImportItem>, String> {
+    let mut items = Vec::new();
+
+    // Grammar: "{" ~ import_item ~ ("," ~ import_item)* ~ "}"
+    for item_pair in pair.into_inner() {
+        if item_pair.as_rule() == Rule::import_item {
+            items.push(build_import_item(item_pair)?);
+        }
+    }
+
+    if items.is_empty() {
+        return Err("Import list cannot be empty".to_string());
+    }
+
+    Ok(items)
+}
+
+fn build_import_item(pair: Pair<Rule>) -> Result<ImportItem, String> {
+    let mut inner = pair.into_inner();
+
+    // Grammar: identifier ~ ("as" ~ identifier)?
+    let name = inner.next()
+        .ok_or("Missing identifier in import item")?
+        .as_str()
+        .to_string();
+
+    let alias = inner.next().map(|p| p.as_str().to_string());
+
+    Ok(ImportItem { name, alias })
+}
+
+fn extract_string_literal(pair: Pair<Rule>) -> Result<String, String> {
+    // Navigate through module_path -> string_literal
+    let inner = pair.into_inner().next()
+        .ok_or("Missing string literal in module path")?;
+
+    if inner.as_rule() != Rule::string_literal {
+        return Err(format!("Expected string_literal, got {:?}", inner.as_rule()));
+    }
+
+    // Parse the string literal (remove quotes and handle escapes)
+    let s = inner.as_str();
+    let s = &s[1..s.len()-1]; // Remove surrounding quotes
+
+    // Handle escape sequences
+    let s = s.replace("\\n", "\n")
+        .replace("\\t", "\t")
+        .replace("\\r", "\r")
+        .replace("\\\"", "\"")
+        .replace("\\\\", "\\");
+
+    Ok(s)
 }
 
 fn build_let_statement(pair: Pair<Rule>) -> Result<AstNode, String> {

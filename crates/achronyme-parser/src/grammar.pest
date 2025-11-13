@@ -57,7 +57,7 @@ string_char = {
 
 // Reserved keywords (use word boundaries to prevent matching prefixes)
 keyword = _{
-    ("let" | "mut" | "rec" | "self" | "true" | "false") ~ !ASCII_ALPHANUMERIC
+    ("let" | "mut" | "rec" | "self" | "true" | "false" | "import" | "from" | "export" | "as") ~ !ASCII_ALPHANUMERIC
 }
 
 // Identifiers: x, foo, my_var, PI, sin (but not keywords)
@@ -246,6 +246,37 @@ logical_or = {
 expr = { logical_or }
 
 // ============================================================================
+// Import/Export Statements
+// ============================================================================
+
+// Import item: can be a simple identifier or an aliased import
+// Examples: foo, foo as bar
+import_item = {
+    identifier ~ ("as" ~ identifier)?
+}
+
+// Import list: { foo, bar, baz as qux }
+import_list = {
+    "{" ~ import_item ~ ("," ~ import_item)* ~ "}"
+}
+
+// Module path: a string literal representing the module path
+// Examples: "math", "stats", "./my_module", "../utils/helpers"
+module_path = { string_literal }
+
+// Import statement: import { sin, cos } from "math"
+// Also supports: import { mean as average } from "stats"
+import_statement = {
+    "import" ~ import_list ~ "from" ~ module_path
+}
+
+// Export statement: export { foo, bar }
+// For future use when we support user-defined modules
+export_statement = {
+    "export" ~ import_list
+}
+
+// ============================================================================
 // Statements
 // ============================================================================
 
@@ -266,10 +297,12 @@ assignment = {
     postfix_expression ~ "=" ~ expr
 }
 
-// Statement: let, mut, assignment, or expression
-// Try assignment before expr to avoid ambiguity
+// Statement: import, export, let, mut, assignment, or expression
+// Try import/export first, then assignment before expr to avoid ambiguity
 statement = {
-    let_statement
+    import_statement
+  | export_statement
+  | let_statement
   | mut_statement
   | assignment
   | expr

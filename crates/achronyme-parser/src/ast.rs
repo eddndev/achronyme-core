@@ -110,6 +110,17 @@ pub enum AstNode {
     DoBlock {
         statements: Vec<AstNode>,
     },
+    // Import statement: import { sin, cos } from "math"
+    // Supports aliasing: import { mean as average } from "stats"
+    Import {
+        items: Vec<ImportItem>,
+        module_path: String,
+    },
+    // Export statement: export { foo, bar }
+    // For future use when we support user-defined modules
+    Export {
+        items: Vec<ImportItem>,
+    },
 }
 
 /// Represents an array element - can be a single expression or a spread expression
@@ -135,4 +146,19 @@ pub enum IndexArg {
         start: Option<Box<AstNode>>,
         end: Option<Box<AstNode>>,
     },
+}
+
+/// Represents an import item - can be a simple identifier or an aliased import
+/// Examples: foo, foo as bar
+#[derive(Debug, Clone, PartialEq)]
+pub struct ImportItem {
+    pub name: String,           // The original name in the module
+    pub alias: Option<String>,  // Optional alias (for "as" imports)
+}
+
+impl ImportItem {
+    /// Get the local name (alias if present, otherwise original name)
+    pub fn local_name(&self) -> &str {
+        self.alias.as_deref().unwrap_or(&self.name)
+    }
 }
