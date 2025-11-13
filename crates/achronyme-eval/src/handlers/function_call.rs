@@ -138,10 +138,22 @@ pub fn dispatch(evaluator: &mut Evaluator, name: &str, args: &[AstNode]) -> Resu
         _ => {}
     }
 
-    // Otherwise, it's a built-in function call from FunctionRegistry
-    if !evaluator.functions().has(name) {
+    // Try to resolve function through module system
+    // This checks: 1) prelude, 2) imported modules, 3) global FunctionRegistry (backward compat)
+    let function_info = if let Some((func, arity)) = evaluator.module_registry().resolve(name, evaluator.imported_modules()) {
+        Some((func, arity))
+    } else if evaluator.functions().has(name) {
+        // Fallback to FunctionRegistry for backward compatibility
+        evaluator.functions().get(name)
+    } else {
+        None
+    };
+
+    if function_info.is_none() {
         return Err(format!("Unknown function or constant: {}", name));
     }
+
+    let (func, expected_arity) = function_info.unwrap();
 
     // Evaluate all arguments
     let mut arg_values = Vec::new();
@@ -150,17 +162,15 @@ pub fn dispatch(evaluator: &mut Evaluator, name: &str, args: &[AstNode]) -> Resu
     }
 
     // Check arity (if not variadic)
-    if let Some(expected_arity) = evaluator.functions().arity(name) {
-        if expected_arity >= 0 && arg_values.len() != expected_arity as usize {
-            return Err(format!(
-                "Function {} expects {} arguments, got {}",
-                name,
-                expected_arity,
-                arg_values.len()
-            ));
-        }
+    if expected_arity >= 0 && arg_values.len() != expected_arity as usize {
+        return Err(format!(
+            "Function {} expects {} arguments, got {}",
+            name,
+            expected_arity,
+            arg_values.len()
+        ));
     }
 
-    // Call the function
-    evaluator.functions_mut().call(name, &arg_values)
+    // Call the resolved function directly
+    func(&arg_values)
 }

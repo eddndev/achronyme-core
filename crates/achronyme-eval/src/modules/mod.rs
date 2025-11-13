@@ -13,6 +13,9 @@
 use std::collections::HashMap;
 use crate::functions::BuiltinFunction;
 
+pub mod builtin_registry;
+pub use builtin_registry::create_builtin_registry;
+
 /// Represents a single module with its exported functions
 #[derive(Clone)]
 pub struct Module {

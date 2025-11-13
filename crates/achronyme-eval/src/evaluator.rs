@@ -4,8 +4,11 @@ use achronyme_types::value::Value;
 use achronyme_types::LambdaEvaluator;
 use achronyme_types::Environment;
 
+use std::collections::HashMap;
+
 use crate::constants::ConstantsRegistry;
 use crate::functions::FunctionRegistry;
+use crate::modules::{ModuleRegistry, create_builtin_registry};
 use crate::handlers;
 
 /// Evaluator
@@ -32,6 +35,17 @@ pub struct Evaluator {
     env: Environment,
     constants: ConstantsRegistry,
     functions: FunctionRegistry,
+    /// Module registry for organizing functions into modules
+    module_registry: ModuleRegistry,
+    /// Track which modules have been imported
+    /// Format: local_name -> (module_name, original_name)
+    imported_modules: HashMap<String, (String, String)>,
+    /// Track exported values from current module (for user-defined modules)
+    /// Format: name -> Value
+    exported_values: HashMap<String, Value>,
+    /// Cache of loaded user modules to avoid re-parsing
+    /// Format: module_path -> HashMap<name, Value>
+    module_cache: HashMap<String, HashMap<String, Value>>,
     /// Flag to enable tail call optimization mode
     /// When true, CallExpression with rec will return TailCall markers
     tco_mode: bool,
@@ -44,6 +58,10 @@ impl Evaluator {
             env: Environment::new(),
             constants: ConstantsRegistry::new(),
             functions: FunctionRegistry::new(),
+            module_registry: create_builtin_registry(),
+            imported_modules: HashMap::new(),
+            exported_values: HashMap::new(),
+            module_cache: HashMap::new(),
             tco_mode: false,
         }
     }
@@ -73,6 +91,21 @@ impl Evaluator {
         &mut self.functions
     }
 
+    /// Get the module registry
+    pub fn module_registry(&self) -> &ModuleRegistry {
+        &self.module_registry
+    }
+
+    /// Get the imported modules map
+    pub fn imported_modules(&self) -> &HashMap<String, (String, String)> {
+        &self.imported_modules
+    }
+
+    /// Get the exported values map
+    pub fn exported_values(&self) -> &HashMap<String, Value> {
+        &self.exported_values
+    }
+
     /// Check if TCO mode is enabled
     pub fn is_tco_mode(&self) -> bool {
         self.tco_mode
@@ -81,6 +114,57 @@ impl Evaluator {
     /// Set TCO mode (used by tail-recursive function execution)
     pub fn set_tco_mode(&mut self, enabled: bool) {
         self.tco_mode = enabled;
+    }
+
+    /// Load and evaluate a user module from a file path
+    /// Returns the exported values from the module
+    pub fn load_user_module(&mut self, module_path: &str) -> Result<HashMap<String, Value>, String> {
+        use std::fs;
+        use achronyme_parser::parse;
+
+        // Check cache first
+        if let Some(cached_exports) = self.module_cache.get(module_path) {
+            return Ok(cached_exports.clone());
+        }
+
+        // Resolve relative path (add .ach extension if missing)
+        let resolved_path = if module_path.ends_with(".ach") {
+            module_path.to_string()
+        } else {
+            format!("{}.ach", module_path)
+        };
+
+        // Read the file
+        let file_content = fs::read_to_string(&resolved_path)
+            .map_err(|e| format!("Failed to read module '{}': {}", resolved_path, e))?;
+
+        // Parse the module
+        let statements = parse(&file_content)?;
+
+        // Create a new scope for the module
+        self.env.push_scope();
+
+        // Clear exported values for this module
+        let mut module_exports = HashMap::new();
+
+        // Evaluate all statements in the module
+        for stmt in &statements {
+            self.evaluate(stmt)?;
+        }
+
+        // Collect exported values
+        module_exports = self.exported_values.clone();
+
+        // Pop the module scope
+        self.env.pop_scope();
+
+        // Clear exported values (they've been captured)
+        self.exported_values.clear();
+
+        // Cache the module
+        self.module_cache.insert(module_path.to_string(), module_exports.clone());
+
+        Ok(module_exports)
     }
 
     /// Evaluate a SOC expression string using the Pest parser
@@ -248,6 +332,12 @@ impl Evaluator {
                     return Ok(Value::TailCall(arg_values));
                 }
 
+                // If callee is a VariableRef, it might be a built-in function
+                // Dispatch to function_call handler which checks module registry
+                if let AstNode::VariableRef(name) = callee.as_ref() {
+                    return handlers::function_call::dispatch(self, name, args);
+                }
+
                 // Regular call expression - evaluate callee to get the function
                 let func_value = self.evaluate(callee)?;
 
@@ -339,18 +429,60 @@ impl Evaluator {
 
             // Module system
             AstNode::Import { items, module_path } => {
-                // TODO: Implement import handling in Phase 2
-                // For now, we'll return a placeholder
-                Err(format!(
-                    "Import statements not yet implemented: import {{ ... }} from \"{}\"",
-                    module_path
-                ))
+                // Check if the module exists
+                if !self.module_registry.has_module(module_path) {
+                    return Err(format!("Module '{}' not found", module_path));
+                }
+
+                // Add each import to the imported_modules map
+                for item in items {
+                    let local_name = item.local_name();
+                    let original_name = &item.name;
+
+                    // Check if the function exists in the module
+                    let module = self.module_registry.get_module(module_path).unwrap();
+                    if !module.has(original_name) {
+                        return Err(format!(
+                            "Function '{}' not found in module '{}'",
+                            original_name, module_path
+                        ));
+                    }
+
+                    self.imported_modules.insert(
+                        local_name.to_string(),
+                        (module_path.clone(), original_name.clone())
+                    );
+                }
+
+                // Import statements don't produce a value, return unit (true)
+                Ok(Value::Boolean(true))
             }
 
             AstNode::Export { items } => {
-                // TODO: Implement export handling for user-defined modules
-                // For now, exports are not needed (only built-in modules)
-                Err("Export statements not yet implemented".to_string())
+                // Export statement: marks variables/functions for external use
+                // export { mean, std, variance }
+
+                for item in items {
+                    let name = &item.name;
+                    let export_name = item.local_name(); // Use alias if provided
+
+                    // Check if the value exists in the environment
+                    if !self.env.has(name) {
+                        return Err(format!(
+                            "Cannot export '{}': not found in current scope",
+                            name
+                        ));
+                    }
+
+                    // Get the value from environment
+                    let value = self.env.get(name)?;
+
+                    // Add to exported values
+                    self.exported_values.insert(export_name.to_string(), value);
+                }
+
+                // Export statements don't produce a value, return unit (true)
+                Ok(Value::Boolean(true))
             }
         }
     }

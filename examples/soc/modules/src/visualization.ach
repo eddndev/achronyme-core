@@ -1,0 +1,349 @@
+// ============================================================================
+// Data Visualization Utilities Module
+// ============================================================================
+// This module provides utility functions for data visualization and reporting.
+// It creates text-based visualizations suitable for terminal output.
+//
+// NOTE: User-defined modules with export are not yet implemented in Phase 2/3.
+// This file serves as a design example for when export functionality is added.
+// ============================================================================
+
+import { mean, std } from "stats"
+
+// Export functions (syntax ready for Phase 4)
+// export { createHistogram, printReport, createBarChart, createBoxPlot }
+
+// ============================================================================
+// ASCII Art Visualization
+// ============================================================================
+
+// Create a simple text-based histogram
+let createHistogram = (data, bins) => {
+    let dataMin = min(data)
+    let dataMax = max(data)
+    let binWidth = (dataMax - dataMin) / bins
+
+    // Initialize bin counts
+    let binCounts = map(x => 0, range(0, bins))
+
+    // Count values in each bin
+    let i = 0
+    while (i < len(data)) {
+        let value = data[i]
+        let binIndex = floor((value - dataMin) / binWidth)
+
+        // Handle edge case where value == dataMax
+        if (binIndex >= bins) {
+            binIndex = bins - 1
+        }
+
+        binCounts[binIndex] = binCounts[binIndex] + 1
+        i = i + 1
+    }
+
+    // Return histogram data
+    {
+        bins: bins,
+        binWidth: binWidth,
+        binCounts: binCounts,
+        min: dataMin,
+        max: dataMax
+    }
+}
+
+// Print histogram to console
+let printHistogram = (histData, title) => {
+    print("")
+    print(title)
+    print("-" * 50)
+
+    let maxCount = max(histData.binCounts)
+    let scale = 40 / maxCount  // Scale to fit in 40 characters
+
+    let i = 0
+    while (i < len(histData.binCounts)) {
+        let count = histData.binCounts[i]
+        let binStart = histData.min + i * histData.binWidth
+        let binEnd = binStart + histData.binWidth
+
+        // Create bar
+        let barLength = floor(count * scale)
+        let bar = ""
+        let j = 0
+        while (j < barLength) {
+            bar = bar + "█"
+            j = j + 1
+        }
+
+        // Print bin range and bar
+        print("[", binStart, "-", binEnd, "]", bar, "(", count, ")")
+
+        i = i + 1
+    }
+    print("")
+}
+
+// ============================================================================
+// Statistical Report Generation
+// ============================================================================
+
+// Create a comprehensive statistical report
+let createReport = (data, title) => {
+    {
+        title: title,
+        count: len(data),
+        mean: mean(data),
+        std: std(data),
+        min: min(data),
+        max: max(data),
+        range: max(data) - min(data),
+        sum: sum(data)
+    }
+}
+
+// Print a formatted statistical report
+let printReport = report => {
+    print("")
+    print("=" * 60)
+    print(report.title)
+    print("=" * 60)
+    print("")
+    print("Sample Size:       ", report.count)
+    print("Mean:              ", report.mean)
+    print("Standard Deviation:", report.std)
+    print("Minimum:           ", report.min)
+    print("Maximum:           ", report.max)
+    print("Range:             ", report.range)
+    print("Sum:               ", report.sum)
+    print("")
+    print("=" * 60)
+    print("")
+}
+
+// ============================================================================
+// Simple Bar Chart (Horizontal)
+// ============================================================================
+
+// Create horizontal bar chart for categorical data
+let createBarChart = (labels, values, title) => {
+    print("")
+    print(title)
+    print("-" * 50)
+
+    let maxValue = max(values)
+    let scale = 30 / maxValue  // Scale to fit in 30 characters
+
+    let i = 0
+    while (i < len(labels)) {
+        let label = labels[i]
+        let value = values[i]
+
+        // Create bar
+        let barLength = floor(value * scale)
+        let bar = ""
+        let j = 0
+        while (j < barLength) {
+            bar = bar + "▓"
+            j = j + 1
+        }
+
+        // Print label and bar
+        print(label, ":", bar, value)
+
+        i = i + 1
+    }
+    print("")
+}
+
+// ============================================================================
+// Box Plot (Text-based)
+// ============================================================================
+
+// Calculate quartiles for box plot
+let calculateQuartiles = data => {
+    // Note: This is simplified; ideally we'd sort first
+    let n = len(data)
+
+    let q1Index = floor(n * 0.25)
+    let q2Index = floor(n * 0.50)
+    let q3Index = floor(n * 0.75)
+
+    {
+        min: min(data),
+        q1: data[q1Index],
+        median: data[q2Index],
+        q3: data[q3Index],
+        max: max(data)
+    }
+}
+
+// Print a text-based box plot
+let printBoxPlot = (data, title) => {
+    let quartiles = calculateQuartiles(data)
+
+    print("")
+    print(title)
+    print("-" * 50)
+    print("")
+    print("    Min    Q1    Median   Q3     Max")
+    print("     |-----|---[]---|-----|")
+    print("    ", quartiles.min, "   ", quartiles.q1, "   ",
+          quartiles.median, "   ", quartiles.q3, "   ", quartiles.max)
+    print("")
+}
+
+// ============================================================================
+// Distribution Visualization
+// ============================================================================
+
+// Create distribution comparison
+let compareDistributions = (data1, data2, label1, label2) => {
+    let report1 = createReport(data1, label1)
+    let report2 = createReport(data2, label2)
+
+    print("")
+    print("=" * 60)
+    print("Distribution Comparison")
+    print("=" * 60)
+    print("")
+    print("Metric              ", label1, "          ", label2)
+    print("-" * 60)
+    print("Count:              ", report1.count, "             ", report2.count)
+    print("Mean:               ", report1.mean, "      ", report2.mean)
+    print("Std Dev:            ", report1.std, "      ", report2.std)
+    print("Min:                ", report1.min, "      ", report2.min)
+    print("Max:                ", report1.max, "      ", report2.max)
+    print("")
+}
+
+// ============================================================================
+// Data Summary Table
+// ============================================================================
+
+// Print a summary table of multiple datasets
+let printSummaryTable = datasets => {
+    print("")
+    print("=" * 70)
+    print("Data Summary Table")
+    print("=" * 70)
+    print("")
+    print("Dataset         Count   Mean      Std       Min       Max")
+    print("-" * 70)
+
+    let i = 0
+    while (i < len(datasets)) {
+        let dataset = datasets[i]
+        let name = dataset.name
+        let data = dataset.data
+
+        let report = createReport(data, name)
+
+        print(name, "   ", report.count, "   ", report.mean, "   ",
+              report.std, "   ", report.min, "   ", report.max)
+
+        i = i + 1
+    }
+
+    print("")
+    print("=" * 70)
+    print("")
+}
+
+// ============================================================================
+// Correlation Matrix Visualization
+// ============================================================================
+
+// Print a simple correlation matrix (text-based)
+let printCorrelationMatrix = (labels, correlations) => {
+    print("")
+    print("Correlation Matrix")
+    print("-" * 50)
+    print("")
+
+    // Print header
+    print("       ", join(labels, "    "))
+    print("")
+
+    // Print each row
+    let i = 0
+    while (i < len(labels)) {
+        let row = labels[i]
+        print(row, "  ")
+
+        let j = 0
+        while (j < len(correlations[i])) {
+            print(correlations[i][j], "  ")
+            j = j + 1
+        }
+
+        print("")
+        i = i + 1
+    }
+    print("")
+}
+
+// ============================================================================
+// Progress Bar
+// ============================================================================
+
+// Create a progress bar for long-running operations
+let createProgressBar = (current, total, width) => {
+    let percentage = (current / total) * 100
+    let filled = floor((current / total) * width)
+
+    let bar = "["
+    let i = 0
+    while (i < width) {
+        if (i < filled) {
+            bar = bar + "="
+        } else {
+            bar = bar + " "
+        }
+        i = i + 1
+    }
+    bar = bar + "]"
+
+    bar + " " + percentage + "%"
+}
+
+// ============================================================================
+// Example Usage
+// ============================================================================
+
+print("Visualization Utilities Module Loaded")
+print("Available functions:")
+print("  - createHistogram, printHistogram")
+print("  - createReport, printReport")
+print("  - createBarChart")
+print("  - calculateQuartiles, printBoxPlot")
+print("  - compareDistributions")
+print("  - printSummaryTable")
+print("  - printCorrelationMatrix")
+print("  - createProgressBar")
+print("")
+
+// Example: Visualize sample data
+let sampleData = [12, 15, 14, 13, 16, 14, 15, 14, 15, 16, 14, 15, 13, 14, 15]
+
+// Create and print histogram
+let hist = createHistogram(sampleData, 5)
+printHistogram(hist, "Sample Data Distribution")
+
+// Create and print report
+let report = createReport(sampleData, "Sample Data Analysis")
+printReport(report)
+
+// Create bar chart
+let categories = ["Group A", "Group B", "Group C"]
+let values = [25, 40, 15]
+createBarChart(categories, values, "Category Comparison")
+
+// Print box plot
+printBoxPlot(sampleData, "Sample Data Box Plot")
+
+// Progress bar example
+print("Progress Bar Examples:")
+print(createProgressBar(25, 100, 30))
+print(createProgressBar(50, 100, 30))
+print(createProgressBar(75, 100, 30))
+print(createProgressBar(100, 100, 30))

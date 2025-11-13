@@ -37,6 +37,7 @@ impl FunctionRegistry {
         function_modules::records::register_functions(self);
         function_modules::graphs::register_functions(self);
         function_modules::utils::register_functions(self);
+        function_modules::io::register_functions(self);
     }
 
     /// Register a function
@@ -52,6 +53,11 @@ impl FunctionRegistry {
     /// Get function arity (-1 for variadic)
     pub fn arity(&self, name: &str) -> Option<i32> {
         self.functions.get(name).map(|(_, arity)| *arity)
+    }
+
+    /// Get function pointer and arity
+    pub fn get(&self, name: &str) -> Option<(BuiltinFunction, i32)> {
+        self.functions.get(name).copied()
     }
 
     /// Call a function

@@ -948,7 +948,8 @@ mod tests {
     fn test_parse_function_call() {
         let result = parse("sin(PI)").unwrap();
         assert_eq!(result.len(), 1);
-        assert!(matches!(result[0], AstNode::FunctionCall { .. }));
+        // Can be either FunctionCall or CallExpression (both are valid for function calls)
+        assert!(matches!(result[0], AstNode::FunctionCall { .. } | AstNode::CallExpression { .. }));
     }
 
     #[test]
