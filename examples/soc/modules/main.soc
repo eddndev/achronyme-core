@@ -1,7 +1,35 @@
+import { funcion1 } from "src/funcion1"
+import { funcion2 } from "src/funcion2"
+import { createCounter } from "src/contador"
+import { makeAdder } from "src/makeAdder"
 import { semaforo } from "src/semaforo"
+let a = 10
+let b = 20
 
-print("Estado inicial", semaforo.luz)
+let contadorPrueba = createCounter([1,2,3])
+print("Estado actual del contador", contadorPrueba.value)
+contadorPrueba.inc()
+print("Estado despues de incrementar 1", contadorPrueba.value)
+contadorPrueba.inc()
+print("Estado despues de incrementar 1", contadorPrueba.value)
+
+let add5 = makeAdder(5)
+let add10 = makeAdder(10)
+
+print(add5, add10)
+print("Usando add5 con 20:", add5(20))
+print("Usando add10 con 20:", add10(20))
+print(funcion1(a,b))
+print(funcion2(a,b))
+describe(contadorPrueba)
+print(contadorPrueba.ejeDirigido)
+print(contadorPrueba.ejeNoDirigido)
+print("Operaciones con complejos nativas asi es", E^(i*PI) + 1)
+
+print("Estado inicial del semaforo", semaforo.luz)
 semaforo.next()
-print("Estado siguiente", semaforo.luz)
+print("Estado siguiente del semaforo", semaforo.luz)
 semaforo.next()
-print("Estado siguiente", semaforo.luz)
+print("Estado siguiente del semaforo", semaforo.luz)
+semaforo.next()
+print("Estado de inicio de nuevo del semaforo", semaforo.luz)

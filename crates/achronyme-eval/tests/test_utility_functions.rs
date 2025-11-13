@@ -61,8 +61,13 @@ fn test_type_vector() {
 fn test_type_tensor() {
     let mut evaluator = Evaluator::new();
 
+    // Simple arrays are now Vectors, matrices are Tensors
     let result = evaluator.eval_str("type([1, 2, 3])").unwrap();
-    assert_eq!(result, Value::String("Tensor".to_string()));
+    assert_eq!(result, Value::String("Vector".to_string()));
+
+    // 2D arrays (matrices) are Tensors
+    let result2 = evaluator.eval_str("type([[1, 2], [3, 4]])").unwrap();
+    assert_eq!(result2, Value::String("Tensor".to_string()));
 }
 
 #[test]

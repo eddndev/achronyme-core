@@ -1,4 +1,4 @@
-use crate::function_modules::graphs::helpers::{build_adjacency_list, extract_node_ids};
+use crate::function_modules::graphs::helpers::{build_adjacency_list, build_undirected_adjacency_list, extract_node_ids};
 use achronyme_types::value::Value;
 use achronyme_types::Environment;
 use std::cmp::Ordering;
@@ -14,13 +14,14 @@ pub fn connected_components(args: &[Value], _env: &mut Environment) -> Result<Va
     // Get all nodes
     let node_ids = extract_node_ids(network)?;
 
-    // Get edges and build adjacency list
+    // Get edges and build adjacency list using weak connectivity
+    // (treat all edges as undirected for component analysis)
     let edges_vec = match network.get("edges") {
         Some(Value::Vector(v)) => v,
         _ => return Err("Network must have an 'edges' field with a vector".to_string()),
     };
 
-    let adj_list = build_adjacency_list(edges_vec)?;
+    let adj_list = build_undirected_adjacency_list(edges_vec)?;
 
     // Find connected components using DFS
     let mut visited: HashSet<String> = HashSet::new();

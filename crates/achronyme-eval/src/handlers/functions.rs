@@ -59,22 +59,32 @@ pub fn apply_lambda(
             }
         }
         Function::Builtin(name) => {
-            // Built-in functions should be dispatched to their handlers
-            // Create temporary AST nodes for the arguments
-            let _arg_nodes: Vec<AstNode> = args.iter().enumerate().map(|(i, _)| {
-                // We can't easily convert Values back to AstNodes, so we need a different approach
-                // For now, error out - this will be fixed by making the function_call handler
-                // work with evaluated Values instead of AST nodes
-                AstNode::VariableRef(format!("__builtin_arg_{}", i))
-            }).collect();
+            // Built-in functions can be called directly through the registry
+            // Try module system first, then fall back to global FunctionRegistry
+            let function_info = if let Some((func, arity)) = evaluator.module_registry().resolve(name, evaluator.imported_modules()) {
+                Some((func, arity))
+            } else if evaluator.functions().has(name) {
+                evaluator.functions().get(name)
+            } else {
+                None
+            };
 
-            // For now, return an error - we need to refactor function_call handlers
-            // to accept Vec<Value> instead of Vec<&AstNode>
-            Err(format!(
-                "Built-in function '{}' cannot yet be used as a first-class value in this context. \
-                This requires refactoring the function call handlers.",
-                name
-            ))
+            if let Some((func, expected_arity)) = function_info {
+                // Check arity (if not variadic)
+                if expected_arity >= 0 && args.len() != expected_arity as usize {
+                    return Err(format!(
+                        "Function {} expects {} arguments, got {}",
+                        name,
+                        expected_arity,
+                        args.len()
+                    ));
+                }
+
+                // Call the builtin function directly with the evaluated arguments
+                func(&args, evaluator.environment_mut())
+            } else {
+                Err(format!("Unknown built-in function: {}", name))
+            }
         }
     }
 }

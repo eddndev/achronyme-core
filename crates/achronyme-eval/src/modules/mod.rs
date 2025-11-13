@@ -141,22 +141,9 @@ impl ModuleRegistry {
             }
         }
 
-        // 3. [TEMPORARY - Phase 3 will remove this]
-        // For backward compatibility during migration, allow global access
-        // This will be removed in a future version
-        #[cfg(feature = "global-fallback")]
-        {
-            for module in self.modules.values() {
-                if let Some(func) = module.get(name) {
-                    eprintln!(
-                        "Warning: '{}' from module '{}' used without import. \
-                         Add: import {{ {} }} from \"{}\"",
-                        name, module.name, name, module.name
-                    );
-                    return Some(func);
-                }
-            }
-        }
+        // 3. [REMOVED - Phase 3 complete]
+        // Global fallback was removed - all functions now require explicit imports
+        // (except prelude which is always available)
 
         None
     }

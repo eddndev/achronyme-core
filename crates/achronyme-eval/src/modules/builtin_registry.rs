@@ -40,22 +40,6 @@ pub fn create_builtin_registry() -> ModuleRegistry {
     registry
 }
 
-/// Helper function to copy a function from FunctionRegistry to ModuleRegistry/Module
-fn copy_function(
-    func_registry: &FunctionRegistry,
-    name: &str,
-) -> Option<(crate::functions::BuiltinFunction, i32)> {
-    if !func_registry.has(name) {
-        return None;
-    }
-    let arity = func_registry.arity(name)?;
-    // We need to extract the function pointer - we'll do this by calling it
-    // Actually, we can't extract the function pointer directly
-    // Let's use a different approach - we'll need to access the internal HashMap
-    // For now, let's just register the names and we'll fix the actual function dispatch later
-    None
-}
-
 // ============================================================================
 // Prelude Registration (39 functions)
 // ============================================================================

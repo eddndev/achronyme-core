@@ -50,8 +50,8 @@ fn test_save_env_function_basic() {
     let temp_path = temp_dir().join(format!("test_basic_{}.ach", timestamp));
 
     // Define some variables
-    evaluator.eval_str("x = 42").unwrap();
-    evaluator.eval_str("name = \"test\"").unwrap();
+    evaluator.eval_str("let x = 42").unwrap();
+    evaluator.eval_str("let name = \"test\"").unwrap();
 
     // Save the environment
     let save_expr = format!("save_env(\"{}\")", temp_path.to_string_lossy());

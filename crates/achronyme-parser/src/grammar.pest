@@ -65,6 +65,11 @@ identifier = @{
     !keyword ~ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")*
 }
 
+// Field identifier: like identifier but allows keywords (for field access like e.from)
+field_identifier = @{
+    (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")*
+}
+
 // ============================================================================
 // Composite Literals
 // ============================================================================
@@ -189,7 +194,7 @@ postfix_op = {
 
 call_op = { "(" ~ (expr ~ ("," ~ expr)*)? ~ ")" }
 index_op = { "[" ~ access_arg ~ ("," ~ access_arg)* ~ "]" }
-field_op = { "." ~ identifier }
+field_op = { "." ~ field_identifier }
 
 // Power (right-associative): 2^3^4 = 2^(3^4)
 power = {

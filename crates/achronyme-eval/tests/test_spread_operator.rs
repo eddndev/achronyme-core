@@ -9,10 +9,16 @@ fn eval(source: &str) -> Result<Value, String> {
 #[test]
 fn test_array_spread_basic() {
     let result = eval("[...[1,2], ...[3,4]]").unwrap();
-    if let Value::Tensor(t) = result {
-        assert_eq!(t.data(), &[1.0, 2.0, 3.0, 4.0]);
-    } else {
-        panic!("Expected Tensor, got {:?}", result);
+    match result {
+        Value::Vector(v) => {
+            assert_eq!(v.len(), 4);
+            assert_eq!(v[0], Value::Number(1.0));
+            assert_eq!(v[3], Value::Number(4.0));
+        }
+        Value::Tensor(t) => {
+            assert_eq!(t.data(), &[1.0, 2.0, 3.0, 4.0]);
+        }
+        _ => panic!("Expected Vector or Tensor, got {:?}", result),
     }
 }
 
@@ -42,20 +48,32 @@ fn test_record_spread_override() {
 #[test]
 fn test_array_spread_multiple() {
     let result = eval("[...[1], ...[2], ...[3]]").unwrap();
-    if let Value::Tensor(t) = result {
-        assert_eq!(t.data(), &[1.0, 2.0, 3.0]);
-    } else {
-        panic!("Expected Tensor, got {:?}", result);
+    match result {
+        Value::Vector(v) => {
+            assert_eq!(v.len(), 3);
+            assert_eq!(v[0], Value::Number(1.0));
+            assert_eq!(v[2], Value::Number(3.0));
+        }
+        Value::Tensor(t) => {
+            assert_eq!(t.data(), &[1.0, 2.0, 3.0]);
+        }
+        _ => panic!("Expected Vector or Tensor, got {:?}", result),
     }
 }
 
 #[test]
 fn test_array_spread_mixed() {
     let result = eval("[0, ...[1,2], 3]").unwrap();
-    if let Value::Tensor(t) = result {
-        assert_eq!(t.data(), &[0.0, 1.0, 2.0, 3.0]);
-    } else {
-        panic!("Expected Tensor, got {:?}", result);
+    match result {
+        Value::Vector(v) => {
+            assert_eq!(v.len(), 4);
+            assert_eq!(v[0], Value::Number(0.0));
+            assert_eq!(v[3], Value::Number(3.0));
+        }
+        Value::Tensor(t) => {
+            assert_eq!(t.data(), &[0.0, 1.0, 2.0, 3.0]);
+        }
+        _ => panic!("Expected Vector or Tensor, got {:?}", result),
     }
 }
 
@@ -66,10 +84,16 @@ fn test_spread_with_variables() {
         let nums2 = [4, 5, 6];
         [...nums1, ...nums2]
     "#).unwrap();
-    if let Value::Tensor(t) = result {
-        assert_eq!(t.data(), &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
-    } else {
-        panic!("Expected Tensor, got {:?}", result);
+    match result {
+        Value::Vector(v) => {
+            assert_eq!(v.len(), 6);
+            assert_eq!(v[0], Value::Number(1.0));
+            assert_eq!(v[5], Value::Number(6.0));
+        }
+        Value::Tensor(t) => {
+            assert_eq!(t.data(), &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
+        }
+        _ => panic!("Expected Vector or Tensor, got {:?}", result),
     }
 }
 

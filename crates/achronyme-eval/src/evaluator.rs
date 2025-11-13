@@ -179,16 +179,13 @@ impl Evaluator {
         // Create a new scope for the module
         self.env.push_scope();
 
-        // Clear exported values for this module
-        let mut module_exports = HashMap::new();
-
         // Evaluate all statements in the module
         for stmt in &statements {
             self.evaluate(stmt)?;
         }
 
-        // Collect exported values
-        module_exports = self.exported_values.clone();
+        // Collect exported values from this module
+        let module_exports = self.exported_values.clone();
 
         // Pop the module scope
         self.env.pop_scope();

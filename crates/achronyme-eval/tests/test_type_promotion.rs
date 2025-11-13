@@ -166,14 +166,16 @@ fn test_mixed_complex_operations() {
     match result {
         Value::Vector(v) => {
             assert_eq!(v.len(), 3);
-            // i^2 = -1
-            assert_eq!(v[0], Value::Complex(Complex::new(-1.0, 0.0)));
+            // i^2 = -1 (with floating point tolerance)
+            let c0 = v[0].as_complex().unwrap();
+            assert!((c0.re + 1.0).abs() < 1e-10);
+            assert!(c0.im.abs() < 1e-10);
             // 2 promoted to complex
             assert_eq!(v[1], Value::Complex(Complex::new(2.0, 0.0)));
             // (1+i)^2 = 0 + 2i
-            let c = v[2].as_complex().unwrap();
-            assert!(c.re.abs() < 1e-10);
-            assert!((c.im - 2.0).abs() < 1e-10);
+            let c2 = v[2].as_complex().unwrap();
+            assert!(c2.re.abs() < 1e-10);
+            assert!((c2.im - 2.0).abs() < 1e-10);
         }
         _ => panic!("Expected Vector, got {:?}", result),
     }

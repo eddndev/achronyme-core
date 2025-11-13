@@ -38,6 +38,30 @@ pub fn build_adjacency_list(edges: &[Value]) -> Result<HashMap<String, Vec<Strin
     Ok(adj_list)
 }
 
+/// Build adjacency list treating all edges as undirected (weak connectivity)
+/// Used for connected_components to find weakly connected components
+pub fn build_undirected_adjacency_list(edges: &[Value]) -> Result<HashMap<String, Vec<String>>, String> {
+    let mut adj_list: HashMap<String, Vec<String>> = HashMap::new();
+
+    for edge in edges {
+        match edge {
+            Value::Edge { from, to, .. } => {
+                // Always add both directions (weak connectivity)
+                adj_list.entry(from.clone())
+                    .or_insert_with(Vec::new)
+                    .push(to.clone());
+
+                adj_list.entry(to.clone())
+                    .or_insert_with(Vec::new)
+                    .push(from.clone());
+            }
+            _ => return Err("Invalid edge in edges vector".to_string()),
+        }
+    }
+
+    Ok(adj_list)
+}
+
 /// Validate that a node exists in the network
 pub fn validate_node_exists(network: &HashMap<String, Value>, node_id: &str) -> Result<(), String> {
     let node_ids = extract_node_ids(network)?;

@@ -75,19 +75,46 @@ pub fn evaluate_array(evaluator: &mut Evaluator, elements: &[achronyme_parser::a
         return combine_tensors_to_higher_dimension(values);
     }
 
-    // Check if all elements are numbers - create tensor directly
-    if values.iter().all(|v| matches!(v, Value::Number(_))) {
-        let nums: Vec<f64> = values.iter().map(|v| {
-            if let Value::Number(n) = v {
-                *n
+    // Check if all elements are numeric Vectors of the same length - create 2D tensor (matrix)
+    // This handles [[1, 2], [3, 4]] → Tensor with shape [2, 2]
+    if values.iter().all(|v| matches!(v, Value::Vector(_))) {
+        let all_numeric_same_len = values.iter().all(|v| {
+            if let Value::Vector(vec) = v {
+                !vec.is_empty() && Value::is_numeric_vector(vec)
+            } else {
+                false
+            }
+        });
+
+        if all_numeric_same_len {
+            // Get the length of the first vector
+            let first_len = if let Value::Vector(vec) = &values[0] {
+                vec.len()
             } else {
                 unreachable!()
+            };
+
+            // Check if all vectors have the same length
+            let same_length = values.iter().all(|v| {
+                if let Value::Vector(vec) = v {
+                    vec.len() == first_len
+                } else {
+                    false
+                }
+            });
+
+            if same_length {
+                // Convert to 2D tensor
+                return convert_vector_of_vectors_to_tensor(values);
             }
-        }).collect();
-        return Ok(Value::Tensor(RealTensor::vector(nums)));
+        }
     }
 
-    // Otherwise, validate type homogeneity and apply type promotion for generic vectors
+    // For simple arrays (even if all numbers), keep them as Vector for better UX
+    // Only create Tensor when explicitly needed (matrices, multi-dimensional arrays)
+    // This ensures that [1, 2, 3] remains a Vector, not auto-promoted to Tensor
+
+    // Validate type homogeneity and apply type promotion for generic vectors
     validate_and_promote_vector(values)
 }
 
@@ -161,6 +188,72 @@ fn combine_tensors_to_higher_dimension(tensors: Vec<Value>) -> Result<Value, Str
     RealTensor::new(all_data, new_shape)
         .map(Value::Tensor)
         .map_err(|e| e.to_string())
+}
+
+/// Convert a vector of numeric vectors into a 2D tensor (matrix)
+/// Example: [[1, 2], [3, 4], [5, 6]] → Tensor with shape [3, 2]
+fn convert_vector_of_vectors_to_tensor(vectors: Vec<Value>) -> Result<Value, String> {
+    if vectors.is_empty() {
+        return Err("Cannot convert empty vector list to tensor".to_string());
+    }
+
+    // Check if any vector contains complex numbers
+    let has_complex = vectors.iter().any(|v| {
+        if let Value::Vector(vec) = v {
+            vec.iter().any(|elem| matches!(elem, Value::Complex(_)))
+        } else {
+            false
+        }
+    });
+
+    let num_rows = vectors.len();
+    let num_cols = if let Value::Vector(vec) = &vectors[0] {
+        vec.len()
+    } else {
+        unreachable!()
+    };
+
+    if has_complex {
+        // Create complex tensor
+        use achronyme_types::complex::Complex;
+        use achronyme_types::tensor::ComplexTensor;
+
+        let mut data = Vec::with_capacity(num_rows * num_cols);
+        for vector_value in vectors {
+            if let Value::Vector(vec) = vector_value {
+                for elem in vec {
+                    let c = match elem {
+                        Value::Number(n) => Complex::from_real(n),
+                        Value::Complex(c) => c,
+                        _ => return Err("Matrix elements must be numeric".to_string()),
+                    };
+                    data.push(c);
+                }
+            }
+        }
+
+        ComplexTensor::new(data, vec![num_rows, num_cols])
+            .map(Value::ComplexTensor)
+            .map_err(|e| e.to_string())
+    } else {
+        // Create real tensor
+        let mut data = Vec::with_capacity(num_rows * num_cols);
+        for vector_value in vectors {
+            if let Value::Vector(vec) = vector_value {
+                for elem in vec {
+                    if let Value::Number(n) = elem {
+                        data.push(n);
+                    } else {
+                        return Err("Matrix elements must be numeric".to_string());
+                    }
+                }
+            }
+        }
+
+        RealTensor::new(data, vec![num_rows, num_cols])
+            .map(Value::Tensor)
+            .map_err(|e| e.to_string())
+    }
 }
 
 /// Evaluate a record literal

@@ -39,7 +39,9 @@ fn test_import_nonexistent_module() {
     assert!(
         err.contains("Module 'nonexistent' not found") ||
         err.contains("No such file") ||
-        err.contains("cannot find"),
+        err.contains("cannot find") ||
+        err.contains("Failed to read module") ||
+        err.contains("El sistema no puede encontrar"),  // Spanish Windows error
         "Expected module not found error, got: {}", err
     );
 }
