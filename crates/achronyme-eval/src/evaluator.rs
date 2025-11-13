@@ -336,6 +336,22 @@ impl Evaluator {
                 // Return the last evaluated expression
                 result.ok_or_else(|| "Empty do block (no statements)".to_string())
             }
+
+            // Module system
+            AstNode::Import { items, module_path } => {
+                // TODO: Implement import handling in Phase 2
+                // For now, we'll return a placeholder
+                Err(format!(
+                    "Import statements not yet implemented: import {{ ... }} from \"{}\"",
+                    module_path
+                ))
+            }
+
+            AstNode::Export { items } => {
+                // TODO: Implement export handling for user-defined modules
+                // For now, exports are not needed (only built-in modules)
+                Err("Export statements not yet implemented".to_string())
+            }
         }
     }
 

@@ -93,6 +93,10 @@ pub fn is_tail_position(node: &AstNode) -> bool {
         // Mutable declarations and assignments are NOT tail position
         AstNode::MutableDecl { .. } => false,
         AstNode::Assignment { .. } => false,
+
+        // Import/Export are NOT tail positions (they're module declarations)
+        AstNode::Import { .. } => false,
+        AstNode::Export { .. } => false,
     }
 }
 
