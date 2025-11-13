@@ -367,6 +367,15 @@ fn format_value(value: &achronyme_types::value::Value) -> String {
             }
         }
         Value::Function(_) => "<function>".to_string(),
+        Value::TailCall(_) => {
+            // TailCall is an internal marker that should never reach the REPL
+            // If it does, it indicates a bug in TCO implementation
+            "<internal:tail-call>".to_string()
+        }
+        Value::MutableRef(rc) => {
+            // Auto-deref mutable references for display
+            format_value(&rc.borrow())
+        }
     }
 }
 

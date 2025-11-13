@@ -57,7 +57,7 @@ string_char = {
 
 // Reserved keywords (use word boundaries to prevent matching prefixes)
 keyword = _{
-    ("let" | "rec" | "self" | "true" | "false") ~ !ASCII_ALPHANUMERIC
+    ("let" | "mut" | "rec" | "self" | "true" | "false") ~ !ASCII_ALPHANUMERIC
 }
 
 // Identifiers: x, foo, my_var, PI, sin (but not keywords)
@@ -96,8 +96,12 @@ record = {
     "{" ~ (record_field_or_spread ~ ("," ~ record_field_or_spread)*)? ~ "}"
 }
 
+// Mutable field keyword
+mut_keyword = @{ "mut" ~ !ASCII_ALPHANUMERIC }
+
 record_field = {
-    identifier ~ ":" ~ expr
+    (mut_keyword ~ identifier ~ ":" ~ expr)  // Mutable field: mut valor: 10
+  | (identifier ~ ":" ~ expr)                // Immutable field: valor: 10
 }
 
 // ============================================================================
@@ -250,9 +254,24 @@ let_statement = {
     "let" ~ identifier ~ "=" ~ expr
 }
 
-// Statement: either let or expression
+// Mut statement: mut x = 42
+mut_statement = {
+    "mut" ~ identifier ~ "=" ~ expr
+}
+
+// Assignment: x = 20, obj.field = 30, arr[0] = 40
+// Uses postfix_expression as target for maximum flexibility
+// Semantic validation happens in evaluator
+assignment = {
+    postfix_expression ~ "=" ~ expr
+}
+
+// Statement: let, mut, assignment, or expression
+// Try assignment before expr to avoid ambiguity
 statement = {
     let_statement
+  | mut_statement
+  | assignment
   | expr
 }
 

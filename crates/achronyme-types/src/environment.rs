@@ -1,6 +1,7 @@
 use crate::value::Value;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::cell::RefCell;
 
 /// Environment for variable storage with scope support using linked list of scopes
 ///
@@ -33,8 +34,11 @@ use std::rc::Rc;
 pub struct Environment {
     /// Current scope variables
     variables: HashMap<String, Value>,
+    /// Metadata: tracks which variables are mutable
+    mutability: HashMap<String, bool>,
     /// Parent environment (if any)
-    parent: Option<Rc<Environment>>,
+    /// Now uses RefCell to allow mutation of parent scopes
+    parent: Option<Rc<RefCell<Environment>>>,
 }
 
 impl Environment {
@@ -42,6 +46,7 @@ impl Environment {
     pub fn new() -> Self {
         Self {
             variables: HashMap::new(),
+            mutability: HashMap::new(),
             parent: None,
         }
     }
@@ -50,9 +55,10 @@ impl Environment {
     ///
     /// This is now the primary way to create a new scope. It's O(1) because
     /// we just create a new empty HashMap and an Rc pointer to the parent.
-    pub fn new_child(parent: Rc<Environment>) -> Self {
+    pub fn new_child(parent: Rc<RefCell<Environment>>) -> Self {
         Self {
             variables: HashMap::new(),
+            mutability: HashMap::new(),
             parent: Some(parent),
         }
     }
@@ -65,7 +71,7 @@ impl Environment {
     ///
     /// NOTE: This is now implemented by creating a child and swapping.
     pub fn push_scope(&mut self) {
-        let parent = Rc::new(self.clone());
+        let parent = Rc::new(RefCell::new(self.clone()));
         *self = Environment::new_child(parent);
     }
 
@@ -74,9 +80,9 @@ impl Environment {
     /// This removes the innermost scope and all variables defined in it.
     /// Panics if trying to pop the root scope.
     pub fn pop_scope(&mut self) {
-        if let Some(parent) = &self.parent {
-            // Clone the parent out of the Rc and replace self
-            *self = (**parent).clone();
+        if let Some(parent) = self.parent.clone() {
+            // Clone the parent out of the Rc<RefCell<>> and replace self
+            *self = parent.borrow().clone();
         } else {
             panic!("Cannot pop root scope");
         }
@@ -85,15 +91,15 @@ impl Environment {
     /// Get the current scope depth (0 = root, 1+ = nested)
     pub fn scope_depth(&self) -> usize {
         let mut depth = 0;
-        let mut current = self;
-        while let Some(ref parent) = current.parent {
+        let mut current_parent = self.parent.clone();
+        while let Some(parent) = current_parent {
             depth += 1;
-            current = parent;
+            current_parent = parent.borrow().parent.clone();
         }
         depth
     }
 
-    /// Define a new variable in the current scope
+    /// Define a new variable in the current scope (immutable by default)
     ///
     /// With shadowing enabled, this allows redefining variables from outer scopes.
     /// Within the same scope, redefinition is allowed (for `let x = ...; let x = ...`)
@@ -102,12 +108,36 @@ impl Environment {
     /// * `name` - Variable name
     /// * `value` - Initial value
     pub fn define(&mut self, name: String, value: Value) -> Result<(), String> {
+        self.define_with_mutability(name, value, false)
+    }
+
+    /// Define a mutable variable in the current scope
+    ///
+    /// # Arguments
+    /// * `name` - Variable name
+    /// * `value` - Initial value
+    pub fn define_mutable(&mut self, name: String, value: Value) -> Result<(), String> {
+        self.define_with_mutability(name, value, true)
+    }
+
+    /// Internal: Define a variable with specified mutability
+    fn define_with_mutability(&mut self, name: String, value: Value, is_mutable: bool) -> Result<(), String> {
+        // Wrap in MutableRef if mutable
+        let stored_value = if is_mutable {
+            Value::new_mutable(value)
+        } else {
+            value
+        };
+
         // Insert into current scope's variables
-        self.variables.insert(name, value);
+        self.variables.insert(name.clone(), stored_value);
+        self.mutability.insert(name, is_mutable);
         Ok(())
     }
 
     /// Get a variable value, searching from current to parent scopes
+    ///
+    /// Auto-dereferences MutableRef values for transparent access
     ///
     /// # Arguments
     /// * `name` - Variable name
@@ -120,12 +150,13 @@ impl Environment {
     pub fn get(&self, name: &str) -> Result<Value, String> {
         // Check current scope first
         if let Some(value) = self.variables.get(name) {
-            return Ok(value.clone());
+            // Auto-deref MutableRef for transparent access
+            return value.deref();
         }
 
         // Search parent scopes
         if let Some(ref parent) = self.parent {
-            return parent.get(name);
+            return parent.borrow().get(name);
         }
 
         Err(format!("Undefined variable '{}'", name))
@@ -144,10 +175,45 @@ impl Environment {
         }
 
         if let Some(ref parent) = self.parent {
-            return parent.has(name);
+            return parent.borrow().has(name);
         }
 
         false
+    }
+
+    /// Assign a new value to a mutable variable
+    ///
+    /// Searches current and parent scopes for the variable.
+    /// Only works on variables declared with `mut`.
+    ///
+    /// # Arguments
+    /// * `name` - Variable name
+    /// * `value` - New value
+    ///
+    /// # Errors
+    /// Returns error if:
+    /// - Variable not found in any scope
+    /// - Variable is immutable (not declared with `mut`)
+    pub fn assign(&mut self, name: &str, value: Value) -> Result<(), String> {
+        // Check current scope first
+        if let Some(var_value) = self.variables.get(name) {
+            let is_mutable = self.mutability.get(name).copied().unwrap_or(false);
+
+            if !is_mutable {
+                return Err(format!("Cannot assign to immutable variable '{}'", name));
+            }
+
+            // Assign to MutableRef
+            var_value.assign(value)?;
+            return Ok(());
+        }
+
+        // Search and mutate in parent scopes
+        if let Some(ref parent) = self.parent {
+            return parent.borrow_mut().assign(name, value);
+        }
+
+        Err(format!("Undefined variable '{}'", name))
     }
 
     /// Update an existing variable in the scope where it was defined
@@ -173,9 +239,8 @@ impl Environment {
 
         // Check if it exists in parent scopes
         if let Some(ref parent) = self.parent {
-            if parent.has(name) {
-                // Variable exists in parent, but we can't modify it due to Rc
-                // Instead, we shadow it in the current scope
+            if parent.borrow().has(name) {
+                // Variable exists in parent, but we shadow it in the current scope
                 self.variables.insert(name.to_string(), value);
                 return Ok(());
             }
@@ -187,6 +252,7 @@ impl Environment {
     /// Clear all variables in the current scope only
     pub fn clear(&mut self) {
         self.variables.clear();
+        self.mutability.clear();
         self.parent = None;
     }
 
@@ -207,18 +273,22 @@ impl Environment {
     /// Used when creating a closure to capture the current environment.
     ///
     /// DEPRECATED: This is kept for backward compatibility but is expensive.
-    /// New code should use `to_rc()` to capture the environment as Rc<Environment>.
+    /// New code should use `to_rc()` to capture the environment as Rc<RefCell<Environment>>.
     pub fn snapshot(&self) -> HashMap<String, Value> {
         let mut snapshot = HashMap::new();
 
         // Collect from parent first (so current scope can override)
         if let Some(ref parent) = self.parent {
-            snapshot = parent.snapshot();
+            snapshot = parent.borrow().snapshot();
         }
 
-        // Add/override with current scope
+        // Add/override with current scope (deref MutableRef values)
         for (name, value) in &self.variables {
-            snapshot.insert(name.clone(), value.clone());
+            if let Ok(derefed) = value.deref() {
+                snapshot.insert(name.clone(), derefed);
+            } else {
+                snapshot.insert(name.clone(), value.clone());
+            }
         }
 
         snapshot
@@ -232,19 +302,20 @@ impl Environment {
     pub fn from_snapshot(snapshot: HashMap<String, Value>) -> Self {
         Self {
             variables: snapshot,
+            mutability: HashMap::new(), // No mutability info in snapshot
             parent: None,
         }
     }
 
-    /// Convert this environment to an Rc for efficient sharing
+    /// Convert this environment to an Rc<RefCell<>> for efficient sharing
     ///
     /// This is the preferred way to capture an environment for closures.
-    pub fn to_rc(&self) -> Rc<Environment> {
-        Rc::new(self.clone())
+    pub fn to_rc(&self) -> Rc<RefCell<Environment>> {
+        Rc::new(RefCell::new(self.clone()))
     }
 
     /// Create a new environment with a specific parent
-    pub fn with_parent(parent: Rc<Environment>) -> Self {
+    pub fn with_parent(parent: Rc<RefCell<Environment>>) -> Self {
         Self::new_child(parent)
     }
 }

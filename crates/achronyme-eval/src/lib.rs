@@ -1,6 +1,7 @@
 pub mod evaluator;
 pub mod constants;
 pub mod functions;
+pub mod tco;
 mod handlers;
 mod function_modules;
 

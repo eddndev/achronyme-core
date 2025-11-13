@@ -1,6 +1,7 @@
 use achronyme_parser::ast::AstNode;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::cell::RefCell;
 use crate::environment::Environment;
 
 /// Function representation - can be either a user-defined lambda or a built-in function
@@ -18,18 +19,21 @@ use crate::environment::Environment;
 /// f(0)  // Returns 0
 /// ```
 ///
-/// PERFORMANCE OPTIMIZATION: The UserDefined variant now captures an Rc<Environment>
+/// PERFORMANCE OPTIMIZATION: The UserDefined variant now captures an Rc<RefCell<Environment>>
 /// instead of a HashMap. This makes closure creation O(1) instead of O(n) where n
 /// is the number of variables in scope. This is a MAJOR performance improvement for
 /// recursive functions and deeply nested scopes.
+///
+/// The RefCell wrapper allows mutation of captured variables declared with `mut`.
 #[derive(Debug, Clone)]
 pub enum Function {
     /// User-defined lambda with closure
     UserDefined {
         params: Vec<String>,
         body: Rc<AstNode>,
-        /// Captured environment - using Rc makes this extremely cheap to clone
-        closure_env: Rc<Environment>,
+        /// Captured environment - using Rc<RefCell> makes this cheap to clone
+        /// and allows mutation of mutable captured variables
+        closure_env: Rc<RefCell<Environment>>,
     },
     /// Built-in function by name
     Builtin(String),
@@ -49,7 +53,7 @@ impl Function {
         Function::UserDefined {
             params,
             body: Rc::new(body),
-            closure_env: Rc::new(env),
+            closure_env: Rc::new(RefCell::new(env)),
         }
     }
 
@@ -60,7 +64,7 @@ impl Function {
     pub fn new_with_env(
         params: Vec<String>,
         body: AstNode,
-        closure_env: Rc<Environment>,
+        closure_env: Rc<RefCell<Environment>>,
     ) -> Self {
         Function::UserDefined {
             params,

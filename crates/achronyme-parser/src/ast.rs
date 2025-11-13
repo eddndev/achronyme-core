@@ -72,6 +72,14 @@ pub enum AstNode {
         name: String,
         initializer: Box<AstNode>,
     },
+    MutableDecl {
+        name: String,
+        initializer: Box<AstNode>,
+    },
+    Assignment {
+        target: Box<AstNode>,  // postfix_expression (variable, field access, index)
+        value: Box<AstNode>,
+    },
     VariableRef(String),
     SelfReference, // 'self' keyword for use in records
     RecReference,  // 'rec' keyword for recursive function calls
@@ -114,8 +122,9 @@ pub enum ArrayElement {
 /// Represents a record field or spread expression
 #[derive(Debug, Clone, PartialEq)]
 pub enum RecordFieldOrSpread {
-    Field { name: String, value: AstNode },  // Regular field: key: value
-    Spread(Box<AstNode>),                     // Spread: ...expr
+    Field { name: String, value: AstNode },         // Immutable field: key: value
+    MutableField { name: String, value: AstNode },  // Mutable field: mut key: value
+    Spread(Box<AstNode>),                           // Spread: ...expr
 }
 
 /// Represents an indexing argument - can be a single expression or a range

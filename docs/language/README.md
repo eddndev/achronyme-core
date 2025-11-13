@@ -62,6 +62,7 @@ let point = {
 24. **[Best Practices](23-best-practices.md)** - Code style and patterns
 25. **[Examples](24-examples.md)** - Complete programs
 26. **[Performance Limitations](25-performance-limitations.md)** - Stack limits and workarounds
+27. **[Mutability](26-mutability.md)** - Mutable variables and record fields
 
 ## Quick Reference Card
 
@@ -86,8 +87,13 @@ true, false     // Boolean
 
 ### Variables
 ```javascript
+// Immutable (default)
 let x = 10
 let y = x + 5
+
+// Mutable (explicit)
+mut counter = 0
+counter = counter + 1
 ```
 
 ### Functions
@@ -146,10 +152,10 @@ arr[..5]
 point.x
 point.method()
 
-// Self-reference
+// Self-reference with mutable fields
 {
-    value: 10,
-    double: () => self.value * 2
+    mut value: 10,
+    double: () => do { self.value = self.value * 2 }
 }
 
 // Spread
@@ -232,15 +238,17 @@ clear   - Clear screen
 - IIFE pattern: `(x => expr)(value)`
 - Records with methods
 
-✅ **Immutability**
-- All values immutable
+✅ **Immutability by Default**
+- Variables immutable by default
+- Optional mutability with `mut` keyword
 - Functional updates
-- No reassignment
+- Controlled state management
 
 ## Reserved Keywords
 
 ```
-let      // Variable declaration
+let      // Immutable variable declaration
+mut      // Mutable variable declaration
 true     // Boolean literal
 false    // Boolean literal
 self     // Record self-reference

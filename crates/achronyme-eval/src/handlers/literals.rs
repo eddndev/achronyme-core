@@ -177,6 +177,12 @@ pub fn evaluate_record(evaluator: &mut Evaluator, fields: &[achronyme_parser::as
                 let evaluated_value = evaluator.evaluate(value)?;
                 record.insert(name.clone(), evaluated_value);
             }
+            RecordFieldOrSpread::MutableField { name, value } => {
+                // Evaluate the value and wrap it in a MutableRef
+                let evaluated_value = evaluator.evaluate(value)?;
+                let mutable_value = Value::new_mutable(evaluated_value);
+                record.insert(name.clone(), mutable_value);
+            }
             RecordFieldOrSpread::Spread(node) => {
                 let spread_value = evaluator.evaluate(node)?;
                 match spread_value {

@@ -28,11 +28,11 @@ let squared = map(square, numbers)
 // Numerical integration
 let area = integral(x => x^2, 0, 10)
 
-// Records (objects)
-let point = {
-    x: 10,
-    y: 20,
-    distance: () => sqrt(self.x^2 + self.y^2)
+// Records with mutable fields
+let counter = {
+    mut value: 0,
+    increment: () => do { self.value = self.value + 1 },
+    get: () => self.value
 }
 ```
 
@@ -69,12 +69,14 @@ let point = {
 - **[18. Graph Theory](18-graph-theory.md)** - Networks, paths, algorithms
 - **[19. Optimization](19-optimization.md)** - Linear programming, simplex method
 - **[20. Strings](20-strings.md)** - String operations
+- **[25. Utilities](25-utilities.md)** - Output, type inspection, string conversion
 
 ### Advanced Topics
 - **[21. Do Blocks](21-do-blocks.md)** - Multi-statement blocks
 - **[22. Recursion Patterns](22-recursion.md)** - Recursive functions, self-reference
 - **[23. Best Practices](23-best-practices.md)** - Code style, patterns, performance
 - **[24. Examples](24-examples.md)** - Complete programs and use cases
+- **[26. Mutability](26-mutability.md)** - Mutable variables, mutable record fields, stateful objects
 
 ## Language Philosophy
 
@@ -85,12 +87,17 @@ Everything in Achronyme is an expression that returns a value. There are no stat
 let result = if(x > 0, 1, -1)  // if() is a function that returns a value
 ```
 
-### Immutable by Default
-Variables cannot be reassigned. Use shadowing if you need to update a value:
+### Immutable by Default, Mutable When Needed
+Variables are immutable by default but can be declared mutable with `mut`:
 
 ```javascript
+// Immutable (default)
 let x = 10
 let x = x + 5  // New binding, shadows the old one
+
+// Mutable (explicit)
+mut counter = 0
+counter = counter + 1  // Reassignment allowed
 ```
 
 ### First-Class Functions

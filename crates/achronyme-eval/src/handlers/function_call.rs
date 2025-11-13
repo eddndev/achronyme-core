@@ -93,6 +93,12 @@ pub fn dispatch(evaluator: &mut Evaluator, name: &str, args: &[AstNode]) -> Resu
         "filter" => return super::hof::handle_filter(evaluator, args),
         "reduce" => return super::hof::handle_reduce(evaluator, args),
         "pipe" => return super::hof::handle_pipe(evaluator, args),
+        // Tier 2 predicates
+        "any" => return super::hof::handle_any(evaluator, args),
+        "all" => return super::hof::handle_all(evaluator, args),
+        "find" => return super::hof::handle_find(evaluator, args),
+        "findIndex" => return super::hof::handle_find_index(evaluator, args),
+        "count" => return super::hof::handle_count(evaluator, args),
         _ => {}
     }
 

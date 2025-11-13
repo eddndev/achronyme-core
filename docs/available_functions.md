@@ -97,17 +97,50 @@ let v = linspace(0, 10, 11)  // [0, 1, 2, ..., 10]
 
 ## Higher-Order Functions
 
+### Core HOFs
+
 These functions are "special forms" that require lazy evaluation:
 
-- `map(fn, vector)` - Apply function to each element
-- `filter(fn, vector)` - Filter elements by predicate
-- `reduce(fn, initial, vector)` - Reduce vector to single value
-- `pipe(fn1, fn2, ...)` - Function composition pipeline
+- `map(fn, coll, ...)` - Apply function to collection(s)
+- `filter(pred, coll)` - Filter elements by predicate
+- `reduce(fn, initial, coll)` - Reduce collection to single value
+- `pipe(value, f1, f2, ...)` - Function composition pipeline
+
+### Predicate HOFs (Tier 2)
+
+Higher-order functions for searching and testing:
+
+- `any(coll, pred)` - Check if any element matches predicate
+- `all(coll, pred)` - Check if all elements match predicate
+- `find(coll, pred)` - Find first matching element (errors if not found)
+- `findIndex(coll, pred)` - Find index of first match (returns -1 if not found)
+- `count(coll, pred)` - Count elements matching predicate
 
 Example:
 ```javascript
 let doubled = map(x => x * 2, [1, 2, 3])  // [2, 4, 6]
 let evens = filter(x => x % 2 == 0, [1, 2, 3, 4])  // [2, 4]
+any([1, 2, 3, 4], x => x > 3)  // true
+count([1, 2, 3, 4, 5], x => x > 2)  // 3
+```
+
+## Array Utility Functions
+
+### Tier 1: Essential Operations
+
+- `product(array)` - Multiply all elements
+- `range(start, end, step?)` - Generate integer sequence (exclusive end)
+- `len(array)` - Get array/vector/tensor length
+- `reverse(array)` - Reverse array order
+- `contains(array, value)` - Check if value exists in array (also works with strings)
+
+Example:
+```javascript
+product([1, 2, 3, 4])     // 24
+range(0, 5)               // [0, 1, 2, 3, 4]
+len([1, 2, 3])            // 3
+reverse([1, 2, 3])        // [3, 2, 1]
+contains([1, 2, 3], 2)    // true
 ```
 
 ## Numerical Analysis
@@ -136,8 +169,48 @@ These are also special forms because they require lambda evaluation:
 
 ## String Functions
 
-- `concat(s1, s2)` - Concatenate two strings
+### Basic Functions
+
+- `concat(s1, s2)` - Concatenate two strings (also available via `+` operator)
 - `length(s)` - Get string length
+
+### Case Conversion
+
+- `upper(s)` - Convert to uppercase
+- `lower(s)` - Convert to lowercase
+
+### Whitespace Handling
+
+- `trim(s)` - Remove whitespace from both ends
+- `trim_start(s)` - Remove whitespace from start
+- `trim_end(s)` - Remove whitespace from end
+
+### Search Functions
+
+- `starts_with(s, prefix)` - Check if string starts with prefix
+- `ends_with(s, suffix)` - Check if string ends with suffix
+- `contains(s, substring)` - Check if string contains substring
+
+### Manipulation
+
+- `replace(s, pattern, replacement)` - Replace all occurrences
+- `split(s, delimiter)` - Split string into array
+- `join(array, delimiter)` - Join array of strings
+
+### Padding
+
+- `pad_start(s, length, fill_char?)` - Pad at start (default: space)
+- `pad_end(s, length, fill_char?)` - Pad at end (default: space)
+
+Example:
+```javascript
+upper("hello")                              // "HELLO"
+trim("  hello  ")                           // "hello"
+split("a,b,c", ",")                         // ["a", "b", "c"]
+join(["a", "b", "c"], "-")                  // "a-b-c"
+pad_start("5", 3, "0")                      // "005"
+"hello" + " " + "world"                     // "hello world"
+```
 
 ## Record Functions
 
@@ -211,6 +284,46 @@ Linear programming and optimization:
 - `basic_variables(...)` - Basic variables
 - `nonbasic_variables(...)` - Non-basic variables
 
+## Utility Functions
+
+Essential utility functions for output, type inspection, and string conversion:
+
+### Output
+- `print(value1, value2, ...)` - Print values to standard output (variadic, accepts 1+ arguments)
+  - Prints values separated by spaces
+  - Always adds newline at end
+  - Returns the last value printed (useful for chaining)
+  - Example: `print("Value:", x)` or `print(1, 2, 3)`
+
+### Type Inspection
+- `type(value)` - Get the type name of a value as a string
+  - Returns: "Number", "Boolean", "String", "Vector", "Tensor", "ComplexTensor", "Complex", "Function", "Record", "Edge", "TailCall", or "MutableRef<T>"
+  - Example: `type(42)` returns `"Number"`
+
+### String Conversion
+- `str(value)` - Convert any value to its string representation
+  - Numbers: Formats integers without decimal point (42 instead of 42.0)
+  - Complex: Formats as "a+bi" or "a-bi"
+  - Vectors/Tensors: Formats as "[1, 2, 3]"
+  - Functions: Shows "<function:name>" or "<function:lambda>"
+  - Records: Shows "{key: value, ...}"
+  - Example: `"The answer is " + str(42)` returns `"The answer is 42"`
+
+Example usage:
+```javascript
+let x = [1, 2, 3];
+print("Type:", type(x));     // Prints: Type: Tensor
+print("Value:", str(x));     // Prints: Value: [1, 2, 3]
+
+// Use in pipeline
+pipe(
+    5,
+    x => x * 2,
+    x => print(x),    // Prints 10 and returns it
+    x => x + 10
+)  // Returns 20
+```
+
 ## Debug Functions
 
 - `describe(value)` - Get detailed description of a value
@@ -244,11 +357,14 @@ Currently implemented function counts by module:
 - Matrix: 6 functions (dot, cross, norm, det, transpose, trace)
 - DSP: 11 functions (fft, ifft, fft_mag, fft_phase, conv, conv_fft, 4 windows, linspace)
 - HOF: 4 functions (map, filter, reduce, pipe)
+- Predicate HOFs: 5 functions (any, all, find, findIndex, count)
+- Array Utilities: 5 functions (product, range, len, reverse, contains)
 - Numerical: 13 functions (differentiation, integration, solvers)
-- Strings: 2 functions (concat, length)
+- Strings: 15 functions (concat, length, upper, lower, trim, split, join, etc.)
 - Records: 3 functions (keys, values, has_field)
 - Graphs: 15+ functions
 - PERT/CPM: 13 functions
+- Utilities: 3 functions (print, type, str)
 - Debug: 1 function (describe)
 
 ### How to Check Available Functions

@@ -13,9 +13,25 @@ pub fn evaluate_declaration(
     // Evaluate the initializer
     let value = evaluator.evaluate(initializer)?;
 
-    // Define the variable in the environment
+    // Define the variable in the environment (immutable)
     evaluator.environment_mut().define(name.to_string(), value.clone())?;
 
+    Ok(value)
+}
+
+/// Evaluate a mutable variable declaration (mut statement)
+pub fn evaluate_mutable_declaration(
+    evaluator: &mut Evaluator,
+    name: &str,
+    initializer: &AstNode,
+) -> Result<Value, String> {
+    // Evaluate the initializer
+    let value = evaluator.evaluate(initializer)?;
+
+    // Define as mutable variable in the environment
+    evaluator.environment_mut().define_mutable(name.to_string(), value.clone())?;
+
+    // Return the value (not the MutableRef wrapper)
     Ok(value)
 }
 
@@ -60,6 +76,8 @@ fn is_special_form(name: &str) -> bool {
         name,
         // Higher-order functions (require lazy evaluation)
         "map" | "filter" | "reduce" | "pipe" |
+        // Tier 2 array predicates (require lambda evaluation)
+        "any" | "all" | "find" | "findIndex" | "count" |
         // Numerical calculus functions (require evaluator for lambda evaluation)
         "diff" | "diff2" | "diff3" | "gradient" | "integral" | "trapz" |
         "simpson" | "romberg" | "quad" | "solve" | "bisect" | "newton" | "secant" | "derivative" |

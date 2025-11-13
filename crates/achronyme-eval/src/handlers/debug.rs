@@ -81,6 +81,16 @@ fn describe_value(value: &Value, indent: usize) -> String {
                 format!("Edge({} -> {}, {}, properties: {})", from, to, dir, properties.len())
             }
         }
+
+        Value::MutableRef(rc) => {
+            let inner = rc.borrow();
+            format!("MutableRef({})", describe_value(&inner, indent))
+        }
+
+        Value::TailCall(_) => {
+            // TailCall should never be visible to user code - it's an internal marker
+            "TailCall(internal marker - should not be visible)".to_string()
+        }
     }
 }
 
@@ -186,6 +196,9 @@ fn format_ast_node(node: &AstNode, indent: usize) -> String {
                     .map(|f| match f {
                         RecordFieldOrSpread::Field { name, value } => {
                             format!("{}: {}", name, format_ast_node(value, indent))
+                        }
+                        RecordFieldOrSpread::MutableField { name, value } => {
+                            format!("mut {}: {}", name, format_ast_node(value, indent))
                         }
                         RecordFieldOrSpread::Spread(node) => {
                             format!("...{}", format_ast_node(node, indent))

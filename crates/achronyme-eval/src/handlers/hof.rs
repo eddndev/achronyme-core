@@ -5,7 +5,9 @@ use crate::evaluator::Evaluator;
 
 /// Higher-Order Functions Handler
 ///
-/// This module contains implementations of map, filter, reduce, and pipe.
+/// This module contains implementations of:
+/// - map, filter, reduce, pipe (original HOFs)
+/// - any, all, find, findIndex, count (Tier 2 predicates)
 
 /// Helper: Convert a collection (Vector, Tensor, or ComplexTensor) to Vec<Value>
 fn collection_to_vec(collection: Value) -> Result<Vec<Value>, String> {
@@ -194,4 +196,249 @@ pub fn handle_pipe(evaluator: &mut Evaluator, args: &[AstNode]) -> Result<Value,
     }
 
     Ok(result)
+}
+
+// ============================================================================
+// Tier 2: Predicate Functions
+// ============================================================================
+
+/// any(collection, predicate) - Check if any element satisfies predicate
+///
+/// Returns true if at least one element matches, false otherwise.
+/// Short-circuits on first match.
+///
+/// Examples:
+/// - any([1, 2, 3, 4], x => x > 3) => true
+/// - any([1, 2, 3], x => x > 10) => false
+/// - any([], x => x > 0) => false
+pub fn handle_any(evaluator: &mut Evaluator, args: &[AstNode]) -> Result<Value, String> {
+    if args.len() != 2 {
+        return Err("any requires 2 arguments: collection and predicate".to_string());
+    }
+
+    // Evaluate collection
+    let coll_value = evaluator.evaluate(&args[0])?;
+    let collection = collection_to_vec(coll_value)?;
+
+    // Evaluate predicate (must be a function)
+    let predicate_value = evaluator.evaluate(&args[1])?;
+    let predicate = match predicate_value {
+        Value::Function(f) => f,
+        _ => return Err("Second argument to any must be a function".to_string()),
+    };
+
+    // Check arity
+    if predicate.arity() != 1 {
+        return Err("Predicate for any must be unary (take 1 argument)".to_string());
+    }
+
+    // Test each element (short-circuit on first true)
+    for item in collection {
+        let result = evaluator.apply_lambda(&predicate, vec![item])?;
+        match result {
+            Value::Boolean(true) => return Ok(Value::Boolean(true)),
+            Value::Boolean(false) => continue,
+            Value::Number(n) => {
+                // Truthiness: non-zero is true
+                if n != 0.0 {
+                    return Ok(Value::Boolean(true));
+                }
+            }
+            _ => return Err("Predicate must return boolean or number".to_string()),
+        }
+    }
+
+    Ok(Value::Boolean(false))
+}
+
+/// all(collection, predicate) - Check if all elements satisfy predicate
+///
+/// Returns true if all elements match, false otherwise.
+/// Short-circuits on first failure.
+///
+/// Examples:
+/// - all([2, 4, 6], x => x % 2 == 0) => true
+/// - all([1, 2, 3], x => x > 0) => true
+/// - all([1, 2, 3], x => x > 2) => false
+/// - all([], x => x > 0) => true (vacuous truth)
+pub fn handle_all(evaluator: &mut Evaluator, args: &[AstNode]) -> Result<Value, String> {
+    if args.len() != 2 {
+        return Err("all requires 2 arguments: collection and predicate".to_string());
+    }
+
+    // Evaluate collection
+    let coll_value = evaluator.evaluate(&args[0])?;
+    let collection = collection_to_vec(coll_value)?;
+
+    // Evaluate predicate (must be a function)
+    let predicate_value = evaluator.evaluate(&args[1])?;
+    let predicate = match predicate_value {
+        Value::Function(f) => f,
+        _ => return Err("Second argument to all must be a function".to_string()),
+    };
+
+    // Check arity
+    if predicate.arity() != 1 {
+        return Err("Predicate for all must be unary (take 1 argument)".to_string());
+    }
+
+    // Test each element (short-circuit on first false)
+    for item in collection {
+        let result = evaluator.apply_lambda(&predicate, vec![item])?;
+        match result {
+            Value::Boolean(false) => return Ok(Value::Boolean(false)),
+            Value::Boolean(true) => continue,
+            Value::Number(n) => {
+                // Truthiness: zero is false
+                if n == 0.0 {
+                    return Ok(Value::Boolean(false));
+                }
+            }
+            _ => return Err("Predicate must return boolean or number".to_string()),
+        }
+    }
+
+    Ok(Value::Boolean(true)) // Empty array or all true
+}
+
+/// find(collection, predicate) - Find first element that satisfies predicate
+///
+/// Returns the first matching element, or error if not found.
+///
+/// Examples:
+/// - find([1, 2, 3, 4], x => x > 2) => 3
+/// - find([1, 2, 3], x => x > 10) => error
+pub fn handle_find(evaluator: &mut Evaluator, args: &[AstNode]) -> Result<Value, String> {
+    if args.len() != 2 {
+        return Err("find requires 2 arguments: collection and predicate".to_string());
+    }
+
+    // Evaluate collection
+    let coll_value = evaluator.evaluate(&args[0])?;
+    let collection = collection_to_vec(coll_value)?;
+
+    // Evaluate predicate (must be a function)
+    let predicate_value = evaluator.evaluate(&args[1])?;
+    let predicate = match predicate_value {
+        Value::Function(f) => f,
+        _ => return Err("Second argument to find must be a function".to_string()),
+    };
+
+    // Check arity
+    if predicate.arity() != 1 {
+        return Err("Predicate for find must be unary (take 1 argument)".to_string());
+    }
+
+    // Find first matching element
+    for item in collection {
+        let result = evaluator.apply_lambda(&predicate, vec![item.clone()])?;
+        match result {
+            Value::Boolean(true) => return Ok(item),
+            Value::Boolean(false) => continue,
+            Value::Number(n) => {
+                // Truthiness: non-zero is true
+                if n != 0.0 {
+                    return Ok(item);
+                }
+            }
+            _ => return Err("Predicate must return boolean or number".to_string()),
+        }
+    }
+
+    Err("Element not found".to_string())
+}
+
+/// findIndex(collection, predicate) - Find index of first matching element
+///
+/// Returns the index (0-based) of the first matching element, or -1 if not found.
+///
+/// Examples:
+/// - findIndex([1, 2, 3, 4], x => x > 2) => 2
+/// - findIndex([1, 2, 3], x => x > 10) => -1
+pub fn handle_find_index(evaluator: &mut Evaluator, args: &[AstNode]) -> Result<Value, String> {
+    if args.len() != 2 {
+        return Err("findIndex requires 2 arguments: collection and predicate".to_string());
+    }
+
+    // Evaluate collection
+    let coll_value = evaluator.evaluate(&args[0])?;
+    let collection = collection_to_vec(coll_value)?;
+
+    // Evaluate predicate (must be a function)
+    let predicate_value = evaluator.evaluate(&args[1])?;
+    let predicate = match predicate_value {
+        Value::Function(f) => f,
+        _ => return Err("Second argument to findIndex must be a function".to_string()),
+    };
+
+    // Check arity
+    if predicate.arity() != 1 {
+        return Err("Predicate for findIndex must be unary (take 1 argument)".to_string());
+    }
+
+    // Find first matching index
+    for (index, item) in collection.iter().enumerate() {
+        let result = evaluator.apply_lambda(&predicate, vec![item.clone()])?;
+        match result {
+            Value::Boolean(true) => return Ok(Value::Number(index as f64)),
+            Value::Boolean(false) => continue,
+            Value::Number(n) => {
+                // Truthiness: non-zero is true
+                if n != 0.0 {
+                    return Ok(Value::Number(index as f64));
+                }
+            }
+            _ => return Err("Predicate must return boolean or number".to_string()),
+        }
+    }
+
+    Ok(Value::Number(-1.0)) // Not found
+}
+
+/// count(collection, predicate) - Count elements that satisfy predicate
+///
+/// Returns the number of elements that match.
+///
+/// Examples:
+/// - count([1, 2, 3, 4, 5], x => x > 2) => 3
+/// - count([1, 2, 3], x => x > 10) => 0
+pub fn handle_count(evaluator: &mut Evaluator, args: &[AstNode]) -> Result<Value, String> {
+    if args.len() != 2 {
+        return Err("count requires 2 arguments: collection and predicate".to_string());
+    }
+
+    // Evaluate collection
+    let coll_value = evaluator.evaluate(&args[0])?;
+    let collection = collection_to_vec(coll_value)?;
+
+    // Evaluate predicate (must be a function)
+    let predicate_value = evaluator.evaluate(&args[1])?;
+    let predicate = match predicate_value {
+        Value::Function(f) => f,
+        _ => return Err("Second argument to count must be a function".to_string()),
+    };
+
+    // Check arity
+    if predicate.arity() != 1 {
+        return Err("Predicate for count must be unary (take 1 argument)".to_string());
+    }
+
+    // Count matching elements
+    let mut count = 0;
+    for item in collection {
+        let result = evaluator.apply_lambda(&predicate, vec![item])?;
+        match result {
+            Value::Boolean(true) => count += 1,
+            Value::Boolean(false) => continue,
+            Value::Number(n) => {
+                // Truthiness: non-zero is true
+                if n != 0.0 {
+                    count += 1;
+                }
+            }
+            _ => return Err("Predicate must return boolean or number".to_string()),
+        }
+    }
+
+    Ok(Value::Number(count as f64))
 }

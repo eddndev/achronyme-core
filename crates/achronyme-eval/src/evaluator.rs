@@ -32,6 +32,9 @@ pub struct Evaluator {
     env: Environment,
     constants: ConstantsRegistry,
     functions: FunctionRegistry,
+    /// Flag to enable tail call optimization mode
+    /// When true, CallExpression with rec will return TailCall markers
+    tco_mode: bool,
 }
 
 impl Evaluator {
@@ -41,6 +44,7 @@ impl Evaluator {
             env: Environment::new(),
             constants: ConstantsRegistry::new(),
             functions: FunctionRegistry::new(),
+            tco_mode: false,
         }
     }
 
@@ -67,6 +71,16 @@ impl Evaluator {
     /// Get mutable functions registry (for handlers)
     pub fn functions_mut(&mut self) -> &mut FunctionRegistry {
         &mut self.functions
+    }
+
+    /// Check if TCO mode is enabled
+    pub fn is_tco_mode(&self) -> bool {
+        self.tco_mode
+    }
+
+    /// Set TCO mode (used by tail-recursive function execution)
+    pub fn set_tco_mode(&mut self, enabled: bool) {
+        self.tco_mode = enabled;
     }
 
     /// Evaluate a SOC expression string using the Pest parser
@@ -118,6 +132,12 @@ impl Evaluator {
                 handlers::variables::evaluate_declaration(self, name, initializer)
             }
             AstNode::VariableRef(name) => handlers::variables::evaluate_reference(self, name),
+            AstNode::MutableDecl { name, initializer } => {
+                handlers::variables::evaluate_mutable_declaration(self, name, initializer)
+            }
+            AstNode::Assignment { target, value } => {
+                handlers::assignment::evaluate_assignment(self, target, value)
+            }
             AstNode::SelfReference => {
                 // Look up 'self' in the environment
                 self.env.get("self").map_err(|_| {
@@ -136,9 +156,11 @@ impl Evaluator {
                 let record_value = self.evaluate(record)?;
                 match record_value {
                     Value::Record(ref map) => {
-                        map.get(field)
+                        let field_value = map.get(field)
                             .cloned()
-                            .ok_or_else(|| format!("Field '{}' not found in record", field))
+                            .ok_or_else(|| format!("Field '{}' not found in record", field))?;
+                        // Auto-deref MutableRef when accessing fields
+                        field_value.deref()
                     }
                     Value::Edge { from, to, directed, properties } => {
                         // Handle special fields
@@ -214,6 +236,16 @@ impl Evaluator {
                         }
                         _ => return Err(format!("Cannot access field '{}' on non-record value", field)),
                     }
+                }
+
+                // TCO OPTIMIZATION: Check if this is a tail call to 'rec' in TCO mode
+                if self.is_tco_mode() && matches!(callee.as_ref(), AstNode::RecReference) {
+                    // This is a tail call to rec - return TailCall marker instead of calling
+                    let mut arg_values = Vec::new();
+                    for arg in args {
+                        arg_values.push(self.evaluate(arg)?);
+                    }
+                    return Ok(Value::TailCall(arg_values));
                 }
 
                 // Regular call expression - evaluate callee to get the function

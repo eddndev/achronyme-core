@@ -4,7 +4,9 @@ Higher-order functions (HOFs) are functions that take other functions as argumen
 
 ## Overview
 
-Achronyme provides four core higher-order functions:
+Achronyme provides higher-order functions for transformation, filtering, aggregation, and searching:
+
+### Core HOFs
 
 | Function | Purpose | Signature |
 |----------|---------|-----------|
@@ -12,6 +14,16 @@ Achronyme provides four core higher-order functions:
 | `filter` | Select elements | `filter(pred, coll)` |
 | `reduce` | Aggregate values | `reduce(fn, init, coll)` |
 | `pipe` | Compose functions | `pipe(value, f1, f2, ...)` |
+
+### Predicate HOFs (Tier 2)
+
+| Function | Purpose | Returns |
+|----------|---------|---------|
+| `any` | Check if any element matches | Boolean |
+| `all` | Check if all elements match | Boolean |
+| `find` | Find first matching element | Element or Error |
+| `findIndex` | Find index of first match | Number (-1 if not found) |
+| `count` | Count matching elements | Number |
 
 All HOFs work with:
 - **Vectors** (heterogeneous arrays)
@@ -357,6 +369,160 @@ let process_text = text => pipe(
 
 // ✅ Works: wrap in lambda
 pipe(5, x => x + 3)
+```
+
+## Predicate Functions (Tier 2)
+
+These higher-order functions use predicates to search, test, and count elements in collections.
+
+### any - Check if Any Element Matches
+
+Returns `true` if at least one element satisfies the predicate. Short-circuits on first match.
+
+**Signature:** `any(collection, predicate) -> Boolean`
+
+```javascript
+any([1, 2, 3, 4], x => x > 3)     // true (4 > 3)
+any([1, 2, 3], x => x > 10)       // false
+any([], x => x > 0)               // false (empty array)
+
+// With range
+any(range(1, 100), x => x == 50)  // true
+
+// Complex predicates
+any([1, 2, 3, 4, 5], x => x % 2 == 0 && x > 3)  // true (4 matches)
+```
+
+**Performance:** O(n) with short-circuit optimization - stops at first `true`.
+
+### all - Check if All Elements Match
+
+Returns `true` if all elements satisfy the predicate. Short-circuits on first failure.
+
+**Signature:** `all(collection, predicate) -> Boolean`
+
+```javascript
+all([2, 4, 6, 8], x => x % 2 == 0)  // true (all even)
+all([1, 2, 3], x => x > 0)          // true (all positive)
+all([1, 2, 3], x => x > 2)          // false (1 and 2 fail)
+all([], x => x > 0)                 // true (vacuous truth)
+
+// Validate data
+let data = [1.5, 2.3, 3.7, 4.2]
+all(data, x => x > 0 && x < 10)     // true (all in range)
+```
+
+**Performance:** O(n) with short-circuit optimization - stops at first `false`.
+
+### find - Find First Matching Element
+
+Returns the first element that satisfies the predicate. Throws error if not found.
+
+**Signature:** `find(collection, predicate) -> Element or Error`
+
+```javascript
+find([1, 2, 3, 4, 5], x => x > 3)   // 4 (first element > 3)
+find([2, 4, 6], x => x % 2 == 0)    // 2 (first even, they all are)
+find([1, 2, 3], x => x > 10)        // Error: "Element not found"
+
+// Find in range
+find(range(1, 100), x => x * x > 50)  // 8 (8² = 64 > 50)
+
+// Find record
+let users = [
+    {name: "Alice", age: 30},
+    {name: "Bob", age: 25}
+]
+find(users, u => u.age > 26)  // {name: "Alice", age: 30}
+```
+
+**Performance:** O(n) with short-circuit - stops at first match.
+
+### findIndex - Find Index of First Match
+
+Returns the 0-based index of the first matching element. Returns `-1` if not found.
+
+**Signature:** `findIndex(collection, predicate) -> Number`
+
+```javascript
+findIndex([1, 2, 3, 4, 5], x => x > 3)  // 3 (index of 4)
+findIndex([1, 2, 3], x => x > 10)       // -1 (not found)
+findIndex([5, 4, 3, 2, 1], x => x == 5) // 0 (first element)
+findIndex([1, 2, 3, 4, 5], x => x == 5) // 4 (last element)
+
+// Use with indexing
+let arr = [10, 20, 30, 40, 50]
+let idx = findIndex(arr, x => x == 30)
+arr[idx]  // 30
+```
+
+**Performance:** O(n) with short-circuit - stops at first match.
+
+### count - Count Matching Elements
+
+Counts how many elements satisfy the predicate.
+
+**Signature:** `count(collection, predicate) -> Number`
+
+```javascript
+count([1, 2, 3, 4, 5], x => x > 2)     // 3 (elements: 3, 4, 5)
+count([1, 2, 3], x => x > 10)          // 0
+count(range(1, 11), x => x % 2 == 0)   // 5 (evens: 2,4,6,8,10)
+
+// Count in range
+count(range(1, 101), x => x % 3 == 0)  // 33 (multiples of 3)
+
+// Complex conditions
+let data = [1.5, 2.3, 3.7, 4.2, 5.1]
+count(data, x => x > 2 && x < 5)       // 3 (2.3, 3.7, 4.2)
+```
+
+**Performance:** O(n) - always scans entire collection.
+
+### Practical Examples with Predicates
+
+#### Data Validation
+
+```javascript
+let data = [1.2, 3.4, 2.1, 4.5, 3.2]
+
+// Check if all values are positive
+all(data, x => x > 0)  // true
+
+// Check if any value exceeds threshold
+any(data, x => x > 4)  // true
+
+// Count values in range
+count(data, x => x >= 2 && x <= 4)  // 4
+```
+
+#### Finding in Collections
+
+```javascript
+let numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+// Find first perfect square > 20
+find(numbers, x => x * x > 20)  // 5 (5² = 25)
+
+// Get index for slicing
+let idx = findIndex(numbers, x => x > 5)
+numbers[idx..]  // [6, 7, 8, 9, 10]
+```
+
+#### Combining Predicates with Other HOFs
+
+```javascript
+let data = range(1, 20)
+
+// Filter evens, then check if any > 10
+let evens = filter(x => x % 2 == 0, data)
+any(evens, x => x > 10)  // true
+
+// Count vs length
+let nums = range(1, 11)
+let even_count = count(nums, x => x % 2 == 0)
+let total_len = len(nums)
+even_count < total_len  // true
 ```
 
 ## Common Patterns

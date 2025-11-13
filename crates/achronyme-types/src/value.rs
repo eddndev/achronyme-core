@@ -2,6 +2,8 @@ use crate::complex::Complex;
 use crate::tensor::{RealTensor, ComplexTensor};
 use crate::function::Function;
 use std::collections::HashMap;
+use std::rc::Rc;
+use std::cell::RefCell;
 
 #[derive(Debug)]
 pub enum TypeError {
@@ -33,6 +35,13 @@ pub enum Value {
         directed: bool,
         properties: HashMap<String, Value>,
     },
+    /// Internal marker for tail call optimization
+    /// Contains arguments for the next iteration of a tail-recursive function
+    /// This variant should never be exposed to user code or returned from eval_str()
+    TailCall(Vec<Value>),
+    /// Mutable reference - allows mutation of values declared with `mut` keyword
+    /// Uses Rc<RefCell<>> for shared mutable ownership
+    MutableRef(Rc<RefCell<Value>>),
 }
 
 // Conversiones automáticas con From/Into
@@ -99,6 +108,35 @@ impl Value {
             Some(c)
         } else {
             None
+        }
+    }
+
+    /// Create a new mutable reference
+    pub fn new_mutable(value: Value) -> Value {
+        Value::MutableRef(Rc::new(RefCell::new(value)))
+    }
+
+    /// Dereferencia un valor mutable (para lectura)
+    /// Si el valor es MutableRef, retorna una copia del valor interno
+    /// Si no es mutable, retorna una copia del valor mismo
+    pub fn deref(&self) -> Result<Value, String> {
+        match self {
+            Value::MutableRef(rc) => {
+                Ok(rc.borrow().clone())
+            }
+            _ => Ok(self.clone()),
+        }
+    }
+
+    /// Asigna un nuevo valor a una referencia mutable
+    /// Retorna error si el valor no es mutable
+    pub fn assign(&self, new_value: Value) -> Result<(), String> {
+        match self {
+            Value::MutableRef(rc) => {
+                *rc.borrow_mut() = new_value;
+                Ok(())
+            }
+            _ => Err("Cannot assign to immutable value".to_string()),
         }
     }
 }

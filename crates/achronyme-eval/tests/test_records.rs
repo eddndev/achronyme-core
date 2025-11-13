@@ -214,18 +214,24 @@ fn test_field_access_error_non_record() {
 #[test]
 fn test_keys_function() {
     let result = eval(r#"
-        let rec = { a: 1, b: 2, c: 3 }
-        keys(rec)
+        let record = { a: 1, b: 2, c: 3 }
+        keys(record)
     "#).unwrap();
-    // For now, keys() returns the count as a number
-    assert_eq!(result, Value::Number(3.0));
+    // keys() returns a vector of key names
+    match result {
+        Value::Vector(v) => {
+            assert_eq!(v.len(), 3);
+            // Note: HashMap doesn't guarantee order, so we just check the length
+        }
+        _ => panic!("Expected vector"),
+    }
 }
 
 #[test]
 fn test_values_function() {
     let result = eval(r#"
-        let rec = { a: 10, b: 20, c: 30 }
-        values(rec)
+        let record = { a: 10, b: 20, c: 30 }
+        values(record)
     "#).unwrap();
     match result {
         Value::Vector(v) => {
@@ -239,8 +245,8 @@ fn test_values_function() {
 #[test]
 fn test_has_field_true() {
     let result = eval(r#"
-        let rec = { name: "Alice", age: 30 }
-        has_field(rec, "name")
+        let record = { name: "Alice", age: 30 }
+        has_field(record, "name")
     "#).unwrap();
     assert_eq!(result, Value::Boolean(true));
 }
@@ -248,8 +254,8 @@ fn test_has_field_true() {
 #[test]
 fn test_has_field_false() {
     let result = eval(r#"
-        let rec = { name: "Alice" }
-        has_field(rec, "age")
+        let record = { name: "Alice" }
+        has_field(record, "age")
     "#).unwrap();
     assert_eq!(result, Value::Boolean(false));
 }

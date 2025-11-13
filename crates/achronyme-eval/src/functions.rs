@@ -24,6 +24,7 @@ impl FunctionRegistry {
 
     /// Register all standard math functions by delegating to modules
     fn register_all_modules(&mut self) {
+        function_modules::array::register_functions(self);
         function_modules::trig::register_functions(self);
         function_modules::exponential::register_functions(self);
         function_modules::rounding::register_functions(self);
@@ -35,6 +36,7 @@ impl FunctionRegistry {
         function_modules::strings::register_functions(self);
         function_modules::records::register_functions(self);
         function_modules::graphs::register_functions(self);
+        function_modules::utils::register_functions(self);
     }
 
     /// Register a function

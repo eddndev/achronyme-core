@@ -14,6 +14,7 @@ pub mod debug;
 // Node evaluation handlers
 pub mod literals;
 pub mod variables;
+pub mod assignment;
 pub mod control_flow;
 pub mod functions;
 pub mod indexing;

@@ -106,6 +106,16 @@ pub fn format_value(value: &Value) -> String {
             }
         }
         Value::Function(_) => "x => <function>".to_string(),
+
+        Value::MutableRef(rc) => {
+            let inner = rc.borrow();
+            format!("mut {}", format_value(&inner))
+        }
+
+        Value::TailCall(_) => {
+            // TailCall should never be visible to user code - it's an internal marker
+            "<internal:TailCall>".to_string()
+        }
     }
 }
 

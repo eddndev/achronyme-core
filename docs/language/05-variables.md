@@ -29,7 +29,7 @@ let f = x => x^2        // Function
 
 ## Immutability
 
-All variables are **immutable** - their values cannot be changed after assignment:
+Variables declared with `let` are **immutable** - their values cannot be changed after assignment:
 
 ```javascript
 let x = 10
@@ -38,6 +38,8 @@ let x = 10
 let arr = [1, 2, 3]
 // arr[0] = 99  // ERROR: Cannot mutate array
 ```
+
+> **Note**: For mutable variables, use the `mut` keyword. See **[Mutability](26-mutability.md)** for details.
 
 ### Creating New Values
 

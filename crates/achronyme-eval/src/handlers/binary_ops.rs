@@ -157,6 +157,11 @@ fn apply_add(left: Value, right: Value) -> Result<Value, String> {
             Ok(Value::ComplexTensor(ct.add_scalar(c)))
         }
 
+        // String concatenation
+        (Value::String(a), Value::String(b)) => {
+            Ok(Value::String(format!("{}{}", a, b)))
+        }
+
         _ => Err("Incompatible types for addition".to_string()),
     }
 }

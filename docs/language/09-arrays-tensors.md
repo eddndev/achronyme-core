@@ -152,11 +152,13 @@ det(A)          // -2
 ### Using Built-in Functions
 
 ```javascript
-// Linear space
+// Linear space (inclusive end)
 linspace(0, 10, 11)     // [0, 1, 2, ..., 10]
 
-// Range (if available)
-// range(0, 10)          // [0, 1, 2, ..., 9]
+// Range (exclusive end)
+range(0, 10)            // [0, 1, 2, ..., 9]
+range(1, 10, 2)         // [1, 3, 5, 7, 9] (with step)
+range(10, 0, -1)        // [10, 9, 8, ..., 1] (descending)
 
 // Zeros and ones (would need implementation)
 // zeros(5)              // [0, 0, 0, 0, 0]
@@ -325,11 +327,16 @@ let sum = reduce((acc, x) => acc + x, 0, [1, 2, 3, 4, 5])
 
 ```javascript
 let arr = [1, 2, 3, 4, 5]
-length(arr)     // 5
+len(arr)        // 5
 
 let matrix = [[1, 2], [3, 4], [5, 6]]
-length(matrix)  // 3 (number of rows)
+len(matrix)     // 6 (total tensor elements for numeric arrays)
+
+let strings = ["a", "b", "c"]
+len(strings)    // 3
 ```
+
+**Note:** For numeric arrays that become tensors, `len()` returns the total number of elements. Use `length()` for string length.
 
 ### Shape (for Tensors)
 
@@ -342,6 +349,122 @@ let m = [[1, 2, 3], [4, 5, 6]]  // shape: [2, 3]
 
 // 3D: shape = [d1, d2, d3]
 let t = [[[1, 2], [3, 4]], [[5, 6], [7, 8]]]  // shape: [2, 2, 2]
+```
+
+## Array Utility Functions
+
+### Tier 1: Essential Operations
+
+#### product(array)
+
+Multiplies all elements in an array.
+
+```javascript
+product([1, 2, 3, 4])     // 24
+product([2, 3, 4])        // 24
+product([])               // 1 (empty product identity)
+product([5])              // 5
+```
+
+#### range(start, end, step?)
+
+Generates an integer sequence from start to end (exclusive) with optional step.
+
+```javascript
+range(0, 5)               // [0, 1, 2, 3, 4]
+range(1, 10, 2)           // [1, 3, 5, 7, 9]
+range(10, 0, -1)          // [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
+range(0, 0)               // []
+```
+
+**Differences from linspace:**
+- `range` generates integers, `linspace` generates floats
+- `range` excludes end, `linspace` includes end
+- `range` uses step, `linspace` uses count
+
+#### len(array)
+
+Returns the length of an array, vector, or tensor.
+
+```javascript
+len([1, 2, 3])            // 3
+len([])                   // 0
+len([[1, 2], [3, 4]])     // 4 (total elements for tensors)
+len("hello")              // 5 (also works with strings)
+```
+
+#### reverse(array)
+
+Reverses the order of elements in an array.
+
+```javascript
+reverse([1, 2, 3])        // [3, 2, 1]
+reverse([])               // []
+reverse(["a", "b", "c"])  // ["c", "b", "a"]
+reverse("hello")          // "olleh" (also works with strings)
+```
+
+### Tier 2: Predicates and Search
+
+#### any(array, predicate)
+
+Returns true if any element satisfies the predicate. Short-circuits on first match.
+
+```javascript
+any([1, 2, 3, 4], x => x > 3)     // true
+any([1, 2, 3], x => x > 10)       // false
+any([], x => x > 0)               // false
+```
+
+#### all(array, predicate)
+
+Returns true if all elements satisfy the predicate. Short-circuits on first failure.
+
+```javascript
+all([2, 4, 6, 8], x => x % 2 == 0)  // true
+all([1, 2, 3], x => x > 0)          // true
+all([1, 2, 3], x => x > 2)          // false
+all([], x => x > 0)                 // true (vacuous truth)
+```
+
+#### find(array, predicate)
+
+Finds and returns the first element that satisfies the predicate. Errors if not found.
+
+```javascript
+find([1, 2, 3, 4, 5], x => x > 3)   // 4 (first element > 3)
+find([1, 2, 3], x => x > 10)        // Error: "Element not found"
+```
+
+#### findIndex(array, predicate)
+
+Returns the index of the first element that satisfies the predicate. Returns -1 if not found.
+
+```javascript
+findIndex([1, 2, 3, 4, 5], x => x > 3)  // 3 (index of 4)
+findIndex([1, 2, 3], x => x > 10)       // -1
+findIndex([5, 4, 3, 2, 1], x => x == 5) // 0
+```
+
+#### count(array, predicate)
+
+Counts how many elements satisfy the predicate.
+
+```javascript
+count([1, 2, 3, 4, 5], x => x > 2)     // 3 (3, 4, 5)
+count([1, 2, 3], x => x > 10)          // 0
+count(range(1, 11), x => x % 2 == 0)   // 5 (2, 4, 6, 8, 10)
+```
+
+#### contains(array, value)
+
+Checks if an array contains a specific value. Also works with strings.
+
+```javascript
+contains([1, 2, 3, 4, 5], 3)           // true
+contains([1, 2, 3], 10)                // false
+contains([], 1)                        // false
+contains("hello world", "world")       // true (string variant)
 ```
 
 ## Common Patterns

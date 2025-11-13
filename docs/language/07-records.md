@@ -1,6 +1,6 @@
 # Records
 
-Records are key-value structures similar to objects in other languages. They support methods, self-reference, and OOP patterns.
+Records are key-value structures similar to objects in other languages. They support methods, self-reference, mutable fields, and OOP patterns.
 
 ## Creating Records
 
@@ -323,7 +323,8 @@ let user = {
 - Methods use `self` to reference the record
 - Spread operator (`...`) for copying/merging
 - Support OOP patterns (inheritance, mixins)
-- Immutable (operations create new records)
+- Immutable by default (operations create new records)
+- **For mutable fields, see [Mutability](26-mutability.md)**
 
 ---
 

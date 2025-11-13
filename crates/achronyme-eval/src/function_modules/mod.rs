@@ -1,3 +1,4 @@
+pub mod array;
 pub mod common;
 pub mod complex;
 pub mod dsp;
@@ -9,4 +10,5 @@ pub mod rounding;
 pub mod stats;
 pub mod strings;
 pub mod trig;
+pub mod utils;
 pub mod vector;

@@ -98,6 +98,8 @@ fn build_ast_from_statement(pair: Pair<Rule>) -> Result<AstNode, String> {
 
     match inner.as_rule() {
         Rule::let_statement => build_let_statement(inner),
+        Rule::mut_statement => build_mut_statement(inner),
+        Rule::assignment => build_assignment(inner),
         Rule::expr => build_ast_from_expr(inner),
         _ => Err(format!("Unexpected statement rule: {:?}", inner.as_rule()))
     }
@@ -118,6 +120,40 @@ fn build_let_statement(pair: Pair<Rule>) -> Result<AstNode, String> {
     Ok(AstNode::VariableDecl {
         name: identifier,
         initializer: Box::new(build_ast_from_expr(initializer)?),
+    })
+}
+
+fn build_mut_statement(pair: Pair<Rule>) -> Result<AstNode, String> {
+    let mut inner = pair.into_inner();
+
+    // Grammar: "mut" ~ identifier ~ "=" ~ expr
+    let identifier = inner.next()
+        .ok_or("Missing identifier in mut statement")?
+        .as_str()
+        .to_string();
+
+    let initializer = inner.next()
+        .ok_or("Missing initializer in mut statement")?;
+
+    Ok(AstNode::MutableDecl {
+        name: identifier,
+        initializer: Box::new(build_ast_from_expr(initializer)?),
+    })
+}
+
+fn build_assignment(pair: Pair<Rule>) -> Result<AstNode, String> {
+    let mut inner = pair.into_inner();
+
+    // Grammar: postfix_expression ~ "=" ~ expr
+    let target = inner.next()
+        .ok_or("Missing target in assignment")?;
+
+    let value = inner.next()
+        .ok_or("Missing value in assignment")?;
+
+    Ok(AstNode::Assignment {
+        target: Box::new(build_ast_from_expr(target)?),
+        value: Box::new(build_ast_from_expr(value)?),
     })
 }
 
@@ -653,14 +689,29 @@ fn build_record(pair: Pair<Rule>) -> Result<AstNode, String> {
                         }
                         Rule::record_field => {
                             let mut field_inner = inner.into_inner();
-                            let key = field_inner.next()
-                                .ok_or("Missing field key")?
-                                .as_str()
-                                .to_string();
-                            let value = build_ast_from_expr(
-                                field_inner.next().ok_or("Missing field value")?
-                            )?;
-                            Ok(RecordFieldOrSpread::Field { name: key, value })
+
+                            // Grammar: (mut_keyword ~ identifier ~ ":" ~ expr) | (identifier ~ ":" ~ expr)
+                            let first = field_inner.next().ok_or("Missing field key or mut")?;
+
+                            // Check if first token is mut_keyword
+                            if first.as_rule() == Rule::mut_keyword {
+                                // Mutable field: mut key: value
+                                let key = field_inner.next()
+                                    .ok_or("Missing field key after mut")?
+                                    .as_str()
+                                    .to_string();
+                                let value = build_ast_from_expr(
+                                    field_inner.next().ok_or("Missing field value")?
+                                )?;
+                                Ok(RecordFieldOrSpread::MutableField { name: key, value })
+                            } else {
+                                // Immutable field: key: value (first is the identifier)
+                                let key = first.as_str().to_string();
+                                let value = build_ast_from_expr(
+                                    field_inner.next().ok_or("Missing field value")?
+                                )?;
+                                Ok(RecordFieldOrSpread::Field { name: key, value })
+                            }
                         }
                         _ => Err(format!("Unexpected record_field_or_spread inner rule: {:?}", inner.as_rule()))
                     }
