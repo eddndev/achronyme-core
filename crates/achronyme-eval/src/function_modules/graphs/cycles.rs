@@ -1,9 +1,10 @@
 use crate::function_modules::graphs::helpers::{build_adjacency_list, extract_node_ids};
 use achronyme_types::value::Value;
+use achronyme_types::Environment;
 use std::collections::{HashMap, HashSet};
 
 /// Has Cycle - Detect if graph contains a cycle
-pub fn has_cycle(args: &[Value]) -> Result<Value, String> {
+pub fn has_cycle(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     let network = match &args[0] {
         Value::Record(map) => map,
         _ => return Err("has_cycle() requires a network record as first argument".to_string()),

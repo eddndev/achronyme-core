@@ -46,6 +46,9 @@ pub struct Evaluator {
     /// Cache of loaded user modules to avoid re-parsing
     /// Format: module_path -> HashMap<name, Value>
     module_cache: HashMap<String, HashMap<String, Value>>,
+    /// Current file being evaluated (for relative imports)
+    /// This is the directory path of the file currently being evaluated
+    current_file_dir: Option<String>,
     /// Flag to enable tail call optimization mode
     /// When true, CallExpression with rec will return TailCall markers
     tco_mode: bool,
@@ -62,6 +65,7 @@ impl Evaluator {
             imported_modules: HashMap::new(),
             exported_values: HashMap::new(),
             module_cache: HashMap::new(),
+            current_file_dir: None,
             tco_mode: false,
         }
     }
@@ -116,10 +120,21 @@ impl Evaluator {
         self.tco_mode = enabled;
     }
 
+    /// Set the current file directory (for relative imports)
+    /// This should be called when loading a file from disk
+    pub fn set_current_file_dir(&mut self, file_path: &str) {
+        use std::path::Path;
+
+        if let Some(parent) = Path::new(file_path).parent() {
+            self.current_file_dir = Some(parent.to_string_lossy().to_string());
+        }
+    }
+
     /// Load and evaluate a user module from a file path
     /// Returns the exported values from the module
     pub fn load_user_module(&mut self, module_path: &str) -> Result<HashMap<String, Value>, String> {
         use std::fs;
+        use std::path::Path;
         use achronyme_parser::parse;
 
         // Check cache first
@@ -127,11 +142,24 @@ impl Evaluator {
             return Ok(cached_exports.clone());
         }
 
-        // Resolve relative path (add .ach extension if missing)
-        let resolved_path = if module_path.ends_with(".ach") {
+        // Add .soc extension if missing
+        let module_path_with_ext = if module_path.ends_with(".soc") {
             module_path.to_string()
         } else {
-            format!("{}.ach", module_path)
+            format!("{}.soc", module_path)
+        };
+
+        // Resolve path relative to current file directory
+        let resolved_path = if let Some(ref current_dir) = self.current_file_dir {
+            // If we have a current file directory, resolve relative to it
+            let base_path = Path::new(current_dir);
+            let module_file = Path::new(&module_path_with_ext);
+            base_path.join(module_file)
+                .to_string_lossy()
+                .to_string()
+        } else {
+            // No current file context, use path as-is (relative to cwd)
+            module_path_with_ext
         };
 
         // Read the file
@@ -140,6 +168,13 @@ impl Evaluator {
 
         // Parse the module
         let statements = parse(&file_content)?;
+
+        // Save the current file directory and set new one for this module
+        let old_file_dir = self.current_file_dir.clone();
+        let module_dir = Path::new(&resolved_path)
+            .parent()
+            .map(|p| p.to_string_lossy().to_string());
+        self.current_file_dir = module_dir;
 
         // Create a new scope for the module
         self.env.push_scope();
@@ -157,6 +192,9 @@ impl Evaluator {
 
         // Pop the module scope
         self.env.pop_scope();
+
+        // Restore the previous file directory
+        self.current_file_dir = old_file_dir;
 
         // Clear exported values (they've been captured)
         self.exported_values.clear();
@@ -429,29 +467,47 @@ impl Evaluator {
 
             // Module system
             AstNode::Import { items, module_path } => {
-                // Check if the module exists
-                if !self.module_registry.has_module(module_path) {
-                    return Err(format!("Module '{}' not found", module_path));
-                }
+                // Check if this is a built-in module or a file-based user module
+                if self.module_registry.has_module(module_path) {
+                    // Built-in module: add to imported_modules map
+                    for item in items {
+                        let local_name = item.local_name();
+                        let original_name = &item.name;
 
-                // Add each import to the imported_modules map
-                for item in items {
-                    let local_name = item.local_name();
-                    let original_name = &item.name;
+                        // Check if the function exists in the module
+                        let module = self.module_registry.get_module(module_path).unwrap();
+                        if !module.has(original_name) {
+                            return Err(format!(
+                                "Function '{}' not found in module '{}'",
+                                original_name, module_path
+                            ));
+                        }
 
-                    // Check if the function exists in the module
-                    let module = self.module_registry.get_module(module_path).unwrap();
-                    if !module.has(original_name) {
-                        return Err(format!(
-                            "Function '{}' not found in module '{}'",
-                            original_name, module_path
-                        ));
+                        self.imported_modules.insert(
+                            local_name.to_string(),
+                            (module_path.clone(), original_name.clone())
+                        );
                     }
+                } else {
+                    // User-defined module: load from file and import exported values
+                    let exports = self.load_user_module(module_path)?;
 
-                    self.imported_modules.insert(
-                        local_name.to_string(),
-                        (module_path.clone(), original_name.clone())
-                    );
+                    for item in items {
+                        let local_name = item.local_name();
+                        let original_name = &item.name;
+
+                        // Check if the value is exported from the module
+                        let value = exports.get(original_name).ok_or_else(|| {
+                            format!(
+                                "'{}' is not exported from module '{}'",
+                                original_name, module_path
+                            )
+                        })?;
+
+                        // Add the imported value to the environment
+                        // This allows both variables and functions to be imported
+                        self.env.define(local_name.to_string(), value.clone())?;
+                    }
                 }
 
                 // Import statements don't produce a value, return unit (true)

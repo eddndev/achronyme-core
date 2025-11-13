@@ -1,6 +1,7 @@
 use crate::functions::FunctionRegistry;
 use crate::unary_math_fn;
 use achronyme_types::value::Value;
+use achronyme_types::Environment;
 
 pub fn register_functions(registry: &mut FunctionRegistry) {
     registry.register("floor", floor, 1);
@@ -17,19 +18,19 @@ pub fn register_functions(registry: &mut FunctionRegistry) {
 
 // Implementations
 
-fn floor(args: &[Value]) -> Result<Value, String> {
+fn floor(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     unary_math_fn!("floor", f64::floor, &args[0])
 }
 
-fn ceil(args: &[Value]) -> Result<Value, String> {
+fn ceil(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     unary_math_fn!("ceil", f64::ceil, &args[0])
 }
 
-fn round(args: &[Value]) -> Result<Value, String> {
+fn round(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     unary_math_fn!("round", f64::round, &args[0])
 }
 
-fn abs(args: &[Value]) -> Result<Value, String> {
+fn abs(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     match &args[0] {
         Value::Number(x) => Ok(Value::Number(x.abs())),
         Value::Complex(c) => {
@@ -69,11 +70,11 @@ fn abs(args: &[Value]) -> Result<Value, String> {
     }
 }
 
-fn trunc(args: &[Value]) -> Result<Value, String> {
+fn trunc(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     unary_math_fn!("trunc", f64::trunc, &args[0])
 }
 
-fn sign(args: &[Value]) -> Result<Value, String> {
+fn sign(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     unary_math_fn!("sign", |x: f64| {
         if x > 0.0 {
             1.0
@@ -85,15 +86,15 @@ fn sign(args: &[Value]) -> Result<Value, String> {
     }, &args[0])
 }
 
-fn deg(args: &[Value]) -> Result<Value, String> {
+fn deg(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     unary_math_fn!("deg", |x: f64| x.to_degrees(), &args[0])
 }
 
-fn rad(args: &[Value]) -> Result<Value, String> {
+fn rad(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     unary_math_fn!("rad", |x: f64| x.to_radians(), &args[0])
 }
 
-fn min(args: &[Value]) -> Result<Value, String> {
+fn min(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     if args.is_empty() {
         return Err("min() requires at least one argument".to_string());
     }
@@ -145,7 +146,7 @@ fn min(args: &[Value]) -> Result<Value, String> {
     Ok(Value::Number(result))
 }
 
-fn max(args: &[Value]) -> Result<Value, String> {
+fn max(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     if args.is_empty() {
         return Err("max() requires at least one argument".to_string());
     }

@@ -1,5 +1,6 @@
 use crate::functions::FunctionRegistry;
 use achronyme_types::value::Value;
+use achronyme_types::Environment;
 
 pub fn register_functions(registry: &mut FunctionRegistry) {
     registry.register("sum", sum, 1);
@@ -9,7 +10,7 @@ pub fn register_functions(registry: &mut FunctionRegistry) {
 
 // Implementations
 
-fn sum(args: &[Value]) -> Result<Value, String> {
+fn sum(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     match &args[0] {
         // Tensor support (optimized path)
         Value::Tensor(t) => {
@@ -33,7 +34,7 @@ fn sum(args: &[Value]) -> Result<Value, String> {
     }
 }
 
-fn mean(args: &[Value]) -> Result<Value, String> {
+fn mean(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     match &args[0] {
         // Tensor support (optimized path)
         Value::Tensor(t) => {
@@ -52,7 +53,7 @@ fn mean(args: &[Value]) -> Result<Value, String> {
             if !Value::is_numeric_vector(vec) {
                 return Err("mean() requires a numeric vector".to_string());
             }
-            let sum_val = sum(args)?;
+            let sum_val = sum(args, _env)?;
             let len_val = Value::Number(vec.len() as f64);
             crate::handlers::binary_ops::apply(&achronyme_parser::ast::BinaryOp::Divide, sum_val, len_val)
         }
@@ -60,7 +61,7 @@ fn mean(args: &[Value]) -> Result<Value, String> {
     }
 }
 
-fn std(args: &[Value]) -> Result<Value, String> {
+fn std(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     match &args[0] {
         // Tensor support (optimized path)
         Value::Tensor(t) => {
@@ -79,7 +80,7 @@ fn std(args: &[Value]) -> Result<Value, String> {
             if !Value::is_numeric_vector(vec) {
                 return Err("std() requires a numeric vector".to_string());
             }
-            let mean_val = mean(args)?;
+            let mean_val = mean(args, _env)?;
             let mut variance_sum = Value::Number(0.0);
             for val in vec {
                 let diff = crate::handlers::binary_ops::apply(&achronyme_parser::ast::BinaryOp::Subtract, val.clone(), mean_val.clone())?;

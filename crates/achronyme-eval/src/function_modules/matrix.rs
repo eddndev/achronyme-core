@@ -1,5 +1,6 @@
 use crate::functions::FunctionRegistry;
 use achronyme_types::value::Value;
+use achronyme_types::Environment;
 
 pub fn register_functions(registry: &mut FunctionRegistry) {
     registry.register("transpose", transpose, 1);
@@ -9,7 +10,7 @@ pub fn register_functions(registry: &mut FunctionRegistry) {
 
 // Implementations
 
-fn transpose(args: &[Value]) -> Result<Value, String> {
+fn transpose(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     match &args[0] {
         // Tensor support (optimized path)
         Value::Tensor(t) => {
@@ -30,7 +31,7 @@ fn transpose(args: &[Value]) -> Result<Value, String> {
     }
 }
 
-fn det(args: &[Value]) -> Result<Value, String> {
+fn det(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     match &args[0] {
         Value::Tensor(t) => {
             if !t.is_matrix() {
@@ -51,7 +52,7 @@ fn det(args: &[Value]) -> Result<Value, String> {
     }
 }
 
-fn trace(args: &[Value]) -> Result<Value, String> {
+fn trace(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     match &args[0] {
         // Tensor support (optimized path)
         Value::Tensor(t) => {

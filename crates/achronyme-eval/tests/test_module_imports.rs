@@ -34,7 +34,14 @@ fn test_import_nonexistent_module() {
     // Try to import from non-existent module
     let result = evaluator.eval_str("import { foo } from \"nonexistent\"");
     assert!(result.is_err(), "Import from non-existent module should fail");
-    assert!(result.unwrap_err().contains("Module 'nonexistent' not found"));
+    // Now it tries to load as file, so error message is different
+    let err = result.unwrap_err();
+    assert!(
+        err.contains("Module 'nonexistent' not found") ||
+        err.contains("No such file") ||
+        err.contains("cannot find"),
+        "Expected module not found error, got: {}", err
+    );
 }
 
 #[test]

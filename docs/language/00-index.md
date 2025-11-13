@@ -18,6 +18,10 @@ Achronyme source files use the `.soc` extension (Second-Order Calculus).
 ## Quick Example
 
 ```javascript
+// Import from modules
+import { mean, std } from "stats"
+import { sin, cos } from "math"
+
 // Define a function
 let square = x => x^2
 
@@ -34,6 +38,11 @@ let counter = {
     increment: () => do { self.value = self.value + 1 },
     get: () => self.value
 }
+
+// Statistical analysis
+let data = [10, 20, 30, 40, 50]
+let average = mean(data)
+let stdDev = std(data)
 ```
 
 ## Documentation Structure
@@ -77,6 +86,8 @@ let counter = {
 - **[23. Best Practices](23-best-practices.md)** - Code style, patterns, performance
 - **[24. Examples](24-examples.md)** - Complete programs and use cases
 - **[26. Mutability](26-mutability.md)** - Mutable variables, mutable record fields, stateful objects
+- **[27. I/O and Persistence](27-io-persistence.md)** - File I/O, environment save/restore
+- **[28. Modules](28-modules.md)** - Import/export system, code organization
 
 ## Language Philosophy
 

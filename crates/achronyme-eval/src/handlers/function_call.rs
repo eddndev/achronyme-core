@@ -171,6 +171,6 @@ pub fn dispatch(evaluator: &mut Evaluator, name: &str, args: &[AstNode]) -> Resu
         ));
     }
 
-    // Call the resolved function directly
-    func(&arg_values)
+    // Call the resolved function with access to the environment
+    func(&arg_values, evaluator.environment_mut())
 }

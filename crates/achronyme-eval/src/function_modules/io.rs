@@ -48,7 +48,7 @@ pub fn register_functions(registry: &mut FunctionRegistry) {
 ///   - allow_overwrite: Boolean - Allow overwriting existing file (default: false)
 ///
 /// Returns: Boolean (true on success)
-fn save_env(args: &[Value]) -> Result<Value, String> {
+fn save_env(args: &[Value], env: &mut Environment) -> Result<Value, String> {
     if args.is_empty() {
         return Err("save_env() requires at least 1 argument (path or options record)".to_string());
     }
@@ -132,14 +132,8 @@ fn save_env(args: &[Value]) -> Result<Value, String> {
         _ => return Err("save_env() argument must be a String path or Record with options".to_string()),
     };
 
-    // Get the environment from somewhere
-    // NOTE: This is a challenge - we need access to the current Environment
-    // For now, we'll create a dummy environment and document that this needs integration
-    // TODO: Pass Environment as context to functions or use thread-local storage
-    let env = Environment::new();
-
-    // Save the environment
-    save_environment(&env, &path, options)
+    // Save the current environment
+    save_environment(env, &path, options)
         .map_err(|e| format!("Failed to save environment: {}", e))?;
 
     Ok(Value::Boolean(true))
@@ -165,7 +159,7 @@ fn save_env(args: &[Value]) -> Result<Value, String> {
 ///   - strict_version: Boolean - Require exact version match (default: false)
 ///
 /// Returns: Boolean (true on success)
-fn restore_env(args: &[Value]) -> Result<Value, String> {
+fn restore_env(args: &[Value], env: &mut Environment) -> Result<Value, String> {
     if args.is_empty() {
         return Err("restore_env() requires at least 1 argument (path or options record)".to_string());
     }
@@ -247,13 +241,52 @@ fn restore_env(args: &[Value]) -> Result<Value, String> {
         _ => return Err("restore_env() argument must be a String path or Record with options".to_string()),
     };
 
-    // Restore the environment
-    let _restored_env = restore_environment(&path, options)
+    // Restore the environment from file
+    let restored_env = restore_environment(&path, options.clone())
         .map_err(|e| format!("Failed to restore environment: {}", e))?;
 
-    // TODO: Merge/replace into current environment
-    // This requires access to the current Environment context
-    // For now, we just confirm it loaded successfully
+    // Merge or replace into current environment based on mode
+    match options.mode {
+        RestoreMode::Replace => {
+            // Replace: clear current environment and copy all bindings from restored
+            // Note: We can't completely replace the Environment object, so we clear and copy
+            let snapshot = restored_env.snapshot();
+            for (name, value) in snapshot {
+                if let Err(e) = env.define(name.clone(), value) {
+                    eprintln!("Warning: Failed to define '{}': {}", name, e);
+                }
+            }
+        }
+        RestoreMode::Merge => {
+            // Merge: add bindings from restored, optionally overwriting existing
+            let snapshot = restored_env.snapshot();
+            for (name, value) in snapshot {
+                // Check if binding exists in current environment
+                let exists = env.get(&name).is_ok();
+
+                if !exists || options.overwrite {
+                    if let Err(e) = env.define(name.clone(), value) {
+                        eprintln!("Warning: Failed to define '{}': {}", name, e);
+                    }
+                }
+            }
+        }
+        RestoreMode::Namespace => {
+            // Namespace mode: create a record with all restored bindings
+            let namespace_name = options.namespace.as_ref()
+                .ok_or_else(|| "Namespace mode requires 'namespace' option".to_string())?;
+
+            let snapshot = restored_env.snapshot();
+            let mut namespace_record = HashMap::new();
+            for (name, value) in snapshot {
+                namespace_record.insert(name, value);
+            }
+
+            if let Err(e) = env.define(namespace_name.clone(), Value::Record(namespace_record)) {
+                return Err(format!("Failed to create namespace '{}': {}", namespace_name, e));
+            }
+        }
+    }
 
     Ok(Value::Boolean(true))
 }
@@ -271,7 +304,7 @@ fn restore_env(args: &[Value]) -> Result<Value, String> {
 ///   - description: String - Description (if provided)
 ///   - tags: Vector of strings - Tags (if provided)
 ///   - binding_names: Vector of strings - List of variable names
-fn env_info(args: &[Value]) -> Result<Value, String> {
+fn env_info(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     if args.is_empty() {
         return Err("env_info() requires 1 argument (path)".to_string());
     }
@@ -327,21 +360,24 @@ mod tests {
 
     #[test]
     fn test_env_info_requires_path() {
-        let result = env_info(&[]);
+        let mut env = Environment::new();
+        let result = env_info(&[], &mut env);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("requires 1 argument"));
     }
 
     #[test]
     fn test_env_info_path_must_be_string() {
-        let result = env_info(&[Value::Number(42.0)]);
+        let mut env = Environment::new();
+        let result = env_info(&[Value::Number(42.0)], &mut env);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("must be a String"));
     }
 
     #[test]
     fn test_save_env_requires_argument() {
-        let result = save_env(&[]);
+        let mut env = Environment::new();
+        let result = save_env(&[], &mut env);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("requires at least 1 argument"));
     }
@@ -351,6 +387,8 @@ mod tests {
         use std::env::temp_dir;
         use std::time::{SystemTime, UNIX_EPOCH};
 
+        let mut env = Environment::new();
+
         // Use a unique temporary file path to avoid conflicts
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -358,7 +396,7 @@ mod tests {
             .as_nanos();
         let temp_path = temp_dir().join(format!("test_{}.ach", timestamp));
 
-        let result = save_env(&[Value::String(temp_path.to_string_lossy().to_string())]);
+        let result = save_env(&[Value::String(temp_path.to_string_lossy().to_string())], &mut env);
 
         // Clean up if created
         if temp_path.exists() {
@@ -374,50 +412,55 @@ mod tests {
 
     #[test]
     fn test_save_env_record_requires_path() {
+        let mut env = Environment::new();
         let mut map = HashMap::new();
         map.insert("compress".to_string(), Value::Boolean(true));
 
-        let result = save_env(&[Value::Record(map)]);
+        let result = save_env(&[Value::Record(map)], &mut env);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("must contain 'path'"));
     }
 
     #[test]
     fn test_save_env_compression_level_validation() {
+        let mut env = Environment::new();
         let mut map = HashMap::new();
         map.insert("path".to_string(), Value::String("test.ach".to_string()));
         map.insert("compression_level".to_string(), Value::Number(99.0));
 
-        let result = save_env(&[Value::Record(map)]);
+        let result = save_env(&[Value::Record(map)], &mut env);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("between 1 and 22"));
     }
 
     #[test]
     fn test_restore_env_requires_argument() {
-        let result = restore_env(&[]);
+        let mut env = Environment::new();
+        let result = restore_env(&[], &mut env);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("requires at least 1 argument"));
     }
 
     #[test]
     fn test_restore_env_mode_validation() {
+        let mut env = Environment::new();
         let mut map = HashMap::new();
         map.insert("path".to_string(), Value::String("test.ach".to_string()));
         map.insert("mode".to_string(), Value::String("invalid_mode".to_string()));
 
-        let result = restore_env(&[Value::Record(map)]);
+        let result = restore_env(&[Value::Record(map)], &mut env);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Invalid mode"));
     }
 
     #[test]
     fn test_restore_env_namespace_mode_requires_namespace() {
+        let mut env = Environment::new();
         let mut map = HashMap::new();
         map.insert("path".to_string(), Value::String("test.ach".to_string()));
         map.insert("mode".to_string(), Value::String("namespace".to_string()));
 
-        let result = restore_env(&[Value::Record(map)]);
+        let result = restore_env(&[Value::Record(map)], &mut env);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("requires 'namespace'"));
     }

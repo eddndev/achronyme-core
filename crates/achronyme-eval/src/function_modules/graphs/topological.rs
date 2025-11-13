@@ -1,17 +1,18 @@
 use crate::function_modules::graphs::cycles::has_cycle;
 use crate::function_modules::graphs::helpers::{build_adjacency_list, extract_node_ids};
 use achronyme_types::value::Value;
+use achronyme_types::Environment;
 use std::collections::{HashMap, VecDeque};
 
 /// Topological Sort - Order nodes in a DAG such that for every edge u -> v, u comes before v
-pub fn topological_sort(args: &[Value]) -> Result<Value, String> {
+pub fn topological_sort(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     let network = match &args[0] {
         Value::Record(map) => map,
         _ => return Err("topological_sort() requires a network record as first argument".to_string()),
     };
 
     // Check if graph has cycles (must be DAG)
-    match has_cycle(&[args[0].clone()])? {
+    match has_cycle(&[args[0].clone()], _env)? {
         Value::Boolean(true) => {
             return Err(
                 "topological_sort() requires a Directed Acyclic Graph (DAG), but the graph contains cycles"

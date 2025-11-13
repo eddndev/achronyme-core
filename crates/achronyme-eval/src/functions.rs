@@ -1,10 +1,13 @@
 use achronyme_types::value::Value;
+use achronyme_types::Environment;
 use std::collections::HashMap;
 
 use crate::function_modules;
 
 /// Type for built-in function implementations
-pub type BuiltinFunction = fn(&[Value]) -> Result<Value, String>;
+/// Functions now receive a mutable reference to the Environment to enable
+/// I/O operations like save_env/restore_env that need access to current bindings
+pub type BuiltinFunction = fn(&[Value], &mut Environment) -> Result<Value, String>;
 
 /// Registry for built-in mathematical functions
 #[derive(Clone)]
@@ -60,8 +63,8 @@ impl FunctionRegistry {
         self.functions.get(name).copied()
     }
 
-    /// Call a function
-    pub fn call(&self, name: &str, args: &[Value]) -> Result<Value, String> {
+    /// Call a function with access to the environment
+    pub fn call(&self, name: &str, args: &[Value], env: &mut Environment) -> Result<Value, String> {
         let (func, arity) = self
             .functions
             .get(name)
@@ -76,7 +79,7 @@ impl FunctionRegistry {
             ));
         }
 
-        func(args)
+        func(args, env)
     }
 }
 
@@ -89,13 +92,14 @@ impl Default for FunctionRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
 
     #[test]
     fn test_sin() {
         let registry = FunctionRegistry::new();
+        let mut env = Environment::new();
         let args = vec![Value::Number(std::f64::consts::PI / 2.0)];
-        let result = registry.call("sin", &args).unwrap();
+        let result = registry.call("sin", &args, &mut env).unwrap();
         match result {
             Value::Number(x) => assert!((x - 1.0).abs() < 1e-10),
             _ => panic!("Expected number"),
@@ -105,22 +109,24 @@ mod tests {
     #[test]
     fn test_sqrt() {
         let registry = FunctionRegistry::new();
+        let mut env = Environment::new();
         let args = vec![Value::Number(16.0)];
-        let result = registry.call("sqrt", &args).unwrap();
+        let result = registry.call("sqrt", &args, &mut env).unwrap();
         assert_eq!(result, Value::Number(4.0));
     }
 
     #[test]
     fn test_min_max() {
         let registry = FunctionRegistry::new();
+        let mut env = Environment::new();
         let args = vec![
             Value::Number(3.0),
             Value::Number(1.0),
             Value::Number(4.0),
             Value::Number(1.5),
         ];
-        let min_result = registry.call("min", &args).unwrap();
-        let max_result = registry.call("max", &args).unwrap();
+        let min_result = registry.call("min", &args, &mut env).unwrap();
+        let max_result = registry.call("max", &args, &mut env).unwrap();
         assert_eq!(min_result, Value::Number(1.0));
         assert_eq!(max_result, Value::Number(4.0));
     }
@@ -128,21 +134,23 @@ mod tests {
     #[test]
     fn test_arity_check() {
         let registry = FunctionRegistry::new();
+        let mut env = Environment::new();
         let args = vec![Value::Number(1.0), Value::Number(2.0)];
-        let result = registry.call("sin", &args);
+        let result = registry.call("sin", &args, &mut env);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_sin_vector() {
         let registry = FunctionRegistry::new();
+        let mut env = Environment::new();
         let vec = vec![
             Value::Number(0.0),
             Value::Number(std::f64::consts::PI / 2.0),
             Value::Number(std::f64::consts::PI)
         ];
         let args = vec![Value::Vector(vec)];
-        let result = registry.call("sin", &args).unwrap();
+        let result = registry.call("sin", &args, &mut env).unwrap();
         match result {
             Value::Vector(v) => {
                 match (&v[0], &v[1], &v[2]) {
@@ -152,7 +160,7 @@ mod tests {
                         assert!((n2 - 0.0).abs() < 1e-10);
                     }
                     _ => panic!("Expected numeric values"),
-                }
+                    }
             }
             _ => panic!("Expected vector"),
         }

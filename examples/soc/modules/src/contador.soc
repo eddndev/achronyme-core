@@ -1,0 +1,13 @@
+let createCounter = (n) => {
+    mut value: n,
+    inc: () => do {
+        self.value = self.value + 1
+    },
+    dec: () => do {
+        self.value = self.value - 1
+    },
+    ejeDirigido: A -> B,
+    ejeNoDirigido: A <> B
+}
+
+export { createCounter } 

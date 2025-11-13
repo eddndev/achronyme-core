@@ -1,5 +1,6 @@
 use crate::function_modules::graphs::helpers::{extract_node_ids, validate_mst_requirements};
 use achronyme_types::value::Value;
+use achronyme_types::Environment;
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap, HashSet};
 
@@ -93,7 +94,7 @@ impl PartialOrd for WeightedEdge {
 }
 
 /// Kruskal's algorithm - Minimum Spanning Tree
-pub fn kruskal(args: &[Value]) -> Result<Value, String> {
+pub fn kruskal(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     let network = match &args[0] {
         Value::Record(map) => map,
         _ => return Err("kruskal() requires a network record as first argument".to_string()),
@@ -158,7 +159,7 @@ pub fn kruskal(args: &[Value]) -> Result<Value, String> {
 }
 
 /// Prim's algorithm - Minimum Spanning Tree
-pub fn prim(args: &[Value]) -> Result<Value, String> {
+pub fn prim(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     let network = match &args[0] {
         Value::Record(map) => map,
         _ => return Err("prim() requires a network record as first argument".to_string()),

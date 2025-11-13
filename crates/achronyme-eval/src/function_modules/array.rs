@@ -19,6 +19,7 @@
 
 use crate::functions::FunctionRegistry;
 use achronyme_types::value::Value;
+use achronyme_types::Environment;
 
 /// Register all array utility functions
 pub fn register_functions(registry: &mut FunctionRegistry) {
@@ -47,7 +48,7 @@ pub fn register_functions(registry: &mut FunctionRegistry) {
 /// - product([5]) => 5
 ///
 /// Performance: O(n) single pass
-fn product(args: &[Value]) -> Result<Value, String> {
+fn product(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     match &args[0] {
         // Tensor support (optimized path)
         Value::Tensor(t) => {
@@ -101,7 +102,7 @@ fn product(args: &[Value]) -> Result<Value, String> {
 /// - range uses step, linspace uses count
 ///
 /// Performance: O(n) where n = abs((end - start) / step)
-fn range(args: &[Value]) -> Result<Value, String> {
+fn range(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     // Validate argument count
     if args.len() < 2 || args.len() > 3 {
         return Err("range() expects 2 or 3 arguments: range(start, end, step?)".to_string());
@@ -185,7 +186,7 @@ fn range(args: &[Value]) -> Result<Value, String> {
 /// Note: This is different from length() which only works on strings
 ///
 /// Performance: O(1) constant time
-fn len(args: &[Value]) -> Result<Value, String> {
+fn len(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     let length = match &args[0] {
         Value::Vector(vec) => vec.len(),
         Value::Tensor(tensor) => tensor.data().len(),
@@ -207,7 +208,7 @@ fn len(args: &[Value]) -> Result<Value, String> {
 /// - reverse([[1, 2], [3, 4]]) => [[3, 4], [1, 2]]
 ///
 /// Performance: O(n)
-fn reverse(args: &[Value]) -> Result<Value, String> {
+fn reverse(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     match &args[0] {
         Value::Vector(vec) => {
             let mut reversed = vec.clone();
@@ -278,7 +279,7 @@ fn reverse(args: &[Value]) -> Result<Value, String> {
 /// - contains([], 1) => false
 ///
 /// Performance: O(n) with short-circuit
-fn contains(args: &[Value]) -> Result<Value, String> {
+fn contains(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     // This one we can implement directly since it doesn't need a lambda
     if args.len() != 2 {
         return Err("contains() expects 2 arguments".to_string());
@@ -326,26 +327,29 @@ mod tests {
 
     #[test]
     fn test_product_basic() {
+        let mut env = Environment::new();
         let args = vec![Value::Vector(vec![
             Value::Number(2.0),
             Value::Number(3.0),
             Value::Number(4.0),
         ])];
-        let result = product(&args).unwrap();
+        let result = product(&args, &mut env).unwrap();
         assert_eq!(result, Value::Number(24.0));
     }
 
     #[test]
     fn test_product_empty() {
+        let mut env = Environment::new();
         let args = vec![Value::Vector(vec![])];
-        let result = product(&args).unwrap();
+        let result = product(&args, &mut env).unwrap();
         assert_eq!(result, Value::Number(1.0)); // Empty product is 1
     }
 
     #[test]
     fn test_range_basic() {
+        let mut env = Environment::new();
         let args = vec![Value::Number(0.0), Value::Number(5.0)];
-        let result = range(&args).unwrap();
+        let result = range(&args, &mut env).unwrap();
 
         match result {
             Value::Vector(vec) => {
@@ -359,8 +363,9 @@ mod tests {
 
     #[test]
     fn test_range_with_step() {
+        let mut env = Environment::new();
         let args = vec![Value::Number(1.0), Value::Number(10.0), Value::Number(2.0)];
-        let result = range(&args).unwrap();
+        let result = range(&args, &mut env).unwrap();
 
         match result {
             Value::Vector(vec) => {
@@ -379,8 +384,9 @@ mod tests {
 
     #[test]
     fn test_range_negative_step() {
+        let mut env = Environment::new();
         let args = vec![Value::Number(5.0), Value::Number(0.0), Value::Number(-1.0)];
-        let result = range(&args).unwrap();
+        let result = range(&args, &mut env).unwrap();
 
         match result {
             Value::Vector(vec) => {
@@ -394,30 +400,33 @@ mod tests {
 
     #[test]
     fn test_len_vector() {
+        let mut env = Environment::new();
         let args = vec![Value::Vector(vec![
             Value::Number(1.0),
             Value::Number(2.0),
             Value::Number(3.0),
         ])];
-        let result = len(&args).unwrap();
+        let result = len(&args, &mut env).unwrap();
         assert_eq!(result, Value::Number(3.0));
     }
 
     #[test]
     fn test_len_empty() {
+        let mut env = Environment::new();
         let args = vec![Value::Vector(vec![])];
-        let result = len(&args).unwrap();
+        let result = len(&args, &mut env).unwrap();
         assert_eq!(result, Value::Number(0.0));
     }
 
     #[test]
     fn test_reverse_vector() {
+        let mut env = Environment::new();
         let args = vec![Value::Vector(vec![
             Value::Number(1.0),
             Value::Number(2.0),
             Value::Number(3.0),
         ])];
-        let result = reverse(&args).unwrap();
+        let result = reverse(&args, &mut env).unwrap();
 
         match result {
             Value::Vector(vec) => {
@@ -433,8 +442,9 @@ mod tests {
 
     #[test]
     fn test_reverse_string() {
+        let mut env = Environment::new();
         let args = vec![Value::String("hello".to_string())];
-        let result = reverse(&args).unwrap();
+        let result = reverse(&args, &mut env).unwrap();
         assert_eq!(result, Value::String("olleh".to_string()));
     }
 }

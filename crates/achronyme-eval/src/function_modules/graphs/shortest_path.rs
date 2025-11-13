@@ -1,5 +1,6 @@
 use crate::function_modules::graphs::helpers::{validate_edge_weights, validate_node_exists};
 use achronyme_types::value::Value;
+use achronyme_types::Environment;
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap};
 
@@ -36,7 +37,7 @@ impl PartialOrd for DijkstraState {
 }
 
 /// Dijkstra - Find shortest path in weighted graph
-pub fn dijkstra(args: &[Value]) -> Result<Value, String> {
+pub fn dijkstra(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     let network = match &args[0] {
         Value::Record(map) => map,
         _ => return Err("dijkstra() requires a network record as first argument".to_string()),

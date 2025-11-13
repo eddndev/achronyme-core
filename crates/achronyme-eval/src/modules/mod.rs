@@ -191,7 +191,7 @@ mod tests {
     use super::*;
 
     // Dummy function for testing
-    fn dummy_func(_args: &[achronyme_types::value::Value]) -> Result<achronyme_types::value::Value, String> {
+    fn dummy_func(_args: &[achronyme_types::value::Value], _env: &mut achronyme_types::Environment) -> Result<achronyme_types::value::Value, String> {
         Ok(achronyme_types::value::Value::Number(42.0))
     }
 

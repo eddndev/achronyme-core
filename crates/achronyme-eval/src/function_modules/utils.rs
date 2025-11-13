@@ -7,6 +7,7 @@
 
 use crate::functions::FunctionRegistry;
 use achronyme_types::value::Value;
+use achronyme_types::Environment;
 
 pub fn register_functions(registry: &mut FunctionRegistry) {
     // Output function
@@ -34,7 +35,7 @@ pub fn register_functions(registry: &mut FunctionRegistry) {
 /// - print([1, 2, 3]) => prints "[1, 2, 3]\n"
 ///
 /// Returns: The last value printed (or Unit/void equivalent)
-fn print(args: &[Value]) -> Result<Value, String> {
+fn print(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     if args.is_empty() {
         return Err("print() requires at least 1 argument".to_string());
     }
@@ -63,7 +64,7 @@ fn print(args: &[Value]) -> Result<Value, String> {
 /// - type("hello") => "String"
 /// - type([1, 2, 3]) => "Tensor"
 /// - type(true) => "Boolean"
-fn type_of(args: &[Value]) -> Result<Value, String> {
+fn type_of(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     let type_name = get_type_name(&args[0]);
     Ok(Value::String(type_name))
 }
@@ -103,7 +104,7 @@ fn get_type_name(value: &Value) -> String {
 /// - str(3.14) => "3.14"
 /// - str(true) => "true"
 /// - str([1, 2, 3]) => "[1, 2, 3]"
-fn to_string(args: &[Value]) -> Result<Value, String> {
+fn to_string(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     Ok(Value::String(format_value(&args[0])))
 }
 
@@ -212,61 +213,69 @@ mod tests {
 
     #[test]
     fn test_type_number() {
+        let mut env = Environment::new();
         let args = vec![Value::Number(42.0)];
-        let result = type_of(&args).unwrap();
+        let result = type_of(&args, &mut env).unwrap();
         assert_eq!(result, Value::String("Number".to_string()));
     }
 
     #[test]
     fn test_type_string() {
+        let mut env = Environment::new();
         let args = vec![Value::String("hello".to_string())];
-        let result = type_of(&args).unwrap();
+        let result = type_of(&args, &mut env).unwrap();
         assert_eq!(result, Value::String("String".to_string()));
     }
 
     #[test]
     fn test_type_boolean() {
+        let mut env = Environment::new();
         let args = vec![Value::Boolean(true)];
-        let result = type_of(&args).unwrap();
+        let result = type_of(&args, &mut env).unwrap();
         assert_eq!(result, Value::String("Boolean".to_string()));
     }
 
     #[test]
     fn test_str_number() {
+        let mut env = Environment::new();
         let args = vec![Value::Number(42.0)];
-        let result = to_string(&args).unwrap();
+        let result = to_string(&args, &mut env).unwrap();
         assert_eq!(result, Value::String("42".to_string()));
     }
 
     #[test]
     fn test_str_float() {
+        let mut env = Environment::new();
         let args = vec![Value::Number(3.14)];
-        let result = to_string(&args).unwrap();
+        let result = to_string(&args, &mut env).unwrap();
         assert_eq!(result, Value::String("3.14".to_string()));
     }
 
     #[test]
     fn test_str_string() {
+        let mut env = Environment::new();
         let args = vec![Value::String("hello".to_string())];
-        let result = to_string(&args).unwrap();
+        let result = to_string(&args, &mut env).unwrap();
         assert_eq!(result, Value::String("hello".to_string()));
     }
 
     #[test]
     fn test_str_boolean() {
+        let mut env = Environment::new();
         let args = vec![Value::Boolean(true)];
-        let result = to_string(&args).unwrap();
+        let result = to_string(&args, &mut env).unwrap();
         assert_eq!(result, Value::String("true".to_string()));
     }
 
     #[test]
     fn test_str_vector() {
+        let mut env = Environment::new();
         let args = vec![Value::Vector(vec![
             Value::Number(1.0),
             Value::Number(2.0),
             Value::Number(3.0),
         ])];
-        let result = to_string(&args).unwrap();
+        let result = to_string(&args, &mut env).unwrap();
         assert_eq!(result, Value::String("[1, 2, 3]".to_string()));
     }
 

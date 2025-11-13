@@ -63,6 +63,8 @@ let point = {
 25. **[Examples](24-examples.md)** - Complete programs
 26. **[Performance Limitations](25-performance-limitations.md)** - Stack limits and workarounds
 27. **[Mutability](26-mutability.md)** - Mutable variables and record fields
+28. **[I/O and Persistence](27-io-persistence.md)** - File I/O, environment save/restore
+29. **[Modules](28-modules.md)** - Import/export system, code organization
 
 ## Quick Reference Card
 
@@ -170,6 +172,24 @@ reduce(fn, init, array)
 pipe(value, f, g, h)  // Apply functions left-to-right
 ```
 
+### Modules
+```javascript
+// Import from built-in modules
+import { mean, std } from "stats"
+import { sin, cos } from "math"
+import { dot, norm } from "linalg"
+
+// Import with alias
+import { mean as average } from "stats"
+
+// Import from user modules (relative paths)
+import { helper } from "src/utils"
+
+// Export from module
+let myFunction = x => x * 2
+export { myFunction }
+```
+
 ### Common Functions
 ```javascript
 // Math
@@ -253,6 +273,10 @@ true     // Boolean literal
 false    // Boolean literal
 self     // Record self-reference
 rec      // Recursive function reference
+import   // Import from modules
+export   // Export from current module
+from     // Used with import
+as       // Alias in imports
 ```
 
 **Note**: `if` and `piecewise` are **built-in functions**, not keywords.

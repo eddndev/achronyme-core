@@ -261,6 +261,9 @@ fn run_file(filename: &str) {
 
     let mut evaluator = Evaluator::new();
 
+    // Set the current file directory for relative imports
+    evaluator.set_current_file_dir(filename);
+
     // Parse and evaluate the entire file using Pest
     match evaluate_expression(&mut evaluator, &contents) {
         Ok(result) => println!("{}", result),

@@ -1,5 +1,6 @@
 use crate::functions::FunctionRegistry;
 use achronyme_types::value::Value;
+use achronyme_types::Environment;
 
 pub fn register_functions(registry: &mut FunctionRegistry) {
     // FFT functions
@@ -24,7 +25,7 @@ pub fn register_functions(registry: &mut FunctionRegistry) {
 
 // Implementations
 
-fn fft(args: &[Value]) -> Result<Value, String> {
+fn fft(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     match &args[0] {
         // Tensor support (optimized path)
         Value::Tensor(t) => {
@@ -51,7 +52,7 @@ fn fft(args: &[Value]) -> Result<Value, String> {
     }
 }
 
-fn ifft(args: &[Value]) -> Result<Value, String> {
+fn ifft(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     match &args[0] {
         // Tensor support (optimized path)
         Value::ComplexTensor(t) => {
@@ -78,7 +79,7 @@ fn ifft(args: &[Value]) -> Result<Value, String> {
     }
 }
 
-fn fft_mag(args: &[Value]) -> Result<Value, String> {
+fn fft_mag(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     match &args[0] {
         // Tensor support (optimized path) - Real input
         Value::Tensor(t) => {
@@ -124,7 +125,7 @@ fn fft_mag(args: &[Value]) -> Result<Value, String> {
     }
 }
 
-fn fft_phase(args: &[Value]) -> Result<Value, String> {
+fn fft_phase(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     match &args[0] {
         // Tensor support (optimized path) - Real input
         Value::Tensor(t) => {
@@ -170,7 +171,7 @@ fn fft_phase(args: &[Value]) -> Result<Value, String> {
     }
 }
 
-fn conv(args: &[Value]) -> Result<Value, String> {
+fn conv(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     match (&args[0], &args[1]) {
         // Tensor support (optimized path)
         (Value::Tensor(signal_t), Value::Tensor(kernel_t)) => {
@@ -198,7 +199,7 @@ fn conv(args: &[Value]) -> Result<Value, String> {
     }
 }
 
-fn conv_fft(args: &[Value]) -> Result<Value, String> {
+fn conv_fft(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     match (&args[0], &args[1]) {
         // Tensor support (optimized path)
         (Value::Tensor(signal_t), Value::Tensor(kernel_t)) => {
@@ -226,7 +227,7 @@ fn conv_fft(args: &[Value]) -> Result<Value, String> {
     }
 }
 
-fn hanning(args: &[Value]) -> Result<Value, String> {
+fn hanning(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     match &args[0] {
         Value::Number(n) => {
             if *n < 0.0 || n.fract() != 0.0 {
@@ -240,7 +241,7 @@ fn hanning(args: &[Value]) -> Result<Value, String> {
     }
 }
 
-fn hamming(args: &[Value]) -> Result<Value, String> {
+fn hamming(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     match &args[0] {
         Value::Number(n) => {
             if *n < 0.0 || n.fract() != 0.0 {
@@ -254,7 +255,7 @@ fn hamming(args: &[Value]) -> Result<Value, String> {
     }
 }
 
-fn blackman(args: &[Value]) -> Result<Value, String> {
+fn blackman(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     match &args[0] {
         Value::Number(n) => {
             if *n < 0.0 || n.fract() != 0.0 {
@@ -268,7 +269,7 @@ fn blackman(args: &[Value]) -> Result<Value, String> {
     }
 }
 
-fn rectangular(args: &[Value]) -> Result<Value, String> {
+fn rectangular(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     match &args[0] {
         Value::Number(n) => {
             if *n < 0.0 || n.fract() != 0.0 {
@@ -282,7 +283,7 @@ fn rectangular(args: &[Value]) -> Result<Value, String> {
     }
 }
 
-fn linspace(args: &[Value]) -> Result<Value, String> {
+fn linspace(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     match (&args[0], &args[1], &args[2]) {
         (Value::Number(start), Value::Number(end), Value::Number(n)) => {
             if *n < 2.0 || n.fract() != 0.0 {

@@ -1,5 +1,6 @@
 use crate::functions::FunctionRegistry;
 use achronyme_types::value::Value;
+use achronyme_types::Environment;
 
 pub fn register_functions(registry: &mut FunctionRegistry) {
     registry.register("dot", dot, 2);
@@ -10,7 +11,7 @@ pub fn register_functions(registry: &mut FunctionRegistry) {
 
 // Implementations
 
-fn dot(args: &[Value]) -> Result<Value, String> {
+fn dot(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     match (&args[0], &args[1]) {
         // Tensor support (optimized path)
         (Value::Tensor(t1), Value::Tensor(t2)) => {
@@ -51,7 +52,7 @@ fn dot(args: &[Value]) -> Result<Value, String> {
     }
 }
 
-fn cross(args: &[Value]) -> Result<Value, String> {
+fn cross(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     match (&args[0], &args[1]) {
         // Tensor support (optimized path)
         (Value::Tensor(t1), Value::Tensor(t2)) => {
@@ -72,7 +73,7 @@ fn cross(args: &[Value]) -> Result<Value, String> {
     }
 }
 
-fn norm(args: &[Value]) -> Result<Value, String> {
+fn norm(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     match &args[0] {
         // Tensor support (optimized path)
         Value::Tensor(t) => {
@@ -104,7 +105,7 @@ fn norm(args: &[Value]) -> Result<Value, String> {
     }
 }
 
-fn normalize(args: &[Value]) -> Result<Value, String> {
+fn normalize(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     match &args[0] {
         // Tensor support (optimized path)
         Value::Tensor(t) => {

@@ -1,5 +1,6 @@
 use crate::functions::FunctionRegistry;
 use achronyme_types::value::Value;
+use achronyme_types::Environment;
 
 pub fn register_functions(registry: &mut FunctionRegistry) {
     // Basic record operations
@@ -11,7 +12,7 @@ pub fn register_functions(registry: &mut FunctionRegistry) {
 // Implementations
 
 /// Get all keys from a record as a vector of strings
-fn keys(args: &[Value]) -> Result<Value, String> {
+fn keys(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     match &args[0] {
         Value::Record(map) => {
             let keys: Vec<Value> = map.keys().map(|k| Value::String(k.clone())).collect();
@@ -22,7 +23,7 @@ fn keys(args: &[Value]) -> Result<Value, String> {
 }
 
 /// Get all values from a record as a vector
-fn values(args: &[Value]) -> Result<Value, String> {
+fn values(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     match &args[0] {
         Value::Record(map) => {
             let values: Vec<Value> = map.values().cloned().collect();
@@ -33,7 +34,7 @@ fn values(args: &[Value]) -> Result<Value, String> {
 }
 
 /// Check if a record has a specific field
-fn has_field(args: &[Value]) -> Result<Value, String> {
+fn has_field(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     match (&args[0], &args[1]) {
         (Value::Record(map), Value::String(field_name)) => {
             Ok(Value::Boolean(map.contains_key(field_name)))

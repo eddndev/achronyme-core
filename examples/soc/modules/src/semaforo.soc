@@ -1,0 +1,13 @@
+let semaforo = {
+    mut luz: "Verde",
+    next: () => do{
+        piecewise
+        (
+            [self.luz == "Verde", do {self.luz = "Rojo"}],
+            [self.luz == "Rojo", do {self.luz = "Amarillo"}],
+            do { self.luz = "Verde"}
+        )
+    }
+}
+
+export { semaforo }

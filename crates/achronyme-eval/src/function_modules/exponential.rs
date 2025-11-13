@@ -1,6 +1,7 @@
 use crate::functions::FunctionRegistry;
 use crate::unary_math_fn;
 use achronyme_types::value::Value;
+use achronyme_types::Environment;
 
 pub fn register_functions(registry: &mut FunctionRegistry) {
     registry.register("exp", exp, 1);
@@ -15,31 +16,31 @@ pub fn register_functions(registry: &mut FunctionRegistry) {
 
 // Implementations
 
-fn exp(args: &[Value]) -> Result<Value, String> {
+fn exp(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     unary_math_fn!("exp", f64::exp, &args[0])
 }
 
-fn ln(args: &[Value]) -> Result<Value, String> {
+fn ln(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     unary_math_fn!("ln", f64::ln, &args[0])
 }
 
-fn log10(args: &[Value]) -> Result<Value, String> {
+fn log10(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     unary_math_fn!("log10", f64::log10, &args[0])
 }
 
-fn log2(args: &[Value]) -> Result<Value, String> {
+fn log2(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     unary_math_fn!("log2", f64::log2, &args[0])
 }
 
-fn sqrt(args: &[Value]) -> Result<Value, String> {
+fn sqrt(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     unary_math_fn!("sqrt", f64::sqrt, &args[0])
 }
 
-fn cbrt(args: &[Value]) -> Result<Value, String> {
+fn cbrt(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     unary_math_fn!("cbrt", f64::cbrt, &args[0])
 }
 
-fn pow(args: &[Value]) -> Result<Value, String> {
+fn pow(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     match (&args[0], &args[1]) {
         (Value::Number(x), Value::Number(y)) => Ok(Value::Number(x.powf(*y))),
         _ => Err("pow() requires two numbers".to_string()),

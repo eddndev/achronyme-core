@@ -1,4 +1,5 @@
 use achronyme_types::value::Value;
+use achronyme_types::Environment;
 
 use super::super::functions::FunctionRegistry;
 
@@ -57,45 +58,45 @@ pub fn register_functions(registry: &mut FunctionRegistry) {
 // Trigonometric Function Implementations
 // ============================================================================
 
-fn sin(args: &[Value]) -> Result<Value, String> {
+fn sin(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     unary_math_fn!("sin", f64::sin, &args[0])
 }
 
-fn cos(args: &[Value]) -> Result<Value, String> {
+fn cos(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     unary_math_fn!("cos", f64::cos, &args[0])
 }
 
-fn tan(args: &[Value]) -> Result<Value, String> {
+fn tan(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     unary_math_fn!("tan", f64::tan, &args[0])
 }
 
-fn asin(args: &[Value]) -> Result<Value, String> {
+fn asin(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     unary_math_fn!("asin", f64::asin, &args[0])
 }
 
-fn acos(args: &[Value]) -> Result<Value, String> {
+fn acos(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     unary_math_fn!("acos", f64::acos, &args[0])
 }
 
-fn atan(args: &[Value]) -> Result<Value, String> {
+fn atan(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     unary_math_fn!("atan", f64::atan, &args[0])
 }
 
-fn atan2(args: &[Value]) -> Result<Value, String> {
+fn atan2(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     match (&args[0], &args[1]) {
         (Value::Number(y), Value::Number(x)) => Ok(Value::Number(y.atan2(*x))),
         _ => Err("atan2() requires two numbers".to_string()),
     }
 }
 
-fn sinh(args: &[Value]) -> Result<Value, String> {
+fn sinh(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     unary_math_fn!("sinh", f64::sinh, &args[0])
 }
 
-fn cosh(args: &[Value]) -> Result<Value, String> {
+fn cosh(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     unary_math_fn!("cosh", f64::cosh, &args[0])
 }
 
-fn tanh(args: &[Value]) -> Result<Value, String> {
+fn tanh(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     unary_math_fn!("tanh", f64::tanh, &args[0])
 }

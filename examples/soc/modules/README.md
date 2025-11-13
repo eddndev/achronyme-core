@@ -16,16 +16,16 @@ This application showcases:
 
 ```
 examples/soc/modules/
-├── main.ach                      # Main application entry point
+├── main.soc                      # Main application entry point
 ├── src/
-│   ├── data_processing.ach       # Data processing utilities
-│   └── visualization.ach         # Text-based visualization utilities
+│   ├── data_processing.soc       # Data processing utilities
+│   └── visualization.soc         # Text-based visualization utilities
 └── README.md                     # This file
 ```
 
 ## Files
 
-### `main.ach`
+### `main.soc`
 The main application that:
 1. Generates sample scientific measurement data
 2. Performs basic statistical analysis (mean, std, min, max)
@@ -42,7 +42,7 @@ import { asin, acos, sinh, log10 } from "math"
 import { dot, norm } from "linalg"
 ```
 
-### `src/data_processing.ach`
+### `src/data_processing.soc`
 Utility module providing data processing functions:
 - **Data Loading**: `loadData`, `parseCSV`
 - **Outlier Detection**: `detectOutliersIQR`, `detectOutliersZScore`, `filterOutliers`
@@ -53,7 +53,7 @@ Utility module providing data processing functions:
 
 **Note**: This module demonstrates the design for user-defined modules with exports. The `export` syntax is ready for Phase 4 implementation.
 
-### `src/visualization.ach`
+### `src/visualization.soc`
 Utility module providing text-based visualization:
 - **Histograms**: `createHistogram`, `printHistogram`
 - **Reports**: `createReport`, `printReport`
@@ -73,13 +73,13 @@ cd /path/to/achronyme-core
 cargo run --release
 
 # Load and run the main application
-> load("examples/soc/modules/main.ach")
+> load("examples/soc/modules/main.soc")
 ```
 
 ### Using the CLI (when available)
 
 ```bash
-achronyme run examples/soc/modules/main.ach
+achronyme run examples/soc/modules/main.soc
 ```
 
 ## Expected Output

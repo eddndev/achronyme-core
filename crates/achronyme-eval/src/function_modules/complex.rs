@@ -1,5 +1,6 @@
 use crate::functions::FunctionRegistry;
 use achronyme_types::value::Value;
+use achronyme_types::Environment;
 
 pub fn register_functions(registry: &mut FunctionRegistry) {
     registry.register("complex", complex, 2);
@@ -11,7 +12,7 @@ pub fn register_functions(registry: &mut FunctionRegistry) {
 
 // Implementations
 
-fn complex(args: &[Value]) -> Result<Value, String> {
+fn complex(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     match (&args[0], &args[1]) {
         (Value::Number(re), Value::Number(im)) => {
             Ok(Value::Complex(achronyme_types::complex::Complex::new(*re, *im)))
@@ -20,7 +21,7 @@ fn complex(args: &[Value]) -> Result<Value, String> {
     }
 }
 
-fn real(args: &[Value]) -> Result<Value, String> {
+fn real(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     match &args[0] {
         Value::Number(x) => Ok(Value::Number(*x)),
         Value::Complex(c) => Ok(Value::Number(c.re)),
@@ -55,7 +56,7 @@ fn real(args: &[Value]) -> Result<Value, String> {
     }
 }
 
-fn imag(args: &[Value]) -> Result<Value, String> {
+fn imag(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     match &args[0] {
         Value::Number(_) => Ok(Value::Number(0.0)),
         Value::Complex(c) => Ok(Value::Number(c.im)),
@@ -93,7 +94,7 @@ fn imag(args: &[Value]) -> Result<Value, String> {
     }
 }
 
-fn conj(args: &[Value]) -> Result<Value, String> {
+fn conj(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     match &args[0] {
         Value::Number(x) => Ok(Value::Number(*x)),
         Value::Complex(c) => Ok(Value::Complex(c.conjugate())),
@@ -112,7 +113,7 @@ fn conj(args: &[Value]) -> Result<Value, String> {
     }
 }
 
-fn arg(args: &[Value]) -> Result<Value, String> {
+fn arg(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     match &args[0] {
         Value::Number(x) => Ok(Value::Number(if *x >= 0.0 { 0.0 } else { std::f64::consts::PI })),
         Value::Complex(c) => Ok(Value::Number(c.im.atan2(c.re))),

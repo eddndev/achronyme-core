@@ -1,0 +1,7 @@
+import { semaforo } from "src/semaforo"
+
+print("Estado inicial", semaforo.luz)
+semaforo.next()
+print("Estado siguiente", semaforo.luz)
+semaforo.next()
+print("Estado siguiente", semaforo.luz)

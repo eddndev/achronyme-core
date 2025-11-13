@@ -1,9 +1,10 @@
 use crate::function_modules::graphs::helpers::{build_adjacency_list, validate_node_exists};
 use achronyme_types::value::Value;
+use achronyme_types::Environment;
 use std::collections::{HashMap, HashSet, VecDeque};
 
 /// BFS (Breadth-First Search) - Returns nodes in BFS order
-pub fn bfs(args: &[Value]) -> Result<Value, String> {
+pub fn bfs(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     let network = match &args[0] {
         Value::Record(map) => map,
         _ => return Err("bfs() requires a network record as first argument".to_string()),
@@ -51,7 +52,7 @@ pub fn bfs(args: &[Value]) -> Result<Value, String> {
 }
 
 /// DFS (Depth-First Search) - Returns nodes in DFS order
-pub fn dfs(args: &[Value]) -> Result<Value, String> {
+pub fn dfs(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     let network = match &args[0] {
         Value::Record(map) => map,
         _ => return Err("dfs() requires a network record as first argument".to_string()),
@@ -102,7 +103,7 @@ pub fn dfs(args: &[Value]) -> Result<Value, String> {
 }
 
 /// BFS Path - Find shortest path between two nodes (unweighted)
-pub fn bfs_path(args: &[Value]) -> Result<Value, String> {
+pub fn bfs_path(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     let network = match &args[0] {
         Value::Record(map) => map,
         _ => return Err("bfs_path() requires a network record as first argument".to_string()),

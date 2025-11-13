@@ -1,4 +1,5 @@
 use achronyme_types::value::Value;
+use achronyme_types::Environment;
 use std::collections::{HashMap, HashSet};
 
 /// Create a network from edges, optionally with node properties
@@ -15,7 +16,7 @@ use std::collections::{HashMap, HashSet};
 /// - Nodes referenced in edges but not in properties will have empty properties {}
 /// - Nodes in properties but not in edges are allowed (isolated nodes)
 /// - Node properties are flexible - any record structure is accepted
-pub fn network(args: &[Value]) -> Result<Value, String> {
+pub fn network(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     // Validate argument count
     if args.is_empty() || args.len() > 2 {
         return Err("network() expects 1 or 2 arguments".to_string());
@@ -99,7 +100,7 @@ pub fn network(args: &[Value]) -> Result<Value, String> {
 
 /// Extract nodes from a network
 /// Returns a record mapping node IDs to their properties
-pub fn nodes(args: &[Value]) -> Result<Value, String> {
+pub fn nodes(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     match &args[0] {
         Value::Record(map) => {
             map.get("nodes")
@@ -111,7 +112,7 @@ pub fn nodes(args: &[Value]) -> Result<Value, String> {
 }
 
 /// Extract edges from a network
-pub fn edges(args: &[Value]) -> Result<Value, String> {
+pub fn edges(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     match &args[0] {
         Value::Record(map) => {
             map.get("edges")
@@ -124,7 +125,7 @@ pub fn edges(args: &[Value]) -> Result<Value, String> {
 
 /// Get neighbors of a node in a network
 /// neighbors(network, node_id) returns a vector of node IDs that are neighbors
-pub fn neighbors(args: &[Value]) -> Result<Value, String> {
+pub fn neighbors(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     let network = match &args[0] {
         Value::Record(map) => map,
         _ => return Err("neighbors() requires a network record as first argument".to_string()),
@@ -176,7 +177,7 @@ pub fn neighbors(args: &[Value]) -> Result<Value, String> {
 
 /// Get degree of a node in a network
 /// degree(network, node_id) returns the number of edges connected to the node
-pub fn degree(args: &[Value]) -> Result<Value, String> {
+pub fn degree(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     let network = match &args[0] {
         Value::Record(map) => map,
         _ => return Err("degree() requires a network record as first argument".to_string()),

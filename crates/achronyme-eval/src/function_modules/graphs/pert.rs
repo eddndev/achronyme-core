@@ -2,6 +2,7 @@
 // Includes both CPM (Critical Path Method) and Probabilistic PERT analysis
 
 use achronyme_types::value::Value;
+use achronyme_types::Environment;
 use std::collections::{HashMap, HashSet};
 use super::helpers::build_adjacency_list;
 use super::cycles::has_cycle;
@@ -12,8 +13,8 @@ use super::topological::topological_sort;
 // ============================================================================
 
 /// Validate that network is a DAG (required for PERT)
-fn validate_dag(network: &HashMap<String, Value>) -> Result<(), String> {
-    match has_cycle(&[Value::Record(network.clone())])? {
+fn validate_dag(network: &HashMap<String, Value>, _env: &mut Environment) -> Result<(), String> {
+    match has_cycle(&[Value::Record(network.clone())], _env)? {
         Value::Boolean(true) => {
             Err("PERT requires a Directed Acyclic Graph (DAG), but the network contains cycles".to_string())
         }
@@ -201,14 +202,14 @@ fn has_slack_data(network: &HashMap<String, Value>) -> bool {
 /// Forward pass: Calculate Early Start (ES) and Early Finish (EF) for all tasks
 /// ES[task] = max(EF[predecessors])
 /// EF[task] = ES[task] + duration[task]
-pub fn forward_pass(args: &[Value]) -> Result<Value, String> {
+pub fn forward_pass(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     let network = match &args[0] {
         Value::Record(map) => map,
         _ => return Err("forward_pass() requires a network record".to_string()),
     };
 
     // Validate DAG and durations
-    validate_dag(network)?;
+    validate_dag(network, _env)?;
     validate_node_durations(network)?;
 
     // Get nodes and edges
@@ -233,7 +234,7 @@ pub fn forward_pass(args: &[Value]) -> Result<Value, String> {
     }
 
     // Get topological order
-    let topo_order = match topological_sort(&[Value::Record(network.clone())])? {
+    let topo_order = match topological_sort(&[Value::Record(network.clone())], _env)? {
         Value::Vector(v) => v,
         _ => return Err("Failed to get topological order".to_string()),
     };
@@ -298,7 +299,7 @@ pub fn forward_pass(args: &[Value]) -> Result<Value, String> {
 /// LF[task] = min(LS[successors])
 /// LS[task] = LF[task] - duration[task]
 /// Auto-calculates forward_pass if ES/EF data is missing
-pub fn backward_pass(args: &[Value]) -> Result<Value, String> {
+pub fn backward_pass(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     let network = match &args[0] {
         Value::Record(map) => map,
         _ => return Err("backward_pass() requires a network record".to_string()),
@@ -306,7 +307,7 @@ pub fn backward_pass(args: &[Value]) -> Result<Value, String> {
 
     // Auto-calculate forward pass if ES/EF data is missing
     let network_with_es_ef = if !has_es_ef_data(network) {
-        match forward_pass(&[Value::Record(network.clone())])? {
+        match forward_pass(&[Value::Record(network.clone())], _env)? {
             Value::Record(n) => n,
             _ => return Err("Failed to calculate forward pass".to_string()),
         }
@@ -329,7 +330,7 @@ pub fn backward_pass(args: &[Value]) -> Result<Value, String> {
     let adj_list = build_adjacency_list(edges_vec)?;
 
     // Get topological order (reversed for backward pass)
-    let topo_order = match topological_sort(&[Value::Record(network_with_es_ef.clone())])? {
+    let topo_order = match topological_sort(&[Value::Record(network_with_es_ef.clone())], _env)? {
         Value::Vector(mut v) => {
             v.reverse();
             v
@@ -412,7 +413,7 @@ pub fn backward_pass(args: &[Value]) -> Result<Value, String> {
 /// Calculate slack (float) for all tasks
 /// Slack = LS - ES (or LF - EF)
 /// Auto-calculates forward_pass and backward_pass if ES/EF or LS/LF data is missing
-pub fn calculate_slack(args: &[Value]) -> Result<Value, String> {
+pub fn calculate_slack(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     let network = match &args[0] {
         Value::Record(map) => map,
         _ => return Err("calculate_slack() requires a network record".to_string()),
@@ -421,7 +422,7 @@ pub fn calculate_slack(args: &[Value]) -> Result<Value, String> {
     // Auto-calculate backward pass if LS/LF data is missing
     // (backward_pass will auto-calculate forward_pass if ES/EF is also missing)
     let network_with_all_data = if !has_ls_lf_data(network) {
-        match backward_pass(&[Value::Record(network.clone())])? {
+        match backward_pass(&[Value::Record(network.clone())], _env)? {
             Value::Record(n) => n,
             _ => return Err("Failed to calculate backward pass".to_string()),
         }
@@ -467,7 +468,7 @@ pub fn calculate_slack(args: &[Value]) -> Result<Value, String> {
 /// Find one complete critical path from start to finish
 /// Returns a single path (vector of node IDs) following nodes with slack = 0
 /// Auto-calculates all prerequisites (forward_pass, backward_pass, calculate_slack) if missing
-pub fn critical_path(args: &[Value]) -> Result<Value, String> {
+pub fn critical_path(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     let network = match &args[0] {
         Value::Record(map) => map,
         _ => return Err("critical_path() requires a network record".to_string()),
@@ -476,7 +477,7 @@ pub fn critical_path(args: &[Value]) -> Result<Value, String> {
     // Auto-calculate slack if missing
     // (calculate_slack will auto-calculate forward_pass and backward_pass if needed)
     let network_with_slack = if !has_slack_data(network) {
-        match calculate_slack(&[Value::Record(network.clone())])? {
+        match calculate_slack(&[Value::Record(network.clone())], _env)? {
             Value::Record(n) => n,
             _ => return Err("Failed to calculate slack".to_string()),
         }
@@ -616,7 +617,7 @@ pub fn critical_path(args: &[Value]) -> Result<Value, String> {
 /// Returns a vector of paths (each path is a vector of node IDs)
 /// Shows all parallel critical paths in the network
 /// Auto-calculates all prerequisites if missing
-pub fn all_critical_paths(args: &[Value]) -> Result<Value, String> {
+pub fn all_critical_paths(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     let network = match &args[0] {
         Value::Record(map) => map,
         _ => return Err("all_critical_paths() requires a network record".to_string()),
@@ -624,7 +625,7 @@ pub fn all_critical_paths(args: &[Value]) -> Result<Value, String> {
 
     // Auto-calculate slack if missing
     let network_with_slack = if !has_slack_data(network) {
-        match calculate_slack(&[Value::Record(network.clone())])? {
+        match calculate_slack(&[Value::Record(network.clone())], _env)? {
             Value::Record(n) => n,
             _ => return Err("Failed to calculate slack".to_string()),
         }
@@ -765,18 +766,18 @@ pub fn all_critical_paths(args: &[Value]) -> Result<Value, String> {
 }
 
 /// Calculate total project duration (max EF across all nodes)
-pub fn project_duration(args: &[Value]) -> Result<Value, String> {
+pub fn project_duration(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     let network = match &args[0] {
         Value::Record(map) => map,
         _ => return Err("project_duration() requires a network record".to_string()),
     };
 
     // Validate and calculate
-    validate_dag(network)?;
+    validate_dag(network, _env)?;
     validate_node_durations(network)?;
 
     // Run forward pass to get EF values
-    let network_with_times = forward_pass(&[Value::Record(network.clone())])?;
+    let network_with_times = forward_pass(&[Value::Record(network.clone())], _env)?;
 
     let nodes_record = match network_with_times {
         Value::Record(ref map) => match map.get("nodes") {
@@ -806,7 +807,7 @@ pub fn project_duration(args: &[Value]) -> Result<Value, String> {
 // ============================================================================
 
 /// Calculate expected time using PERT formula: te = (op + 4*mo + pe) / 6
-pub fn expected_time(args: &[Value]) -> Result<Value, String> {
+pub fn expected_time(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     let op = match &args[0] {
         Value::Number(n) => *n,
         _ => return Err("expected_time() requires three numbers (op, mo, pe)".to_string()),
@@ -835,7 +836,7 @@ pub fn expected_time(args: &[Value]) -> Result<Value, String> {
 }
 
 /// Calculate task variance: variance = ((pe - op) / 6)^2
-pub fn task_variance(args: &[Value]) -> Result<Value, String> {
+pub fn task_variance(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     let op = match &args[0] {
         Value::Number(n) => *n,
         _ => return Err("task_variance() requires three numbers (op, mo, pe)".to_string()),
@@ -862,18 +863,18 @@ pub fn task_variance(args: &[Value]) -> Result<Value, String> {
 
 /// Calculate project variance (sum of variances on critical path)
 /// Auto-calculates critical path if needed
-pub fn project_variance(args: &[Value]) -> Result<Value, String> {
+pub fn project_variance(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     let network = match &args[0] {
         Value::Record(map) => map,
         _ => return Err("project_variance() requires a network record".to_string()),
     };
 
     // Validate probabilistic properties
-    validate_dag(network)?;
+    validate_dag(network, _env)?;
     validate_probabilistic_properties(network)?;
 
     // Get critical path (auto-calculates all prerequisites if needed)
-    let critical_nodes = critical_path(&[Value::Record(network.clone())])?;
+    let critical_nodes = critical_path(&[Value::Record(network.clone())], _env)?;
 
     let nodes_record = match network.get("nodes") {
         Some(Value::Record(r)) => r,
@@ -915,8 +916,8 @@ pub fn project_variance(args: &[Value]) -> Result<Value, String> {
 }
 
 /// Calculate project standard deviation
-pub fn project_std_dev(args: &[Value]) -> Result<Value, String> {
-    let variance = match project_variance(args)? {
+pub fn project_std_dev(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
+    let variance = match project_variance(args, _env)? {
         Value::Number(v) => v,
         _ => return Err("Failed to calculate project variance".to_string()),
     };
@@ -926,7 +927,7 @@ pub fn project_std_dev(args: &[Value]) -> Result<Value, String> {
 
 /// Calculate probability of completing project by target time
 /// Uses normal distribution: P(T <= target) = Φ((target - te) / σ)
-pub fn completion_probability(args: &[Value]) -> Result<Value, String> {
+pub fn completion_probability(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     let network = match &args[0] {
         Value::Record(map) => map,
         _ => return Err("completion_probability() requires a network record and target time".to_string()),
@@ -938,12 +939,12 @@ pub fn completion_probability(args: &[Value]) -> Result<Value, String> {
     };
 
     // Calculate project duration (te) and standard deviation
-    let te = match project_duration(&[Value::Record(network.clone())])? {
+    let te = match project_duration(&[Value::Record(network.clone())], _env)? {
         Value::Number(n) => n,
         _ => return Err("Failed to calculate project duration".to_string()),
     };
 
-    let std_dev = match project_std_dev(&[Value::Record(network.clone())])? {
+    let std_dev = match project_std_dev(&[Value::Record(network.clone())], _env)? {
         Value::Number(n) => n,
         _ => return Err("Failed to calculate project standard deviation".to_string()),
     };
@@ -963,7 +964,7 @@ pub fn completion_probability(args: &[Value]) -> Result<Value, String> {
 }
 
 /// Calculate time needed for desired completion probability
-pub fn time_for_probability(args: &[Value]) -> Result<Value, String> {
+pub fn time_for_probability(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     let network = match &args[0] {
         Value::Record(map) => map,
         _ => return Err("time_for_probability() requires a network record and probability".to_string()),
@@ -979,12 +980,12 @@ pub fn time_for_probability(args: &[Value]) -> Result<Value, String> {
     }
 
     // Calculate project duration (te) and standard deviation
-    let te = match project_duration(&[Value::Record(network.clone())])? {
+    let te = match project_duration(&[Value::Record(network.clone())], _env)? {
         Value::Number(n) => n,
         _ => return Err("Failed to calculate project duration".to_string()),
     };
 
-    let std_dev = match project_std_dev(&[Value::Record(network.clone())])? {
+    let std_dev = match project_std_dev(&[Value::Record(network.clone())], _env)? {
         Value::Number(n) => n,
         _ => return Err("Failed to calculate project standard deviation".to_string()),
     };
@@ -1006,23 +1007,23 @@ pub fn time_for_probability(args: &[Value]) -> Result<Value, String> {
 /// Complete PERT analysis - one-stop function for all PERT calculations
 /// Returns a record with: network (with ES/EF/LS/LF/slack), critical_path, duration,
 /// and if probabilistic properties exist: variance and std_dev
-pub fn pert_analysis(args: &[Value]) -> Result<Value, String> {
+pub fn pert_analysis(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     let network = match &args[0] {
         Value::Record(map) => map,
         _ => return Err("pert_analysis() requires a network record".to_string()),
     };
 
     // Calculate network with all properties (auto-calculates prerequisites)
-    let network_with_slack = match calculate_slack(&[Value::Record(network.clone())])? {
+    let network_with_slack = match calculate_slack(&[Value::Record(network.clone())], _env)? {
         Value::Record(n) => n,
         _ => return Err("Failed to calculate slack".to_string()),
     };
 
     // Get critical path
-    let critical_path_nodes = critical_path(&[Value::Record(network_with_slack.clone())])?;
+    let critical_path_nodes = critical_path(&[Value::Record(network_with_slack.clone())], _env)?;
 
     // Calculate project duration
-    let duration = project_duration(&[Value::Record(network_with_slack.clone())])?;
+    let duration = project_duration(&[Value::Record(network_with_slack.clone())], _env)?;
 
     // Check if network has probabilistic properties (op, mo, pe)
     let has_probabilistic = if let Some(Value::Record(nodes)) = network.get("nodes") {
@@ -1045,8 +1046,8 @@ pub fn pert_analysis(args: &[Value]) -> Result<Value, String> {
 
     // Add probabilistic analysis if applicable
     if has_probabilistic {
-        let variance = project_variance(&[Value::Record(network.clone())])?;
-        let std_dev = project_std_dev(&[Value::Record(network.clone())])?;
+        let variance = project_variance(&[Value::Record(network.clone())], _env)?;
+        let std_dev = project_std_dev(&[Value::Record(network.clone())], _env)?;
         result.insert("variance".to_string(), variance);
         result.insert("std_dev".to_string(), std_dev);
     }

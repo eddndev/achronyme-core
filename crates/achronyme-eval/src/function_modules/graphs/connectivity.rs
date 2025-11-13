@@ -1,10 +1,11 @@
 use crate::function_modules::graphs::helpers::{build_adjacency_list, extract_node_ids};
 use achronyme_types::value::Value;
+use achronyme_types::Environment;
 use std::cmp::Ordering;
 use std::collections::HashSet;
 
 /// Connected Components - Find all connected components in a graph
-pub fn connected_components(args: &[Value]) -> Result<Value, String> {
+pub fn connected_components(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     let network = match &args[0] {
         Value::Record(map) => map,
         _ => return Err("connected_components() requires a network record as first argument".to_string()),
@@ -61,7 +62,7 @@ pub fn connected_components(args: &[Value]) -> Result<Value, String> {
 }
 
 /// Is Connected - Check if graph is connected (all nodes reachable from any node)
-pub fn is_connected(args: &[Value]) -> Result<Value, String> {
+pub fn is_connected(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     let network = match &args[0] {
         Value::Record(map) => map,
         _ => return Err("is_connected() requires a network record as first argument".to_string()),
