@@ -24,7 +24,12 @@
 // Whitespace and Comments
 // ============================================================================
 
-WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
+// WHITESPACE excludes newlines - they are handled separately for statement separation
+WHITESPACE = _{ " " | "\t" | "\r" }
+
+// Newline: used for automatic statement separation
+NEWLINE = _{ "\n" }
+
 COMMENT = _{ "//" ~ (!"\n" ~ ANY)* }
 
 // ============================================================================
@@ -57,7 +62,7 @@ string_char = {
 
 // Reserved keywords (use word boundaries to prevent matching prefixes)
 keyword = _{
-    ("let" | "mut" | "rec" | "self" | "true" | "false" | "import" | "from" | "export" | "as") ~ !ASCII_ALPHANUMERIC
+    ("let" | "mut" | "rec" | "self" | "true" | "false" | "import" | "from" | "export" | "as" | "return") ~ !ASCII_ALPHANUMERIC
 }
 
 // Identifiers: x, foo, my_var, PI, sin (but not keywords)
@@ -83,10 +88,11 @@ spread_expr = {
 // This is now recursive to support arbitrary tensor dimensions
 // Allow empty arrays with optional expression list
 // Arrays can now contain spread expressions: [1, ...vec, 2]
+// Allow optional newlines after [ and before ], and around commas
 array_element = { spread_expr | expr }
 
 array = {
-    "[" ~ (array_element ~ ("," ~ array_element)*)? ~ "]"
+    "[" ~ NEWLINE* ~ (array_element ~ (NEWLINE* ~ "," ~ NEWLINE* ~ array_element)*)? ~ NEWLINE* ~ "]"
 }
 
 // Vector and Matrix are now aliases for the unified array syntax
@@ -95,10 +101,11 @@ matrix = { array }
 
 // Record: { name: "Alice", age: 30, city: "Madrid" }
 // Records can now contain spread expressions: { a: 1, ...other, b: 2 }
+// Allow optional newlines after { and before }, and around commas
 record_field_or_spread = { spread_expr | record_field }
 
 record = {
-    "{" ~ (record_field_or_spread ~ ("," ~ record_field_or_spread)*)? ~ "}"
+    "{" ~ NEWLINE* ~ (record_field_or_spread ~ (NEWLINE* ~ "," ~ NEWLINE* ~ record_field_or_spread)*)? ~ NEWLINE* ~ "}"
 }
 
 // Mutable field keyword
@@ -128,8 +135,9 @@ lambda_params = {
 // Generic block: { sequence or statement }
 // The last value in the block is its return value
 // statement includes expr, so this covers all cases
+// Newlines after { and before } are optional and ignored
 block = {
-    "{" ~ (sequence | statement) ~ "}"
+    "{" ~ NEWLINE* ~ (sequence | statement) ~ NEWLINE* ~ "}"
 }
 
 // Do block: do { ... }
@@ -335,22 +343,44 @@ assignment = {
     postfix_expression ~ "=" ~ expr
 }
 
-// Statement: import, export, let, mut, assignment, or expression
-// Try import/export first, then assignment before expr to avoid ambiguity
+// Return statement: return expr
+// Returns from the current function with the given value
+// Only valid inside lambda functions
+// Note: "return" is protected by the keyword rule in identifier
+return_statement = {
+    "return" ~ expr
+}
+
+// Statement: import, export, let, mut, return, assignment, or expression
+// Try import/export first, then return, then assignment before expr to avoid ambiguity
 statement = {
     import_statement
   | export_statement
   | let_statement
   | mut_statement
+  | return_statement
   | assignment
   | expr
 }
 
-// Sequence: multiple statements separated by semicolons
-// Examples: "let a = 1; let b = 2; a + b" or "1 + 1; 2 + 2"
-// The last statement doesn't need a semicolon
+// Statement separator: semicolon (optionally followed by newlines) or one or more newlines
+// This allows:
+//   let a = 1; let b = 2   (semicolon only)
+//   let a = 1;\n let b = 2 (semicolon + newline)
+//   let a = 1\n let b = 2  (newline only)
+statement_sep = _{ (";" ~ NEWLINE*) | NEWLINE+ }
+
+// Optional trailing separator (for last statement in block)
+statement_sep_opt = _{ ((";" ~ NEWLINE*) | NEWLINE+)? }
+
+// Sequence: multiple statements separated by semicolons OR newlines
+// Examples:
+//   "let a = 1; let b = 2; a + b" (semicolons)
+//   "let a = 1\nlet b = 2\na + b" (newlines)
+//   "let a = 1; let b = 2\na + b" (mixed)
+// The last statement doesn't need a separator
 sequence = {
-    statement ~ (";" ~ statement)+ ~ ";"?
+    statement ~ (statement_sep ~ statement)+ ~ statement_sep_opt
 }
 
 // Top-level expression: either a sequence or a single statement
@@ -363,6 +393,7 @@ top_level_expr = {
 // ============================================================================
 
 // Program: sequence of top-level expressions (for REPL compatibility)
+// Accept optional leading/trailing newlines for better REPL/file parsing
 program = {
-    SOI ~ top_level_expr* ~ EOI
+    SOI ~ NEWLINE* ~ top_level_expr* ~ NEWLINE* ~ EOI
 }

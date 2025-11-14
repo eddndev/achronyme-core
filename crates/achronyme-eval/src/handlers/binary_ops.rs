@@ -42,6 +42,7 @@ fn value_to_string(value: &Value) -> String {
             format!("{}{}{}", from, arrow, to)
         }
         Value::TailCall(_) => "<tail-call>".to_string(),
+        Value::EarlyReturn(_) => "<early-return>".to_string(),
         Value::MutableRef(r) => {
             let borrowed = r.borrow();
             value_to_string(&borrowed)

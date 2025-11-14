@@ -83,6 +83,7 @@ fn get_type_name(value: &Value) -> String {
         Value::Record(_) => "Record".to_string(),
         Value::Edge { .. } => "Edge".to_string(),
         Value::TailCall(_) => "TailCall".to_string(),
+        Value::EarlyReturn(_) => "EarlyReturn".to_string(),
         Value::MutableRef(rc) => {
             // For mutable refs, show the type of the inner value
             match rc.try_borrow() {
@@ -198,6 +199,7 @@ fn format_value(value: &Value) -> String {
             }
         }
         Value::TailCall(_) => "<tail-call>".to_string(),
+        Value::EarlyReturn(_) => "<early-return>".to_string(),
         Value::MutableRef(rc) => {
             match rc.try_borrow() {
                 Ok(inner) => format!("mut {}", format_value(&inner)),

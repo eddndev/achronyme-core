@@ -91,6 +91,11 @@ fn describe_value(value: &Value, indent: usize) -> String {
             // TailCall should never be visible to user code - it's an internal marker
             "TailCall(internal marker - should not be visible)".to_string()
         }
+
+        Value::EarlyReturn(_) => {
+            // EarlyReturn should never be visible to user code - it's an internal marker
+            "EarlyReturn(internal marker - should not be visible)".to_string()
+        }
     }
 }
 

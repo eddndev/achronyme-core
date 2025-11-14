@@ -257,6 +257,11 @@ impl Evaluator {
             AstNode::Assignment { target, value } => {
                 handlers::assignment::evaluate_assignment(self, target, value)
             }
+            AstNode::Return { value } => {
+                // Evaluate the return value and wrap it in EarlyReturn
+                let return_value = self.evaluate(value)?;
+                Ok(Value::EarlyReturn(Box::new(return_value)))
+            }
             AstNode::SelfReference => {
                 // Look up 'self' in the environment
                 self.env.get("self").map_err(|_| {
@@ -427,7 +432,15 @@ impl Evaluator {
                 // The result can be any type: Number, String, Vector, Function, etc.
                 let mut result = None;
                 for stmt in statements {
-                    result = Some(self.evaluate(stmt)?);
+                    let value = self.evaluate(stmt)?;
+
+                    // Check for early return - propagate it up immediately
+                    if matches!(value, Value::EarlyReturn(_)) {
+                        self.env.pop_scope();
+                        return Ok(value);
+                    }
+
+                    result = Some(value);
                 }
 
                 // Pop the scope
@@ -452,7 +465,16 @@ impl Evaluator {
                 // The result can be any type: Number, String, Vector, Function, etc.
                 let mut result = None;
                 for stmt in statements {
-                    result = Some(self.evaluate(stmt)?);
+                    let value = self.evaluate(stmt)?;
+
+                    // Check for early return - propagate it immediately
+                    // Do blocks are transparent for control flow; only lambdas consume EarlyReturn
+                    if matches!(value, Value::EarlyReturn(_)) {
+                        self.env.pop_scope();
+                        return Ok(value);
+                    }
+
+                    result = Some(value);
                 }
 
                 // Pop the scope

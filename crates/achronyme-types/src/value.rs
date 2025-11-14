@@ -39,6 +39,10 @@ pub enum Value {
     /// Contains arguments for the next iteration of a tail-recursive function
     /// This variant should never be exposed to user code or returned from eval_str()
     TailCall(Vec<Value>),
+    /// Internal marker for early return from functions
+    /// Contains the value to return from the current function
+    /// This variant should never be exposed to user code or returned from eval_str()
+    EarlyReturn(Box<Value>),
     /// Mutable reference - allows mutation of values declared with `mut` keyword
     /// Uses Rc<RefCell<>> for shared mutable ownership
     MutableRef(Rc<RefCell<Value>>),

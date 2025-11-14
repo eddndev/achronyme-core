@@ -375,6 +375,11 @@ fn format_value(value: &achronyme_types::value::Value) -> String {
             // If it does, it indicates a bug in TCO implementation
             "<internal:tail-call>".to_string()
         }
+        Value::EarlyReturn(_) => {
+            // EarlyReturn is an internal marker that should never reach the REPL
+            // If it does, it indicates a bug in return statement implementation
+            "<internal:early-return>".to_string()
+        }
         Value::MutableRef(rc) => {
             // Auto-deref mutable references for display
             format_value(&rc.borrow())

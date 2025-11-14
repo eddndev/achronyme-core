@@ -7,6 +7,247 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Control Flow Enhancements: if-else Statements & Early Returns 🎯
+
+**Complete Control Flow System:**
+
+Since version 0.1.0, Achronyme now supports modern imperative control flow constructs alongside its functional programming features.
+
+#### 1. if-else Statement Syntax (Block Form)
+
+Traditional imperative-style if-else statements with multi-statement blocks.
+
+**Syntax:**
+```javascript
+if (condition) {
+    statement1;
+    statement2;
+    result
+} else if (condition2) {
+    statement3;
+    result2
+} else {
+    statement4;
+    result3
+}
+```
+
+**Key Features:**
+- Multi-statement blocks without `do` keyword
+- else-if chains supported
+- Returns last expression in block
+- No `do` required (unlike lambda blocks)
+
+**Example:**
+```javascript
+let processValue = (x) => if (x < 0) {
+    print("Processing negative:", x);
+    let abs = -x;
+    abs * 2
+} else {
+    print("Processing positive:", x);
+    x * 2
+}
+```
+
+**Documentation:** `docs/language/08-control-flow.md`
+**Examples:** `examples/soc/39-if-else-complete.soc` (10 comprehensive examples)
+
+---
+
+#### 2. return Statement (Early Return)
+
+Early exit from functions with explicit return values.
+
+**Syntax:**
+```javascript
+return value
+```
+
+**Key Features:**
+- Immediately exits current function
+- Stops execution of subsequent code
+- Works in if-else blocks, do blocks, and anywhere inside functions
+- Perfect for guard clauses and validation patterns
+
+**Guard Clauses Pattern:**
+```javascript
+// Without return (nested)
+let process = (data) => do {
+    if (len(data) > 0) {
+        if (sum(data) > 0) {
+            mean(data)
+        } else {
+            0
+        }
+    } else {
+        0
+    }
+}
+
+// With return (cleaner)
+let processClean = (data) => do {
+    if (len(data) == 0) {
+        return 0
+    };
+    if (sum(data) <= 0) {
+        return 0
+    };
+    mean(data)
+}
+```
+
+**Return in Recursive Functions:**
+```javascript
+// Binary search with early return
+let binarySearch = (arr, target, left, right) => do {
+    if (left > right) {
+        return -1
+    };
+
+    let mid = floor((left + right) / 2);
+
+    if (arr[mid] == target) {
+        return mid
+    };
+
+    if (arr[mid] > target) {
+        return rec(arr, target, left, mid - 1)
+    };
+
+    rec(arr, target, mid + 1, right)
+}
+
+let search = (arr, target) => binarySearch(arr, target, 0, len(arr) - 1)
+```
+
+**Documentation:** `docs/language/08-control-flow.md`
+**Examples:** `examples/soc/40-return-statement.soc` (10 comprehensive examples)
+
+---
+
+#### Syntax Differences Summary
+
+**if-else blocks:** Multi-statements supported directly (NO `do` needed)
+```javascript
+if (x > 0) {
+    let doubled = x * 2;
+    doubled + 1
+} else {
+    0
+}
+```
+
+**Lambda blocks:** Multi-statements require `do` keyword
+```javascript
+map((x) => do {
+    let doubled = x * 2;
+    doubled + 1
+}, data)
+```
+
+**Key Distinction:**
+- if-else: `{ stmt1; stmt2; result }` ← No `do`
+- Lambda: `(x) => do { stmt1; stmt2; result }` ← `do` required
+
+---
+
+#### Use Cases
+
+**When to Use if-else Statements:**
+1. Multi-statement branches - Need to execute multiple operations per branch
+2. Complex logic - Requires intermediate variables and calculations
+3. Debugging - Need to print or log intermediate steps
+4. Readability - Coming from imperative language background
+
+**When to Use return Statement:**
+1. Guard clauses - Early validation and error handling
+2. Reduce nesting - Avoid deep if-else nesting
+3. Recursive search - Early exit when target found
+4. Validation - Multiple validation checks with early exit
+5. Error handling - Exit on first error condition
+
+---
+
+#### Complete Working Examples
+
+**Example 1: Validation Pipeline**
+```javascript
+let validateInput = (value, min, max) => do {
+    // Guard clauses with early return
+    if (!value) {
+        print("Error: Value required");
+        return false
+    };
+
+    if (value < min) {
+        print("Error: Value too small");
+        return false
+    };
+
+    if (value > max) {
+        print("Error: Value too large");
+        return false
+    };
+
+    print("Validation passed");
+    true
+}
+```
+
+**Example 2: Data Analysis with if-else**
+```javascript
+let analyzeData = (data) => if (len(data) == 0) {
+    print("Error: Empty dataset");
+    "No data"
+} else if (len(data) < 5) {
+    print("Warning: Small sample size");
+    let avg = mean(data);
+    print("Mean:", avg);
+    "Insufficient data"
+} else {
+    print("Analyzing", len(data), "data points...");
+    let avg = mean(data);
+    let stddev = std(data);
+    let cv = (stddev / avg) * 100;
+    print("Mean:", avg);
+    print("Std Dev:", stddev);
+    print("CV:", cv, "%");
+    if (cv < 10) {
+        "Low variability"
+    } else if (cv < 30) {
+        "Moderate variability"
+    } else {
+        "High variability"
+    }
+}
+```
+
+---
+
+#### Testing & Validation
+
+All examples have been tested and verified:
+
+✅ `examples/soc/39-if-else-complete.soc` - All 10 sections execute correctly
+✅ `examples/soc/40-return-statement.soc` - All 10 sections execute correctly
+
+Sample output verification:
+- Basic if-else: Working ✓
+- Multi-statement blocks: Working ✓
+- else-if chains: Working ✓
+- Early returns: Working ✓
+- Guard clauses: Working ✓
+- Recursive functions with return: Working ✓
+
+---
+
+#### Breaking Changes
+
+**None** - All changes are backward compatible. Existing code continues to work unchanged.
+
+---
+
 ### Added - Module System, Mutability, and Do Blocks 🚀
 
 **Complete Module System:**

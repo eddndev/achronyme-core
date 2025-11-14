@@ -116,6 +116,11 @@ pub fn format_value(value: &Value) -> String {
             // TailCall should never be visible to user code - it's an internal marker
             "<internal:TailCall>".to_string()
         }
+
+        Value::EarlyReturn(_) => {
+            // EarlyReturn should never be visible to user code - it's an internal marker
+            "<internal:EarlyReturn>".to_string()
+        }
     }
 }
 

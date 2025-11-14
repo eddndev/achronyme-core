@@ -92,24 +92,32 @@ fn test_import_with_usage() {
     let result = parse(input);
     assert!(result.is_ok(), "Parse failed: {:?}", result.err());
 
-    let statements = result.unwrap();
-    assert_eq!(statements.len(), 2);
+    let top_level = result.unwrap();
+    assert_eq!(top_level.len(), 1);
 
-    // First statement should be import
-    match &statements[0] {
-        AstNode::Import { items, module_path } => {
-            assert_eq!(module_path, "stats");
-            assert_eq!(items[0].name, "mean");
-        }
-        _ => panic!("Expected Import node as first statement")
-    }
+    // Should be a sequence with 2 statements
+    match &top_level[0] {
+        AstNode::Sequence { statements } => {
+            assert_eq!(statements.len(), 2);
 
-    // Second statement should be let
-    match &statements[1] {
-        AstNode::VariableDecl { name, .. } => {
-            assert_eq!(name, "result");
+            // First statement should be import
+            match &statements[0] {
+                AstNode::Import { items, module_path } => {
+                    assert_eq!(module_path, "stats");
+                    assert_eq!(items[0].name, "mean");
+                }
+                _ => panic!("Expected Import node as first statement")
+            }
+
+            // Second statement should be let
+            match &statements[1] {
+                AstNode::VariableDecl { name, .. } => {
+                    assert_eq!(name, "result");
+                }
+                _ => panic!("Expected VariableDecl node as second statement")
+            }
         }
-        _ => panic!("Expected VariableDecl node as second statement")
+        _ => panic!("Expected Sequence node at top level")
     }
 }
 
@@ -124,23 +132,31 @@ fn test_multiple_imports() {
     let result = parse(input);
     assert!(result.is_ok(), "Parse failed: {:?}", result.err());
 
-    let statements = result.unwrap();
-    assert_eq!(statements.len(), 3);
+    let top_level = result.unwrap();
+    assert_eq!(top_level.len(), 1);
 
-    // Check first import
-    match &statements[0] {
-        AstNode::Import { module_path, .. } => {
-            assert_eq!(module_path, "math");
-        }
-        _ => panic!("Expected first Import node")
-    }
+    // Should be a sequence with 3 statements
+    match &top_level[0] {
+        AstNode::Sequence { statements } => {
+            assert_eq!(statements.len(), 3);
 
-    // Check second import
-    match &statements[1] {
-        AstNode::Import { module_path, .. } => {
-            assert_eq!(module_path, "stats");
+            // Check first import
+            match &statements[0] {
+                AstNode::Import { module_path, .. } => {
+                    assert_eq!(module_path, "math");
+                }
+                _ => panic!("Expected first Import node")
+            }
+
+            // Check second import
+            match &statements[1] {
+                AstNode::Import { module_path, .. } => {
+                    assert_eq!(module_path, "stats");
+                }
+                _ => panic!("Expected second Import node")
+            }
         }
-        _ => panic!("Expected second Import node")
+        _ => panic!("Expected Sequence node at top level")
     }
 }
 

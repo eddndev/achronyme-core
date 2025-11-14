@@ -101,6 +101,7 @@ fn build_ast_from_statement(pair: Pair<Rule>) -> Result<AstNode, String> {
         Rule::export_statement => build_export_statement(inner),
         Rule::let_statement => build_let_statement(inner),
         Rule::mut_statement => build_mut_statement(inner),
+        Rule::return_statement => build_return_statement(inner),
         Rule::assignment => build_assignment(inner),
         Rule::expr => build_ast_from_expr(inner),
         _ => Err(format!("Unexpected statement rule: {:?}", inner.as_rule()))
@@ -246,6 +247,18 @@ fn build_assignment(pair: Pair<Rule>) -> Result<AstNode, String> {
 
     Ok(AstNode::Assignment {
         target: Box::new(build_ast_from_expr(target)?),
+        value: Box::new(build_ast_from_expr(value)?),
+    })
+}
+
+fn build_return_statement(pair: Pair<Rule>) -> Result<AstNode, String> {
+    let mut inner = pair.into_inner();
+
+    // Grammar: "return" ~ expr
+    let value = inner.next()
+        .ok_or("Missing value in return statement")?;
+
+    Ok(AstNode::Return {
         value: Box::new(build_ast_from_expr(value)?),
     })
 }
@@ -968,6 +981,16 @@ fn build_if_expr(pair: Pair<Rule>) -> Result<AstNode, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_parse_return_statement() {
+        let result = parse("return 42");
+        assert!(result.is_ok(), "Failed to parse: {:?}", result);
+
+        let ast = result.unwrap();
+        assert_eq!(ast.len(), 1);
+        assert!(matches!(ast[0], AstNode::Return { .. }));
+    }
 
     #[test]
     fn test_parse_number() {

@@ -80,6 +80,9 @@ pub enum AstNode {
         target: Box<AstNode>,  // postfix_expression (variable, field access, index)
         value: Box<AstNode>,
     },
+    Return {
+        value: Box<AstNode>,  // Expression to return
+    },
     VariableRef(String),
     SelfReference, // 'self' keyword for use in records
     RecReference,  // 'rec' keyword for recursive function calls

@@ -137,7 +137,11 @@ fn apply_lambda_regular(
     // Restore environment
     *evaluator.environment_mut() = saved_env;
 
-    result
+    // Check if the result is an EarlyReturn - unwrap it
+    match result {
+        Ok(Value::EarlyReturn(value)) => Ok(*value),
+        other => other,
+    }
 }
 
 /// Tail-Call Optimized lambda application
@@ -186,7 +190,7 @@ fn apply_lambda_tco(
         // Pop parameter scope
         evaluator.environment_mut().pop_scope();
 
-        // Check if the result is a tail call marker
+        // Check if the result is a tail call marker or early return
         match value {
             Value::TailCall(new_args) => {
                 // Tail call detected! Update arguments and continue loop
@@ -200,6 +204,10 @@ fn apply_lambda_tco(
                 }
                 args = new_args;
                 // Continue loop with new arguments
+            }
+            Value::EarlyReturn(value) => {
+                // Early return - unwrap and break immediately
+                break Ok(*value);
             }
             other => {
                 // Base case reached - return the value

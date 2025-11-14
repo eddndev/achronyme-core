@@ -109,11 +109,7 @@ fn test_multiline_report() {
         let status = true
         let uptime = 99.9
         let line = "-" * 30
-        line + "\n" +
-        "Nombre: " + name + "\n" +
-        "Estado: " + status + "\n" +
-        "Uptime: " + uptime + "%\n" +
-        line
+        line + "\n" + "Nombre: " + name + "\n" + "Estado: " + status + "\n" + "Uptime: " + uptime + "%\n" + line
     "#).unwrap();
 
     let expected = format!(

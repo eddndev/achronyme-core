@@ -126,6 +126,17 @@ if (x < 0) {
     1
 }
 
+// Early return
+let validate = (x) => do {
+    if (x < 0) {
+        return false
+    };
+    if (x > 100) {
+        return false
+    };
+    true
+}
+
 // piecewise() for multiple conditions
 piecewise(
     [x < 0, -1],
@@ -284,6 +295,7 @@ import   // Import from modules
 export   // Export from current module
 from     // Used with import
 as       // Alias in imports
+return   // Early return from functions
 ```
 
 **Note**: `if` and `piecewise` are **built-in functions**, not keywords.

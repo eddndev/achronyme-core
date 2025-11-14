@@ -138,6 +138,328 @@ if (condition) {
 }
 ```
 
+## Early Return with `return`
+
+Since version 0.1.0, Achronyme supports the `return` statement for early function exit.
+
+### Basic Syntax
+
+```javascript
+return value
+```
+
+The `return` statement:
+- **Immediately exits** the current function with the given value
+- **Can be used in** if-else blocks, do blocks, and anywhere inside a function
+- **Stops execution** - code after `return` is not evaluated
+- **Only valid** inside lambda functions (not at top level)
+
+### Simple Examples
+
+```javascript
+// Early exit from validation
+let validate = (x) => do {
+    if (x < 0) {
+        return false
+    };
+    if (x > 100) {
+        return false
+    };
+    true
+}
+
+validate(-5)   // false (returns immediately)
+validate(150)  // false (returns immediately)
+validate(50)   // true (no early return)
+
+// Return from if statement without else
+let findFirst = (arr, target) => do {
+    if (len(arr) == 0) {
+        return -1
+    };
+    // Continue processing if not empty
+    0
+}
+
+// Multiple return points
+let categorize = (x) => do {
+    if (x < 0) {
+        return "negative"
+    };
+    if (x == 0) {
+        return "zero"
+    };
+    "positive"
+}
+```
+
+### Return in if-else Blocks
+
+```javascript
+// Return in both branches
+let abs = (x) => if (x < 0) {
+    return -x
+} else {
+    return x
+}
+
+// Return only in condition (no else needed)
+let checkPositive = (x) => do {
+    if (x <= 0) {
+        print("Invalid: must be positive");
+        return false
+    };
+    print("Valid");
+    true
+}
+
+// Return in else-if chain
+let grade = (score) => do {
+    if (score >= 90) {
+        return "A"
+    } else if (score >= 80) {
+        return "B"
+    } else if (score >= 70) {
+        return "C"
+    } else if (score >= 60) {
+        return "D"
+    };
+    "F"
+}
+```
+
+### Guard Clauses Pattern
+
+Use `return` for guard clauses to handle edge cases early:
+
+```javascript
+// Without return (nested if)
+let processData = (data) => do {
+    if (len(data) > 0) {
+        if (mean(data) > 0) {
+            // Main logic here
+            sum(data) / len(data)
+        } else {
+            0
+        }
+    } else {
+        0
+    }
+}
+
+// With return (guard clauses - cleaner)
+let processDataClean = (data) => do {
+    if (len(data) == 0) {
+        return 0
+    };
+    if (mean(data) <= 0) {
+        return 0
+    };
+    // Main logic here (less nesting)
+    sum(data) / len(data)
+}
+```
+
+### Return in Recursive Functions
+
+```javascript
+// Binary search with early return
+let binarySearch = (arr, target, left, right) => do {
+    if (left > right) {
+        return -1
+    };
+
+    let mid = floor((left + right) / 2);
+
+    if (arr[mid] == target) {
+        return mid
+    };
+
+    if (arr[mid] > target) {
+        return rec(arr, target, left, mid - 1)
+    };
+
+    rec(arr, target, mid + 1, right)
+}
+
+let search = (arr, target) => binarySearch(arr, target, 0, len(arr) - 1)
+
+// Find first matching element
+let findIndex = (arr, predicate, index) => do {
+    if (index >= len(arr)) {
+        return -1
+    };
+    if (predicate(arr[index])) {
+        return index
+    };
+    rec(arr, predicate, index + 1)
+}
+
+let find = (arr, predicate) => findIndex(arr, predicate, 0)
+```
+
+### Return with Complex Validation
+
+```javascript
+// Input validation with multiple checks
+let validateUser = (user) => do {
+    if (!user.name) {
+        print("Error: Name is required");
+        return false
+    };
+
+    if (len(user.name) < 3) {
+        print("Error: Name too short");
+        return false
+    };
+
+    if (!user.age) {
+        print("Error: Age is required");
+        return false
+    };
+
+    if (user.age < 18) {
+        print("Error: Must be 18 or older");
+        return false
+    };
+
+    print("Validation passed");
+    true
+}
+
+// Array processing with early exit
+let processUntilError = (items) => do {
+    let processItem = (item, index) => do {
+        print("Processing item", index);
+
+        if (item < 0) {
+            print("Error: negative value at index", index);
+            return false
+        };
+
+        if (item > 100) {
+            print("Error: value too large at index", index);
+            return false
+        };
+
+        true
+    };
+
+    // Process each item, return false on first error
+    let checkAll = (i) => do {
+        if (i >= len(items)) {
+            return true
+        };
+        if (!processItem(items[i], i)) {
+            return false
+        };
+        rec(i + 1)
+    };
+
+    checkAll(0)
+}
+```
+
+### Return vs Last Expression
+
+```javascript
+// Without return - last expression is returned
+let method1 = (x) => do {
+    let doubled = x * 2;
+    let result = doubled + 10;
+    result  // This is returned
+}
+
+// With explicit return - same result
+let method2 = (x) => do {
+    let doubled = x * 2;
+    let result = doubled + 10;
+    return result  // Explicit return
+}
+
+// Both are equivalent:
+method1(5)  // 20
+method2(5)  // 20
+
+// But return allows early exit:
+let method3 = (x) => do {
+    if (x < 0) {
+        return 0  // Early exit
+    };
+    let doubled = x * 2;
+    let result = doubled + 10;
+    result
+}
+```
+
+### Best Practices
+
+**1. Use return for guard clauses**
+```javascript
+// Good: Early exits for error cases
+let process = (data) => do {
+    if (!data) {
+        return "error"
+    };
+    if (len(data) == 0) {
+        return "empty"
+    };
+    // Main logic here
+    "success"
+}
+```
+
+**2. Use return to avoid deep nesting**
+```javascript
+// Bad: Deep nesting
+let check = (x) => do {
+    if (x > 0) {
+        if (x < 100) {
+            if (x % 2 == 0) {
+                "valid"
+            } else {
+                "odd"
+            }
+        } else {
+            "too large"
+        }
+    } else {
+        "negative"
+    }
+}
+
+// Good: Guard clauses with return
+let checkClean = (x) => do {
+    if (x <= 0) {
+        return "negative"
+    };
+    if (x >= 100) {
+        return "too large"
+    };
+    if (x % 2 != 0) {
+        return "odd"
+    };
+    "valid"
+}
+```
+
+**3. Use return in recursive search functions**
+```javascript
+// Finding elements in nested structures
+let findInTree = (node, target) => do {
+    if (!node) {
+        return false
+    };
+    if (node.value == target) {
+        return true
+    };
+    if (findInTree(node.left, target)) {
+        return true
+    };
+    findInTree(node.right, target)
+}
+```
+
 ### Simple Examples
 
 ```javascript

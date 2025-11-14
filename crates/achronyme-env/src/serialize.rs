@@ -103,6 +103,11 @@ impl SerializedValue {
                 // TailCall should never be persisted
                 SerializedValue::Unsupported("tail call".to_string())
             },
+
+            Value::EarlyReturn(_) => {
+                // EarlyReturn should never be persisted
+                SerializedValue::Unsupported("early return".to_string())
+            },
         }
     }
 
