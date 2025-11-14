@@ -7,12 +7,10 @@ members = [
     "crates/achronyme-linalg",
     "crates/achronyme-dsp",
     "crates/achronyme-numerical",
-    "crates/achronyme-wasm",
     "crates/achronyme-cli",
     "crates/achronyme-solver",
     "crates/achronyme-env",
 ]
-# Exclude CLI from default members to avoid pulling CLI dependencies when building WASM
 default-members = [
     "crates/achronyme-parser",
     "crates/achronyme-eval",
@@ -20,7 +18,6 @@ default-members = [
     "crates/achronyme-linalg",
     "crates/achronyme-dsp",
     "crates/achronyme-numerical",
-    "crates/achronyme-wasm",
     "crates/achronyme-solver",
     "crates/achronyme-env",
 ]
@@ -40,16 +37,8 @@ lapack-src = { version = "0.8", features = ["openblas"] }
 rustfft = "6.0"
 num-complex = "0.4"
 
-# WASM bindings
-wasm-bindgen = "0.2"
-js-sys = "0.3"
-web-sys = { version = "0.3", features = ["console"] }
-console_error_panic_hook = "0.1"
-wasm-bindgen-futures = "0.4"
-
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
-serde-wasm-bindgen = "0.6"
 serde_json = "1.0"
 
 # Testing

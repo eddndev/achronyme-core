@@ -1,383 +1,490 @@
-# Achronyme Core
+# Achronyme
 
-**Motor de cálculo matemático de alto rendimiento con WebAssembly**
+**A modern functional programming language for mathematical computing**
 
-[![npm version](https://img.shields.io/npm/v/@achronyme/core)](https://www.npmjs.com/package/@achronyme/core)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Achronyme Core es un motor de computación matemática compilado a WebAssembly que combina rendimiento de C++ con la accesibilidad de JavaScript/TypeScript. Presenta un **SDK TypeScript v2.0** moderno y un potente **lenguaje de expresiones SOC** para cálculos eficientes.
-
-```typescript
-import { Achronyme } from '@achronyme/core';
-
-const ach = new Achronyme();
-await ach.init();
-
-// DSP en tiempo real con gestión de memoria automática
-await ach.use(async () => {
-  const signal = ach.vector(Array.from({length: 1024}, (_, i) =>
-    Math.sin(2 * Math.PI * 50 * i / 1000)
-  ));
-  const spectrum = ach.dsp.fftMag(signal);
-
-  console.log('Dominant frequency (first 5 values):', spectrum.data.slice(0, 5));
-  // signal y spectrum se limpian automáticamente al salir de ach.use()
-});
-```
-
----
-
-## ⚡ Performance
-
-**Benchmarks reales** (100K elementos, promedio de 100 iteraciones):
-
-| Operación | Achronyme | math.js | Speedup |
-|-----------|-----------|---------|---------|
-| **Operaciones vectorizadas** | 447ms | 622ms | **🏆 1.39x más rápido** |
-| **FFT (4K samples)** | 26ms | 2032ms | **🚀 78x más rápido** |
-| **Vector operations** | 3.7ms | 9.7ms | **⚡ 2.6x más rápido** |
-
-*Nota: Achronyme usa WASM compilado con -O3 y sistema de handles zero-copy. math.js es JavaScript puro. Benchmarks ejecutados en Chrome V8.*
-
-**Fast Path Usage**: El SDK v2.0 maximiza el uso de rutas optimizadas en WASM, incluyendo **vistas zero-copy** para acceso instantáneo a los datos.
-
----
-
-## ✨ Características
-
-- **🚀 Alto rendimiento**: **4.45x más rápido que JS Nativo** en operaciones matemáticas vectorizadas, **202.01x en FFT**.
-- **🧠 Gestión de Memoria por Sesiones**: El patrón `ach.use()` garantiza la limpieza automática de recursos WASM, previniendo fugas de memoria.
-- **💾 Vistas Zero-Copy**: Acceso instantáneo a los datos en memoria WASM (`Float64Array`) sin costosas copias.
-- **🔢 Tipos avanzados**: Number, Complex, Vector, Matrix, Function.
-- **📡 DSP nativo**: FFT Cooley-Tukey, convolución, ventanas, filtros.
-- **λ Programación funcional**: Lambdas, closures, map/filter/reduce.
-- **📐 Álgebra lineal**: Operaciones matriciales, determinante, inversa, y descomposiciones avanzadas (LU, QR, SVD, Cholesky, Eigenvalues).
-- **📝 Lenguaje de Expresiones SOC**: Un potente lenguaje string-based para ejecutar pipelines complejos en una sola llamada a WASM.
-- **TypeScript SDK v2.0**: API tipo-segura y modular.
-- **🌐 Universal**: Web, Node.js, y compilable a binarios nativos.
-
----
-
-## 📦 Instalación
-
-```bash
-npm install @achronyme/core
-```
-
----
-
-## 🚀 Inicio Rápido
-
-### Uso Básico con SDK TypeScript (v2.0)
-
-El patrón recomendado es usar `ach.use()` para la gestión automática de memoria.
-
-```typescript
-import { Achronyme } from '@achronyme/core';
-
-const ach = new Achronyme();
-await ach.init();
-
-await ach.use(async () => {
-  // Operaciones matemáticas
-  const x = ach.scalar(5);
-  const result = ach.math.add(ach.math.mul(x, 2), 10); // (5 * 2) + 10 = 20
-  console.log('Resultado:', x.value); // 20
-
-  // Vectores y estadísticas
-  const data = ach.vector([1, 2, 3, 4, 5]);
-  const mean = ach.stats.mean(data);
-  const std = ach.stats.std(data);
-
-  console.log('Mean:', mean);
-  console.log('Std:', std);
-
-  // x, result, data, mean, std se limpian automáticamente al salir de ach.use()
-});
-```
-
-### Procesamiento de Señales (DSP)
-
-```typescript
-import { Achronyme } from '@achronyme/core';
-
-const ach = new Achronyme();
-await ach.init();
-
-await ach.use(async () => {
-  // Generar señal con ruido
-  const signalData = Array.from({length: 1024}, (_, i) =>
-    Math.sin(2 * Math.PI * 50 * i / 1000) +
-    0.5 * Math.sin(2 * Math.PI * 120 * i / 1000)
-  );
-
-  const signal = ach.vector(signalData);
-  const window = ach.dsp.hanning(1024);
-  const windowed = ach.vecOps.vmul(signal, window); // Multiplicación elemento a elemento
-  const spectrum = ach.dsp.fftMag(windowed);
-
-  console.log('Spectrum (first 10 values):', spectrum.data.slice(0, 10));
-
-  // signal, window, windowed, spectrum se limpian automáticamente
-});
-```
-
-### Programación Funcional con el Lenguaje SOC
-
-```typescript
-import { Achronyme } from '@achronyme/core';
-
-const ach = new Achronyme();
-await ach.init();
-
-await ach.use(async () => {
-  const numbers = ach.vector([1, 2, 3, 4, 5, 6]);
-
-  // Map, filter, reduce usando el lenguaje SOC
-  const squared = ach.eval("map(x => x^2, [1,2,3,4,5,6])");
-  const evens = ach.eval("filter(x => x % 2 == 0, [1,2,3,4,5,6])");
-  const sum = ach.eval("reduce((a,b) => a+b, 0, [1,2,3,4,5,6])");
-
-  console.log('Squared:', squared); // → "[1, 4, 9, 16, 25, 36]"
-  console.log('Evens:', evens);     // → "[2, 4, 6]"
-  console.log('Sum:', sum);         // → "21" 
-});
-```
-
----
-
-## 📊 Rendimiento
-
-**Benchmarks de producción** - Ejecutados en Chrome V8 con datasets reales:
-
-### Operaciones Matemáticas Vectorizadas
-*(10.000.000 elementos × 5 iteraciones, 3 operaciones: sin, cos, exp)*
-
-| Librería | Tiempo Total | Speedup vs JS Native | Resultado |
-|----------|--------------|----------------------|-----------|
-| **Achronyme (WASM)** | 2239.20ms | **4.45x más rápido** | 🏆 **Ganador** |
-| JS Nativo (V8) | 9971.90ms | 1.00x (baseline) | Referencia |
-
-### DSP y Operaciones Complejas
-
-| Operación | Achronyme | math.js | Speedup |
-|-----------|-----------|---------|---------|
-| **FFT (8K samples)** | 7.40ms | 1494.90ms | **🚀 202.01x más rápido** |
-| **Operaciones Vectoriales (200K)** | 550.10ms | 1649.30ms | **3.00x más rápido** |
-| **Pipeline DSP Completo (16K)** | 5.10ms | 313.90ms | **61.55x más rápido** |
-
-### Fast Path Efficiency
-- **99.9%** de operaciones usan path optimizado (zero-copy)
-- **0.1%** fallback a parser (casos edge)
-
-**Por qué Achronyme es más rápido que math.js:**
-- ✅ C++ compilado a WASM con `-O3` (vs JavaScript interpretado)
-- ✅ Algoritmos nativos especializados (FFT Cooley-Tukey optimizado)
-- ✅ Sistema de **handles zero-copy** (sin serialización JS ↔ WASM)
-- ✅ Mantiene datos en memoria WASM durante pipelines
-
-**Por qué Achronyme compite con JS nativo:**
-- ⚡ Overhead JS-WASM minimalizado, especialmente en operaciones complejas.
-- ⚡ Operaciones vectorizadas sin abstracciones.
-- ⚡ Sin overhead de librerías (math.js tiene múltiples capas).
-- **Nota**: Para operaciones vectoriales muy simples, JavaScript nativo (V8) puede ser marginalmente más rápido, pero Achronyme supera a JS nativo en operaciones matemáticas complejas y pipelines DSP.
-
----
-
-## 📚 Documentación
-
-### Guías Completas
-
-- **[Guía del SDK TypeScript v2.0](./docs/sdk/README.md)** - Visión general del SDK, características clave y ejemplos.
-- **[Referencia de API del SDK](./docs/sdk/api-reference.md)** - Documentación detallada de todas las clases, métodos y funciones del SDK.
-- **[Gestión de Memoria del SDK](./docs/sdk/memory-management.md)** - Patrones y mejores prácticas para el manejo de memoria en el SDK.
-- **[Ejemplos del SDK](./docs/sdk/examples.md)** - Casos de uso prácticos y código de ejemplo para el SDK.
-- **[Tipos de Datos del SDK](./docs/sdk/types.md)** - Definiciones de tipos TypeScript y estructuras de datos del SDK.
-- **[Especificación del Lenguaje SOC](./docs/language-spec.md)** - Gramática, tipos, operadores y funciones del lenguaje de expresiones SOC.
-- **[Guía de Rendimiento](./docs/sdk/optimization-functions.md)** - Estrategias para optimizar el rendimiento y minimizar el overhead JS-WASM.
-- **[Roadmap del Proyecto](./docs/roadmap.md)** - Futuro de Achronyme y ecosistema.
-- **[Comparación con Wolfram](./docs/wolfram-comparison.md)** - Análisis competitivo realista.
-
-### Ejemplos
-
-El proyecto incluye 4 ejemplos completos:
-
-```bash
-node examples/basic-usage.mjs
-node examples/dsp-example.mjs
-node examples/functional-programming.mjs
-node examples/advanced-dsp-pipeline.mjs
-```
-
-### Tests
-
-```bash
-# Test comprehensivo (96 pruebas)
-node demo-achronyme.mjs
-
-# Test del SDK
-node test-sdk.mjs
-```
-
----
-
-## 🛠️ Compilación desde el Código Fuente
-
-### Requisitos Previos
-
-- **Emscripten SDK** (para compilar C++ a WASM)
-- **Node.js 18+**
-- **TypeScript** (para compilar el SDK)
-
-### Instalar Emscripten
-
-**Windows:**
-```bash
-git clone https://github.com/emscripten-core/emsdk.git
-cd emsdk
-emsdk install latest
-emsdk activate latest
-emsdk_env.bat
-```
-
-**Linux/macOS:**
-```bash
-git clone https://github.com/emscripten-core/emsdk.git
-cd emsdk
-./emsdk install latest
-./emsdk activate latest
-source ./emsdk_env.sh
-```
-
-### Compilar
-
-```bash
-# Compilar WASM
-npm run build:wasm
-
-# Compilar TypeScript
-npm run build:js
-
-# Compilar todo
-npm run build
-```
-
----
-
-## 🎯 Características del Lenguaje SOC
-
-El lenguaje SOC permite ejecutar expresiones matemáticas complejas directamente en el motor WASM.
-
-### Tipos de Datos
-
-- **Number**: Punto flotante 64-bit (`42`, `3.14`, `1e6`)
-- **Complex**: Números complejos (`3i`, `2+3i`)
-- **Vector**: Arrays matemáticos (`[1, 2, 3]`)
-- **Matrix**: Matrices 2D (`[[1,2],[3,4]]`)
-- **Function**: Lambdas (`x => x^2`)
-
-### Operaciones DSP
+Achronyme is a high-performance functional programming language designed for mathematical computing, data science, and digital signal processing. Built in Rust with a focus on expressiveness and performance, it combines the elegance of functional programming with the power of numerical computation.
 
 ```javascript
-fft([1,2,3,4,5,6,7,8])        // FFT Cooley-Tukey O(N log N)
-fft_mag(signal)               // Magnitud del espectro
-ifft(spectrum)                // FFT inversa
-dft(signal)                   // DFT clásica O(N²)
-conv(s1, s2)                  // Convolución directa
-conv_fft(s1, s2)              // Convolución rápida con FFT
-hanning(N)                    // Ventana de Hann
-hamming(N)                    // Ventana de Hamming
-blackman(N)                   // Ventana de Blackman
+// Variables and functions
+let square = x => x^2
+let numbers = [1, 2, 3, 4, 5]
+
+// Higher-order functions
+let doubled = map(x => x * 2, numbers)
+let evens = filter(x => x % 2 == 0, numbers)
+let sum = reduce((a, b) => a + b, 0, numbers)
+
+// Records with methods
+let point = {
+    x: 10,
+    y: 20,
+    distance: () => sqrt(self.x^2 + self.y^2)
+}
+
+// DSP operations
+let signal = linspace(0, 1, 1024)
+let spectrum = fft(signal)
+```
+
+---
+
+## ✨ Key Features
+
+### 🎯 Functional Programming
+- **First-class functions**: Lambdas, closures, and higher-order functions
+- **Immutability by default**: Variables are immutable unless marked with `mut`
+- **Pattern matching**: Powerful control flow with `if-else` and `piecewise()`
+- **Recursion**: Native support with `rec` keyword for recursive functions
+
+### 🔢 Rich Type System
+- **Number**: 64-bit floating point
+- **Complex**: Native complex number support (`2+3i`)
+- **Tensor**: N-dimensional homogeneous arrays (optimized for math)
+- **Vector**: Heterogeneous arrays (can mix types)
+- **Record**: Objects with methods and self-reference
+- **Function**: First-class function values
+
+### 📐 Mathematical Computing
+- **Linear Algebra**: Vectors, matrices, decompositions (LU, QR, SVD, Eigenvalues)
+- **DSP**: FFT, convolution, windowing functions
+- **Numerical Analysis**: Differentiation, integration, equation solving
+- **Statistics**: Mean, standard deviation, distributions
+- **Complex Numbers**: Full arithmetic support
+
+### 🏗️ Modern Language Features
+- **Modules**: Import/export system for code organization
+- **Do Blocks**: Multi-statement blocks with early returns
+- **Mutable Variables**: Controlled mutability with `mut` keyword
+- **I/O and Persistence**: File operations and environment management
+- **REPL**: Interactive development environment
+
+---
+
+## 🚀 Getting Started
+
+### Installation
+
+**From source** (Rust required):
+
+```bash
+git clone https://github.com/achronyme/achronyme-core.git
+cd achronyme-core
+cargo build --release
+```
+
+### Your First Program
+
+Create a file `hello.soc`:
+
+```javascript
+// hello.soc
+let greet = name => "Hello, " + name + "!"
+
+// Call the function
+greet("Achronyme")
+```
+
+Run it:
+
+```bash
+cargo run -- hello.soc
+```
+
+### REPL
+
+Start the interactive REPL:
+
+```bash
+cargo run --bin repl
+```
+
+Try some examples:
+
+```javascript
+> let x = 42
+> let double = x => x * 2
+> double(x)
+84
+
+> let numbers = [1, 2, 3, 4, 5]
+> map(x => x^2, numbers)
+[1, 4, 9, 16, 25]
+
+> let signal = [1, 0, -1, 0]
+> fft(signal)
+[0+0i, 1+1i, 0+0i, 1-1i]
+```
+
+---
+
+## 📖 Language Examples
+
+### Variables and Functions
+
+```javascript
+// Immutable by default
+let x = 10
+let y = x + 5
+
+// Mutable when needed
+mut counter = 0
+counter = counter + 1
+
+// Lambda functions
+let square = x => x^2
+let add = (a, b) => a + b
+
+// Recursion with rec
+let factorial = n =>
+    if(n <= 1, 1, n * rec(n - 1))
+
+factorial(5)  // → 120
+```
+
+### Arrays and Tensors
+
+```javascript
+// Homogeneous tensors (optimized for math)
+let tensor = [1, 2, 3, 4, 5]
+let matrix = [[1, 2], [3, 4]]
+
+// Heterogeneous vectors (mixed types)
+let mixed = [1, "hello", true, {x: 10}]
+
+// Indexing and slicing
+tensor[0]        // → 1
+tensor[1..3]     // → [2, 3]
+matrix[0, 1]     // → 2
+
+// Spread operator
+let combined = [...tensor, 6, 7, 8]
 ```
 
 ### Higher-Order Functions
 
 ```javascript
-map(x => x^2, [1,2,3,4])                    // → [1, 4, 9, 16]
-filter(x => x > 5, [1,5,10,15])             // → [10, 15]
-reduce((a,b) => a+b, 0, [1,2,3,4])          // → 10
-pipe([1,2,3,4], f, g, h)                    // Composición
+let numbers = [1, 2, 3, 4, 5, 6]
+
+// Map: transform each element
+map(x => x^2, numbers)
+// → [1, 4, 9, 16, 25, 36]
+
+// Filter: select elements
+filter(x => x % 2 == 0, numbers)
+// → [2, 4, 6]
+
+// Reduce: aggregate values
+reduce((a, b) => a + b, 0, numbers)
+// → 21
+
+// Pipe: chain functions
+pipe(numbers,
+    x => filter(n => n > 2, x),
+    x => map(n => n^2, x),
+    x => reduce((a,b) => a+b, 0, x))
+// → 77
 ```
 
-Ver [Especificación completa del lenguaje](./docs/language-spec.md) para sintaxis detallada.
+### Records and Methods
+
+```javascript
+// Simple record
+let point = {x: 10, y: 20}
+point.x  // → 10
+
+// Record with methods
+let counter = {
+    mut value: 0,
+    increment: () => do { self.value = self.value + 1 },
+    get: () => self.value
+}
+
+counter.increment()
+counter.get()  // → 1
+
+// Record with computed properties
+let circle = {
+    radius: 5,
+    area: () => pi() * self.radius^2,
+    circumference: () => 2 * pi() * self.radius
+}
+
+circle.area()  // → 78.539...
+```
+
+### Control Flow
+
+```javascript
+// if() function (functional style)
+let sign = x => if(x > 0, 1, if(x < 0, -1, 0))
+
+// if-else statement (block style)
+let classify = x => {
+    if (x < 0) {
+        "negative"
+    } else if (x > 0) {
+        "positive"
+    } else {
+        "zero"
+    }
+}
+
+// Early return in do blocks
+let validate = x => do {
+    if (x < 0) { return false };
+    if (x > 100) { return false };
+    true
+}
+
+// piecewise for multiple conditions
+let abs = x => piecewise(
+    [x < 0, -x],
+    [x >= 0, x]
+)
+```
+
+### Digital Signal Processing
+
+```javascript
+// Generate a signal
+let n = 1024
+let t = linspace(0, 1, n)
+let signal = map(x => sin(2 * pi() * 50 * x), t)
+
+// Apply windowing
+let window = hanning(n)
+let windowed = map((s, w) => s * w, signal, window)
+
+// FFT analysis
+let spectrum = fft(windowed)
+let magnitude = fft_mag(windowed)
+
+// Convolution
+let impulse = [1, 0.5, 0.25]
+let filtered = conv(signal, impulse)
+```
+
+### Modules
+
+```javascript
+// Import from built-in modules
+import { mean, std } from "stats"
+import { sin, cos, exp } from "math"
+import { dot, cross } from "linalg"
+
+// Import from user modules
+import { myHelper } from "src/utils"
+
+// Export from current module
+let myFunction = x => x * 2
+export { myFunction }
+```
+
+---
+
+## 📚 Documentation
+
+### Language Documentation
+
+Complete language reference available in `/docs/language/`:
+
+- **[Overview](./docs/language/README.md)** - Quick reference and feature overview
+- **[Getting Started](./docs/language/01-getting-started.md)** - Installation and first steps
+- **[Syntax Basics](./docs/language/02-syntax-basics.md)** - Core syntax rules
+- **[Data Types](./docs/language/03-data-types.md)** - Numbers, strings, arrays, records
+- **[Functions](./docs/language/06-functions.md)** - Lambdas, closures, recursion
+- **[Higher-Order Functions](./docs/language/11-higher-order-functions.md)** - map, filter, reduce
+- **[Records](./docs/language/07-records.md)** - Object-oriented patterns
+- **[Modules](./docs/language/28-modules.md)** - Import/export system
+- **[Mutability](./docs/language/26-mutability.md)** - Mutable variables and fields
+- **[I/O and Persistence](./docs/language/27-io-persistence.md)** - File operations
+
+### Examples
+
+Explore complete programs in `examples/soc/`:
+
+```bash
+# Run examples
+cargo run -- examples/soc/fibonacci.soc
+cargo run -- examples/soc/dsp_pipeline.soc
+cargo run -- examples/soc/linear_algebra.soc
+```
+
+### Tests
+
+Run the comprehensive test suite:
+
+```bash
+cargo test
+```
+
+---
+
+## 🛠️ Building from Source
+
+### Prerequisites
+
+- **Rust 1.70+** (install from [rustup.rs](https://rustup.rs))
+- **Cargo** (included with Rust)
+
+### Build
+
+```bash
+# Clone the repository
+git clone https://github.com/achronyme/achronyme-core.git
+cd achronyme-core
+
+# Build in release mode
+cargo build --release
+
+# Run tests
+cargo test
+
+# Run the REPL
+cargo run --bin repl
+
+# Run a script
+cargo run -- path/to/script.soc
+```
+
+### Project Structure
+
+```
+achronyme-core/
+├── crates/
+│   ├── achronyme-eval/      # Evaluator and runtime
+│   ├── achronyme-parser/    # Lexer and parser
+│   └── achronyme-types/     # Core type system
+├── docs/
+│   └── language/            # Language documentation
+├── examples/
+│   └── soc/                 # Example programs
+└── src/
+    ├── bin/                 # CLI and REPL binaries
+    └── lib.rs               # Library entry point
+```
+
+---
+
+## 🎯 Language Philosophy
+
+Achronyme is designed around these core principles:
+
+1. **Functional First**: Immutability by default, functions as first-class values
+2. **Mathematical Expressiveness**: Syntax optimized for mathematical notation
+3. **Performance**: Native compilation with Rust for high-performance computing
+4. **Simplicity**: Clear, concise syntax without unnecessary complexity
+5. **Practical**: Designed for real-world mathematical and scientific computing
+
+### Design Decisions
+
+- **No null/undefined**: All values are concrete types
+- **Expression-oriented**: Everything is an expression that returns a value
+- **Type inference**: Types are inferred where possible
+- **Lexical scoping**: Closures capture their environment
+- **Tensors vs Vectors**: Homogeneous tensors for math, heterogeneous vectors for data structures
 
 ---
 
 ## 🗺️ Roadmap
 
-### ✅ Completado (v0.4)
+### ✅ Completed
 
-- **Phase 5**: Álgebra lineal avanzada (LU, QR, SVD, eigenvalues)
-- Parser y evaluador de expresiones
-- Tipos complejos (Complex, Vector, Matrix)
-- DSP básico (FFT, convolución, ventanas)
-- Lambdas y higher-order functions
-- SDK TypeScript tipo-seguro
+- ✅ Core language (variables, functions, control flow)
+- ✅ Type system (Number, Complex, Tensor, Vector, Record, Function)
+- ✅ Parser and evaluator
+- ✅ Higher-order functions (map, filter, reduce, pipe)
+- ✅ DSP module (FFT, convolution, windows)
+- ✅ Linear algebra (matrix operations, decompositions)
+- ✅ Recursion with `rec` keyword
+- ✅ Modules and import/export system
+- ✅ Mutability with `mut` keyword
+- ✅ Do blocks and early returns
+- ✅ I/O and persistence
 
-### 🚧 En Desarrollo (v0.5-0.6)
+### 🚧 In Progress
 
-- **Phase 6**: Cálculo numérico (derivación, integración, EDOs)
-- **Phase 7**: Optimización (gradiente, Newton, simplex)
+- 🚧 Numerical analysis (derivatives, integrals, ODE solvers)
+- 🚧 Advanced statistics
+- 🚧 Optimization algorithms
+- 🚧 Documentation improvements
 
-### 🔮 Futuro (v0.7+)
+### 🔮 Planned
 
-- **Phase 8-12**: Estadística, EDPs, cálculo simbólico, DSP avanzado, ML básico
-- **@achronyme/language**: Procesamiento de lenguaje natural matemático
-- **@achronyme/plot**: Visualización matemática
-- **@achronyme/cas**: Computer Algebra System
-
-Ver [Roadmap completo](./docs/roadmap.md) para detalles.
-
----
-
-## 🤝 Contribuir
-
-Achronyme es open-source y buscamos colaboradores en:
-- **C++ developers**: Algoritmos numéricos core
-- **TypeScript developers**: SDK, testing, ejemplos
-- **Math experts**: Validación de algoritmos
-- **DSP engineers**: Optimización de FFT, filtros
-- **Documentation**: Tutoriales, traducciones
-
-**Repositorio**: https://github.com/achronyme/achronyme-core
-**Discusiones**: https://github.com/achronyme/achronyme-core/discussions
+- 🔮 Pattern matching
+- 🔮 Algebraic data types (enums, tagged unions)
+- 🔮 Trait system (type classes)
+- 🔮 Effect system (purity tracking)
+- 🔮 Parallel computing primitives
+- 🔮 GPU acceleration
+- 🔮 Package manager
+- 🔮 Standard library expansion
 
 ---
 
-## 📝 Licencia
+## 🤝 Contributing
+
+Achronyme is open source and we welcome contributions!
+
+### Areas We Need Help
+
+- **Language Design**: Syntax improvements, new features
+- **Core Implementation**: Parser, evaluator, optimizations
+- **Standard Library**: New modules and functions
+- **Documentation**: Tutorials, examples, translations
+- **Testing**: Edge cases, performance benchmarks
+- **Tooling**: IDE support, syntax highlighting, linters
+
+### How to Contribute
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Submit a pull request
+
+**Repository**: https://github.com/achronyme/achronyme-core
+**Discussions**: https://github.com/achronyme/achronyme-core/discussions
+**Issues**: https://github.com/achronyme/achronyme-core/issues
+
+---
+
+## 📝 License
 
 MIT License - Copyright (c) 2025 Eduardo Alonso
 
-Ver [LICENSE](./LICENSE) para detalles completos.
+See [LICENSE](./LICENSE) for details.
 
 ---
 
-## 🔗 Enlaces
+## 🔗 Links
 
-- **[Documentación](./docs/)** - Guías completas
-- **[Ejemplos](./examples/)** - Código de ejemplo
-- **[GitHub](https://github.com/achronyme/achronyme-core)** - Repositorio
-- **[npm](https://www.npmjs.com/package/@achronyme/core)** - Paquete
-Website: https://achrony.me
+- **[Documentation](./docs/language/)** - Complete language reference
+- **[Examples](./examples/soc/)** - Sample programs
+- **[GitHub](https://github.com/achronyme/achronyme-core)** - Source code
+- **Website**: https://achrony.me
 
 ---
 
-**Versión actual**: 0.4.0
+## 🌟 Why Achronyme?
 
-**Reproduce los benchmarks tú mismo:**
-```bash
-cd test-npm-install/demo
-npm install
-npm run dev
-# Abre http://localhost:5173 y ejecuta "Extreme Stress Test"
-```
+**For Data Scientists**: Expressive syntax for data manipulation and analysis
+**For Engineers**: High-performance DSP and numerical computing
+**For Mathematicians**: Natural mathematical notation and operations
+**For Programmers**: Modern functional programming with practical features
 
-**¿Preguntas?** Abre un issue en GitHub o únete a las discusiones.
+---
+
+**Current Version**: 0.4.0
+
+**Questions?** Open an issue on GitHub or join the discussions.
 
 ---
 
 <p align="center">
-  <strong>Construido con ❤️ por la comunidad de Achronyme</strong>
+  <strong>Built with ❤️ by the Achronyme community</strong>
   <br>
-  Democratizando el acceso a cálculo matemático de clase mundial
+  Making mathematical computing accessible and elegant
 </p>
