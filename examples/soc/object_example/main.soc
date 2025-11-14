@@ -12,20 +12,3 @@ let pollito = CrearTejido(paraCrearPollito)
 print("Resultado de pedir 0:", pollito.hacerPedido(0))
 print("Resultado de pedir 3:", pollito.hacerPedido(3))
 print("Resultado de pedir 1:", pollito.hacerPedido(1))
-
-let loop = (n) => do {
-    mut i = n
-    while(i > 0){
-        i = i - 1
-    }
-    print("Contando hasta", n)
-}
-
-loop(1)
-loop(10)
-loop(100)
-loop(1000)
-loop(10000)
-loop(100000)
-loop(1000000)
-loop(10000000)
