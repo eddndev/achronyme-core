@@ -62,7 +62,7 @@ string_char = {
 
 // Reserved keywords (use word boundaries to prevent matching prefixes)
 keyword = _{
-    ("let" | "mut" | "rec" | "self" | "true" | "false" | "import" | "from" | "export" | "as" | "return") ~ !ASCII_ALPHANUMERIC
+    ("let" | "mut" | "rec" | "self" | "true" | "false" | "import" | "from" | "export" | "as" | "return" | "while") ~ !ASCII_ALPHANUMERIC
 }
 
 // Identifiers: x, foo, my_var, PI, sin (but not keywords)
@@ -161,10 +161,11 @@ lambda = {
 // ============================================================================
 // Extensible system for control flow: if, match (future), while (future), etc.
 
-// Control flow expression: currently only if, extensible for match, while, for, etc.
+// Control flow expression: if, while, and more in the future
 control_flow_expr = {
     if_expr
-    // Future: | match_expr | while_expr | for_expr
+  | while_expr
+    // Future: | match_expr | for_expr
 }
 
 // If expression: if(condition) { block } else { block }
@@ -173,6 +174,11 @@ control_flow_expr = {
 if_expr = {
     "if" ~ "(" ~ expr ~ ")" ~ &"{" ~ block ~
     ("else" ~ (if_expr | block))?
+}
+
+// While loop: while(condition) { block }
+while_expr = {
+    "while" ~ "(" ~ expr ~ ")" ~ &"{" ~ block
 }
 
 // ============================================================================

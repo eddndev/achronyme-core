@@ -308,6 +308,9 @@ impl Evaluator {
                 then_expr,
                 else_expr,
             } => handlers::control_flow::evaluate_if(self, condition, then_expr, else_expr),
+            AstNode::WhileLoop { condition, body } => {
+                handlers::control_flow::evaluate_while(self, condition, body)
+            }
             AstNode::Piecewise { cases, default } => {
                 handlers::control_flow::evaluate_piecewise(self, cases, default)
             }

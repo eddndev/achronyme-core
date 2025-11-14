@@ -37,6 +37,9 @@ pub fn is_tail_position(node: &AstNode) -> bool {
             is_tail_position(then_expr) && is_tail_position(else_expr)
         }
 
+        // While loop: body is NOT in tail position (loop returns to top)
+        AstNode::WhileLoop { .. } => false,
+
         // Piecewise: all result branches must be in tail position
         AstNode::Piecewise { cases, default } => {
             cases.iter().all(|(_, result)| is_tail_position(result))
@@ -144,6 +147,10 @@ fn contains_rec(node: &AstNode) -> bool {
             contains_rec(condition) || contains_rec(then_expr) || contains_rec(else_expr)
         }
 
+        AstNode::WhileLoop { condition, body } => {
+            contains_rec(condition) || contains_rec(body)
+        }
+
         AstNode::Piecewise { cases, default } => {
             cases.iter().any(|(cond, result)| contains_rec(cond) || contains_rec(result))
                 || default.as_ref().map(|d| contains_rec(d)).unwrap_or(false)
@@ -247,6 +254,13 @@ fn all_rec_are_tail_helper(node: &AstNode, in_tail_position: bool) -> bool {
             all_rec_are_tail_helper(condition, false)
                 && all_rec_are_tail_helper(then_expr, in_tail_position)
                 && all_rec_are_tail_helper(else_expr, in_tail_position)
+        }
+
+        // While loop: neither condition nor body are in tail position
+        // (the body loops back, so it's never the last operation)
+        AstNode::WhileLoop { condition, body } => {
+            all_rec_are_tail_helper(condition, false)
+                && all_rec_are_tail_helper(body, false)
         }
 
         // Piecewise: result branches inherit tail position, conditions don't

@@ -113,6 +113,13 @@ pub enum AstNode {
     DoBlock {
         statements: Vec<AstNode>,
     },
+    // While loop: while(condition) { body }
+    // Executes body repeatedly while condition is true
+    // Returns the value of the last iteration, or 0 if never executed
+    WhileLoop {
+        condition: Box<AstNode>,
+        body: Box<AstNode>,
+    },
     // Import statement: import { sin, cos } from "math"
     // Supports aliasing: import { mean as average } from "stats"
     Import {

@@ -931,6 +931,7 @@ fn build_control_flow_expr(pair: Pair<Rule>) -> Result<AstNode, String> {
 
     match inner.as_rule() {
         Rule::if_expr => build_if_expr(inner),
+        Rule::while_expr => build_while_expr(inner),
         // Future: Rule::match_expr => build_match_expr(inner),
         _ => Err(format!("Unexpected control flow rule: {:?}", inner.as_rule()))
     }
@@ -969,6 +970,28 @@ fn build_if_expr(pair: Pair<Rule>) -> Result<AstNode, String> {
         condition,
         then_expr,
         else_expr,
+    })
+}
+
+/// Build while expression: while(condition) { block }
+fn build_while_expr(pair: Pair<Rule>) -> Result<AstNode, String> {
+    let mut inner = pair.into_inner();
+
+    // Grammar: "while" ~ "(" ~ expr ~ ")" ~ &"{" ~ block
+
+    // Get condition
+    let condition_pair = inner.next()
+        .ok_or("Missing condition in while expression")?;
+    let condition = Box::new(build_ast_from_expr(condition_pair)?);
+
+    // Get body block
+    let body_pair = inner.next()
+        .ok_or("Missing body block in while expression")?;
+    let body = Box::new(build_block(body_pair)?);
+
+    Ok(AstNode::WhileLoop {
+        condition,
+        body,
     })
 }
 

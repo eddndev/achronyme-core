@@ -24,6 +24,36 @@ pub fn evaluate_if(
     }
 }
 
+/// Evaluate a while loop
+pub fn evaluate_while(
+    evaluator: &mut Evaluator,
+    condition: &AstNode,
+    body: &AstNode,
+) -> Result<Value, String> {
+    let mut last_value = Value::Number(0.0);
+
+    loop {
+        // Evaluate condition
+        let cond_val = evaluator.evaluate(condition)?;
+        let cond_bool = value_to_bool(&cond_val)?;
+
+        // If condition is false, exit loop
+        if !cond_bool {
+            break;
+        }
+
+        // Execute body
+        last_value = evaluator.evaluate(body)?;
+
+        // Check for early return - propagate it immediately
+        if matches!(last_value, Value::EarlyReturn(_)) {
+            return Ok(last_value);
+        }
+    }
+
+    Ok(last_value)
+}
+
 /// Evaluate a piecewise function
 pub fn evaluate_piecewise(
     evaluator: &mut Evaluator,
