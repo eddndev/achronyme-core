@@ -119,11 +119,23 @@ lambda_params = {
   | ("(" ~ (identifier ~ ("," ~ identifier)*)? ~ ")") // Multi param or no params: (x, y) or ()
 }
 
-// Do block: do { let a = 1; let b = 2; a + b }
-// A block that contains a sequence of statements
+// ============================================================================
+// Unified Block System
+// ============================================================================
+// Blocks can contain a sequence of statements or a single expression
+// Used by: do blocks, if expressions, match expressions (future), etc.
+
+// Generic block: { sequence or statement }
+// The last value in the block is its return value
+// statement includes expr, so this covers all cases
+block = {
+    "{" ~ (sequence | statement) ~ "}"
+}
+
+// Do block: do { ... }
+// Explicit block expression with "do" keyword
 do_block = {
-    "do" ~ "{" ~ sequence ~ "}"
-  | "do" ~ "{" ~ statement ~ "}" // Single statement (no semicolon required)
+    "do" ~ block
 }
 
 // Lambda body: can be an expression or a do block
@@ -134,6 +146,25 @@ lambda_body = {
 // Lambda: x => x^2 or (x, y) => x + y or x => do { ... }
 lambda = {
     lambda_params ~ "=>" ~ lambda_body
+}
+
+// ============================================================================
+// Control Flow Expressions
+// ============================================================================
+// Extensible system for control flow: if, match (future), while (future), etc.
+
+// Control flow expression: currently only if, extensible for match, while, for, etc.
+control_flow_expr = {
+    if_expr
+    // Future: | match_expr | while_expr | for_expr
+}
+
+// If expression: if(condition) { block } else { block }
+// The condition MUST be in parentheses to avoid ambiguity with function calls
+// Positive lookahead &"{" ensures we don't confuse with if(cond, then, else) function
+if_expr = {
+    "if" ~ "(" ~ expr ~ ")" ~ &"{" ~ block ~
+    ("else" ~ (if_expr | block))?
 }
 
 // ============================================================================
@@ -151,17 +182,19 @@ self_ref = { "self" ~ !ASCII_ALPHANUMERIC }
 rec_ref = { "rec" ~ !ASCII_ALPHANUMERIC }
 
 // Primary expressions (highest precedence)
+// IMPORTANT: Order matters in PEG! More specific rules must come before general ones
 primary = {
-    boolean        // Boolean literals
-  | string_literal // String literals
-  | complex        // Must come before number (3i contains number)
+    boolean            // Boolean literals
+  | string_literal     // String literals
+  | complex            // Must come before number (3i contains number)
   | number
-  | record         // Record literals { key: value }
-  | array          // Arrays/tensors (vectors, matrices, and higher-dimensional)
-  | do_block       // Do blocks (must come before lambda to avoid ambiguity)
+  | control_flow_expr  // Control flow (if, match, etc.) - before record to avoid ambiguity
+  | record             // Record literals { key: value }
+  | array              // Arrays/tensors (vectors, matrices, and higher-dimensional)
+  | do_block           // Do blocks (must come before lambda to avoid ambiguity)
   | lambda
-  | self_ref       // Self-reference in records
-  | rec_ref        // Rec-reference for recursive calls
+  | self_ref           // Self-reference in records
+  | rec_ref            // Rec-reference for recursive calls
   | identifier
   | "(" ~ expr ~ ")"
 }

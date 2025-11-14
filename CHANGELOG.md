@@ -7,6 +7,100 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Module System, Mutability, and Do Blocks 🚀
+
+**Complete Module System:**
+- **`import` Statement**: Import functionality from built-in or user-defined modules.
+  - `import { mean, std } from "stats"`
+  - `import { double } from "src/utils"`
+- **`export` Statement**: Export functions and values from a module.
+  - `export { myFunction, myValue }`
+- **Built-in Modules**: `stats`, `math`, `linalg`.
+- **User-Defined Modules**: Create reusable `.soc` files.
+- **Module Resolution**: Relative paths from the importing file.
+
+**Mutability:**
+- **`mut` Keyword**: Declare mutable variables and record fields.
+  - `mut counter = 0`
+  - `let config = { mut value: 10 }`
+- **Reassignment**: Mutable variables can be reassigned using `=`.
+  - `counter = counter + 1`
+  - `config.value = 20`
+- **Stateful Objects**: Create objects with methods that mutate internal state via `self`.
+  ```javascript
+  let counter = {
+      mut value: 0,
+      increment: () => do { self.value = self.value + 1 }
+  }
+  ```
+
+**Do Blocks:**
+- **`do { ... }` Syntax**: Group multiple statements into a single expression.
+- **Local Scope**: `let` bindings inside `do` are local.
+- **Return Value**: The value of the last expression is returned.
+  ```javascript
+  let result = do {
+      let x = 5;
+      let y = 10;
+      x + y  // Returns 15
+  }
+  ```
+
+**Breaking Changes:**
+- `import`, `export`, `from`, `as`, `mut` are now reserved keywords.
+
+### Added - Environment I/O and Persistence 💾
+
+**Complete Environment Serialization:**
+- **`save_env()`**: Save the current REPL environment to a compressed `.ach` file.
+  - `save_env("my_session.ach")`
+  - Advanced options: filtering, compression level, metadata.
+- **`restore_env()`**: Load an environment from a file.
+  - `restore_env("my_session.ach")`
+  - Modes: `merge` (default), `replace`, `namespace`.
+- **`env_info()`**: Inspect metadata of an `.ach` file without loading.
+  - `env_info("my_session.ach")` -> `{ created_at, num_bindings, ... }`
+- **`.ach` File Format**:
+  - Custom binary format with versioning.
+  - Zstd compression and SHA-256 checksums for integrity.
+  - MessagePack serialization for cross-platform compatibility.
+
+### Added - Graph Theory & PERT/CPM Analysis 🌐
+
+**Comprehensive Graph Algorithm Suite:**
+- **Graph Construction**: `network()` with `->` (directed) and `<>` (undirected) edge syntax.
+- **Traversal**: `bfs`, `dfs`, `bfs_path`.
+- **Shortest Path**: `dijkstra` for weighted graphs.
+- **Minimum Spanning Tree**: `kruskal`, `prim`.
+- **Topological Sort**: `topological_sort` for DAGs.
+- **Cycle Detection**: `has_cycle`.
+- **Connectivity**: `is_connected`, `connected_components`.
+
+**Full PERT/CPM Project Management Suite:**
+- **Critical Path Method**: `forward_pass`, `backward_pass`, `calculate_slack`, `critical_path`, `project_duration`.
+- **Probabilistic PERT**: `expected_time`, `task_variance`, `project_variance`, `completion_probability`, `time_for_probability`.
+- **Complete Analysis**: `pert_analysis` for one-stop project overview.
+
+### Added - Expanded Standard Library 📚
+
+**New String Functions:**
+- **Case Conversion**: `upper()`, `lower()`.
+- **Whitespace**: `trim()`, `trim_start()`, `trim_end()`.
+- **Searching**: `starts_with()`, `ends_with()`, `contains()`.
+- **Manipulation**: `replace()`, `split()`, `join()`.
+- **Padding**: `pad_start()`, `pad_end()`.
+- **Operator**: `+` for string concatenation.
+
+**New Array & Utility Functions:**
+- **Utilities**: `print()`, `type()`, `str()`.
+- **Array Creation**: `range()`.
+- **Array Operations**: `product()`, `reverse()`.
+- **Predicate Functions**: `any()`, `all()`, `find()`, `findIndex()`, `count()`.
+
+**Linear Algebra Decompositions:**
+- **Decompositions**: `lu`, `qr`, `cholesky`, `svd`.
+- **Eigenvalue Solvers**: `eigenvalues`, `eigenvectors`, `power_iteration`.
+
 ### Added - Tensor Indexing & Slicing 🎯✂️
 
 **Complete N-Dimensional Tensor Indexing:**

@@ -116,8 +116,15 @@ let fact = n =>
 
 ### Control Flow
 ```javascript
-// if() function
+// if() function (functional form)
 if(x > 0, 1, -1)
+
+// if-else statement (block form)
+if (x < 0) {
+    -1
+} else {
+    1
+}
 
 // piecewise() for multiple conditions
 piecewise(

@@ -727,6 +727,7 @@ fn build_primary(pair: Pair<Rule>) -> Result<AstNode, String> {
         Rule::vector => build_array(inner),  // Alias for array
         Rule::matrix => build_array(inner),  // Alias for array
         Rule::record => build_record(inner),
+        Rule::control_flow_expr => build_control_flow_expr(inner),
         Rule::do_block => build_do_block(inner),
         Rule::lambda => build_lambda(inner),
 
@@ -854,33 +855,108 @@ fn extract_lambda_params(pair: Pair<Rule>) -> Result<Vec<String>, String> {
     Ok(params)
 }
 
-// Build do block: do { statements }
-fn build_do_block(pair: Pair<Rule>) -> Result<AstNode, String> {
-    let mut statements = Vec::new();
+// ============================================================================
+// Unified Block System
+// ============================================================================
 
-    for inner_pair in pair.into_inner() {
-        match inner_pair.as_rule() {
-            Rule::sequence => {
-                // Extract statements from the sequence
-                for stmt_pair in inner_pair.into_inner() {
-                    if stmt_pair.as_rule() == Rule::statement {
-                        statements.push(build_ast_from_statement(stmt_pair)?);
-                    }
+/// Build generic block: { sequence or statement }
+/// Used by do blocks, if expressions, match expressions (future), etc.
+/// Returns either a Sequence or a single statement
+fn build_block(pair: Pair<Rule>) -> Result<AstNode, String> {
+    let inner = pair.into_inner().next()
+        .ok_or("Empty block")?;
+
+    match inner.as_rule() {
+        Rule::sequence => {
+            // Build sequence: multiple statements
+            let mut statements = Vec::new();
+            for stmt_pair in inner.into_inner() {
+                if stmt_pair.as_rule() == Rule::statement {
+                    statements.push(build_ast_from_statement(stmt_pair)?);
                 }
             }
-            Rule::statement => {
-                // Single statement (no semicolon)
-                statements.push(build_ast_from_statement(inner_pair)?);
+            if statements.is_empty() {
+                return Err("Empty sequence in block".to_string());
             }
-            _ => {}
+            Ok(AstNode::Sequence { statements })
         }
+        Rule::statement => {
+            // Single statement (can be assignment, let, expr, etc.)
+            build_ast_from_statement(inner)
+        }
+        _ => Err(format!("Unexpected block content: {:?}", inner.as_rule()))
     }
+}
 
-    if statements.is_empty() {
-        return Err("Empty do block".to_string());
-    }
+/// Build do block: do { ... }
+/// Now uses the unified build_block and wraps the result in DoBlock
+fn build_do_block(pair: Pair<Rule>) -> Result<AstNode, String> {
+    // do_block grammar: "do" ~ block
+    let block_pair = pair.into_inner().next()
+        .ok_or("Missing block in do block")?;
+
+    let block_content = build_block(block_pair)?;
+
+    // Wrap the block content in DoBlock
+    // Convert the result to a statements vec for DoBlock
+    let statements = match block_content {
+        AstNode::Sequence { statements } => statements,
+        single_expr => vec![single_expr],
+    };
 
     Ok(AstNode::DoBlock { statements })
+}
+
+// ============================================================================
+// Control Flow Expressions
+// ============================================================================
+
+/// Build control flow expression (if, match, while, etc.)
+fn build_control_flow_expr(pair: Pair<Rule>) -> Result<AstNode, String> {
+    let inner = pair.into_inner().next()
+        .ok_or("Empty control flow expression")?;
+
+    match inner.as_rule() {
+        Rule::if_expr => build_if_expr(inner),
+        // Future: Rule::match_expr => build_match_expr(inner),
+        _ => Err(format!("Unexpected control flow rule: {:?}", inner.as_rule()))
+    }
+}
+
+/// Build if expression: if(condition) { block } else { block }
+fn build_if_expr(pair: Pair<Rule>) -> Result<AstNode, String> {
+    let mut inner = pair.into_inner();
+
+    // Grammar: "if" ~ "(" ~ expr ~ ")" ~ &"{" ~ block ~ ("else" ~ (if_expr | block))?
+
+    // Get condition
+    let condition_pair = inner.next()
+        .ok_or("Missing condition in if expression")?;
+    let condition = Box::new(build_ast_from_expr(condition_pair)?);
+
+    // Get then block
+    let then_block_pair = inner.next()
+        .ok_or("Missing then block in if expression")?;
+    let then_expr = Box::new(build_block(then_block_pair)?);
+
+    // Get optional else clause
+    let else_expr = if let Some(else_pair) = inner.next() {
+        // else_pair can be either if_expr or block
+        match else_pair.as_rule() {
+            Rule::if_expr => Box::new(build_if_expr(else_pair)?),
+            Rule::block => Box::new(build_block(else_pair)?),
+            _ => return Err(format!("Unexpected else clause rule: {:?}", else_pair.as_rule()))
+        }
+    } else {
+        // No else clause - return 0 (could also be unit/null in the future)
+        Box::new(AstNode::Number(0.0))
+    };
+
+    Ok(AstNode::If {
+        condition,
+        then_expr,
+        else_expr,
+    })
 }
 
 
@@ -964,5 +1040,85 @@ mod tests {
         let result = parse("3i").unwrap();
         assert_eq!(result.len(), 1);
         assert!(matches!(result[0], AstNode::ComplexLiteral { re: 0.0, im: 3.0 }));
+    }
+
+    #[test]
+    fn test_parse_if_expr_with_else() {
+        let result = parse("if(true) { 42 } else { 0 }");
+        match result {
+            Ok(ast) => {
+                assert_eq!(ast.len(), 1);
+                assert!(matches!(ast[0], AstNode::If { .. }));
+            }
+            Err(e) => {
+                panic!("Failed to parse if expression: {}", e);
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_if_expr_without_else() {
+        let result = parse("if(x > 5) { 42 }");
+        match result {
+            Ok(ast) => {
+                assert_eq!(ast.len(), 1);
+                assert!(matches!(ast[0], AstNode::If { .. }));
+            }
+            Err(e) => {
+                panic!("Failed to parse if expression without else: {}", e);
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_if_expr_else_if() {
+        let result = parse("if(x > 10) { 1 } else if(x > 5) { 2 } else { 3 }");
+        match result {
+            Ok(ast) => {
+                eprintln!("Parsed {} statements", ast.len());
+                for (i, node) in ast.iter().enumerate() {
+                    eprintln!("Statement {}: {:?}", i, node);
+                }
+                // The parser might be splitting on semicolons or seeing this as multiple statements
+                // Let's check if it's actually one If node
+                if ast.len() == 1 {
+                    assert!(matches!(ast[0], AstNode::If { .. }));
+                } else {
+                    // If it parsed as multiple statements, the structure might be different
+                    // This could happen if there are implicit semicolons or whitespace issues
+                    panic!("Expected 1 statement, got {}", ast.len());
+                }
+            }
+            Err(e) => {
+                panic!("Failed to parse else-if chain: {}", e);
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_if_vs_function_call() {
+        // if(x, y, z) should parse as function call, not if expression
+        let result = parse("if(true, 42, 0)");
+        match result {
+            Ok(ast) => {
+                assert_eq!(ast.len(), 1);
+                // Debug: print what we got
+                eprintln!("Parsed as: {:?}", ast[0]);
+                // Should be a CallExpression, NOT If
+                // Actually, the functional if(cond, then, else) gets converted to AstNode::If
+                // in the postfix handler (see line 658-666 in pest_parser.rs)
+                // So this test expectation is wrong - both syntaxes produce AstNode::If
+                match &ast[0] {
+                    AstNode::If { .. } => {
+                        // This is actually CORRECT - functional if is also converted to If node
+                        // The difference is just syntactic
+                    }
+                    _ => panic!("Expected If node for if(cond, then, else)")
+                }
+            }
+            Err(e) => {
+                panic!("Failed to parse functional if: {}", e);
+            }
+        }
     }
 }

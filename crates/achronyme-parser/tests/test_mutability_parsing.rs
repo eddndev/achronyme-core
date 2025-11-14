@@ -278,6 +278,11 @@ fn test_parse_record_with_mutable_method() {
         mut valor: 0,
         incrementar: () => do { self.valor = self.valor + 1 }
     }"#);
+
+    if let Err(ref e) = result {
+        eprintln!("Parse error: {}", e);
+    }
+
     assert!(result.is_ok());
 
     let ast = result.unwrap();

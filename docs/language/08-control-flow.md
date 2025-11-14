@@ -1,8 +1,12 @@
 # Control Flow
 
-Achronyme uses **functional control flow** with `if()` and `piecewise()` functions instead of traditional statements.
+Achronyme provides two forms of conditional expressions:
+1. **Functional form**: `if(condition, then_value, else_value)` - Expression-based
+2. **Statement form**: `if (condition) { ... } else { ... }` - Block-based
 
-## The if() Function
+Both forms are expressions that return values.
+
+## The if() Function (Functional Form)
 
 ### Basic Syntax
 
@@ -118,6 +122,150 @@ in_range(15, 0, 10)   // false
 let xor = (a, b) => if((a || b) && !(a && b), true, false)
 xor(true, false)   // true
 xor(true, true)    // false
+```
+
+## if-else Statements (Block Form)
+
+Since version 0.1.0, Achronyme supports traditional `if-else` statement syntax with blocks.
+
+### Basic Syntax
+
+```javascript
+if (condition) {
+    // Code executed if condition is true
+} else {
+    // Code executed if condition is false
+}
+```
+
+### Simple Examples
+
+```javascript
+// Basic if-else
+let f = (x) => if (x < 0) { -1 } else { 1 }
+f(-5)  // -1
+f(10)  // 1
+
+// With multiple statements
+let classify = (x) => if (x < 0) {
+    print("Negative")
+    -1
+} else {
+    print("Positive or zero")
+    1
+}
+
+// Assigning result
+let sign = if (value < 0) {
+    -1
+} else if (value > 0) {
+    1
+} else {
+    0
+}
+```
+
+### Key Features
+
+- **Returns a value**: The last expression in each block becomes the return value
+- **Multi-statement blocks**: Can contain multiple statements separated by semicolons (`;`)
+- **Else-if chains**: Support `else if` for multiple conditions
+- **No `do` required**: Unlike lambdas, if-else blocks directly support multiple statements
+
+**Note**: Lambdas with multiple statements still require `do` blocks:
+```javascript
+// Lambda needs do for multiple statements
+map((x) => do {
+    let doubled = x * 2;
+    doubled + 1
+}, data)
+
+// But if-else blocks don't need do
+if (x > 0) {
+    let result = x * 2;
+    result + 1
+} else {
+    0
+}
+```
+
+### Comparison: Function vs Statement Form
+
+```javascript
+// Function form (compact)
+let abs1 = x => if(x < 0, -x, x)
+
+// Statement form (more readable for complex logic)
+let abs2 = x => if (x < 0) {
+    print("Negating:", x)
+    -x
+} else {
+    print("Already positive:", x)
+    x
+}
+
+// Both work the same way
+abs1(-5)  // 5
+abs2(-5)  // 5 (also prints message)
+```
+
+### When to Use Each Form
+
+**Use function form `if(...)` when:**
+- Simple, single-line conditions
+- Compact expressions needed
+- Functional programming style preferred
+- Inline in expressions
+
+**Use statement form `if {...} else {...}` when:**
+- Multiple statements per branch
+- Complex logic requires readability
+- Need to print/debug intermediate steps
+- Coming from imperative language background
+
+### Examples with Complex Logic
+
+```javascript
+// Multi-statement branches
+let processValue = (x) => if (x < 0) {
+    let abs = -x;
+    print("Processing negative:", abs);
+    abs * 2
+} else if (x == 0) {
+    print("Zero value");
+    0
+} else {
+    print("Processing positive:", x);
+    x * 2
+}
+
+// Nested if-else
+let categorize = (age) => if (age < 18) {
+    "Minor"
+} else if (age < 65) {
+    if (age < 30) {
+        "Young Adult"
+    } else {
+        "Adult"
+    }
+} else {
+    "Senior"
+}
+
+// With do blocks for side effects
+let updateCounter = (val) => if (val > 0) {
+    do {
+        counter = counter + 1;
+        print("Incremented to:", counter);
+        counter
+    }
+} else {
+    do {
+        counter = counter - 1;
+        print("Decremented to:", counter);
+        counter
+    }
+}
 ```
 
 ### if() with Higher-Order Functions
