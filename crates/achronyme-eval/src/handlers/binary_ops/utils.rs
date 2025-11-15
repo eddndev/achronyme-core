@@ -46,5 +46,7 @@ pub fn value_to_string(value: &Value) -> String {
             value_to_string(&borrowed)
         }
         Value::Null => "null".to_string(),
+        Value::Generator(_) => "<generator>".to_string(),
+        Value::GeneratorYield(_) => "<generator-yield>".to_string(),
     }
 }

@@ -112,6 +112,16 @@ impl SerializedValue {
             },
 
             Value::Null => SerializedValue::Null,
+
+            Value::Generator(_) => {
+                // Generators cannot be serialized as they contain runtime state
+                SerializedValue::Unsupported("generator".to_string())
+            },
+
+            Value::GeneratorYield(_) => {
+                // GeneratorYield is an internal marker and should never be persisted
+                SerializedValue::Unsupported("generator yield".to_string())
+            },
         }
     }
 

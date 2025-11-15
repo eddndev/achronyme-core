@@ -15,6 +15,7 @@ impl AstParser {
             Rule::mut_statement => self.build_mut_statement(inner),
             Rule::type_alias_statement => self.build_type_alias_statement(inner),
             Rule::return_statement => self.build_return_statement(inner),
+            Rule::yield_statement => self.build_yield_statement(inner),
             Rule::assignment => self.build_assignment(inner),
             Rule::expr => self.build_ast_from_expr(inner),
             _ => Err(format!("Unexpected statement rule: {:?}", inner.as_rule()))
@@ -219,6 +220,18 @@ impl AstParser {
         Ok(AstNode::TypeAlias {
             name: identifier,
             type_definition,
+        })
+    }
+
+    pub(super) fn build_yield_statement(&mut self, pair: Pair<Rule>) -> Result<AstNode, String> {
+        let mut inner = pair.into_inner();
+
+        // Grammar: "yield" ~ expr
+        let value = inner.next()
+            .ok_or("Missing value in yield statement")?;
+
+        Ok(AstNode::Yield {
+            value: Box::new(self.build_ast_from_expr(value)?),
         })
     }
 }

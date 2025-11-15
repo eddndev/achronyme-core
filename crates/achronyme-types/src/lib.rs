@@ -8,3 +8,4 @@ pub mod environment;
 // Re-exports
 pub use lambda_evaluator::LambdaEvaluator;
 pub use environment::Environment;
+pub use value::GeneratorState;

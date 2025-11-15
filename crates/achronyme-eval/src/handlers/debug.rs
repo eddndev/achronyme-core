@@ -98,6 +98,16 @@ fn describe_value(value: &Value, indent: usize) -> String {
         }
 
         Value::Null => "null".to_string(),
+
+        Value::Generator(gen_rc) => {
+            let state = gen_rc.borrow();
+            format!("Generator(position: {}, done: {}, statements: {})",
+                state.position, state.done, state.statements.len())
+        }
+
+        Value::GeneratorYield(inner) => {
+            format!("GeneratorYield({})", describe_value(inner, indent))
+        }
     }
 }
 

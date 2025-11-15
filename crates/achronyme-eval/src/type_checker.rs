@@ -76,6 +76,8 @@ fn get_value_type_name(value: &Value) -> String {
         Value::EarlyReturn(_) => "EarlyReturn (internal)".to_string(),
         Value::MutableRef(_) => "MutableRef".to_string(),
         Value::Null => "null".to_string(),
+        Value::Generator(_) => "Generator".to_string(),
+        Value::GeneratorYield(_) => "GeneratorYield (internal)".to_string(),
     }
 }
 
@@ -462,6 +464,10 @@ pub fn infer_type(value: &Value) -> TypeAnnotation {
         Value::TailCall(_) => TypeAnnotation::Any,
         Value::EarlyReturn(_) => TypeAnnotation::Any,
         Value::MutableRef(_) => unreachable!("MutableRef should be dereferenced"),
+        // Generator type - represents an iterator
+        Value::Generator(_) => TypeAnnotation::Any, // TODO: Add Generator type annotation
+        // GeneratorYield is internal marker - should not appear in type inference
+        Value::GeneratorYield(_) => TypeAnnotation::Any,
     }
 }
 

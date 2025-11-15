@@ -62,7 +62,7 @@ string_char = {
 
 // Reserved keywords (use word boundaries to prevent matching prefixes)
 keyword = _{
-    ("let" | "mut" | "rec" | "self" | "true" | "false" | "import" | "from" | "export" | "as" | "return" | "while" | "type") ~ !ASCII_ALPHANUMERIC
+    ("let" | "mut" | "rec" | "self" | "true" | "false" | "import" | "from" | "export" | "as" | "return" | "while" | "type" | "yield" | "generate" | "for" | "in") ~ !ASCII_ALPHANUMERIC
 }
 
 // Identifiers: x, foo, my_var, PI, sin (but not keywords)
@@ -239,9 +239,15 @@ do_block = {
     "do" ~ block
 }
 
-// Lambda body: can be an expression or a do block
+// Generate block: generate { ... }
+// Creates a generator function body with yield support
+generate_block = {
+    "generate" ~ block
+}
+
+// Lambda body: can be an expression, do block, or generate block
 lambda_body = {
-    do_block | expr
+    generate_block | do_block | expr
 }
 
 // Lambda with type annotations (gradual typing)
@@ -258,11 +264,12 @@ lambda = {
 // ============================================================================
 // Extensible system for control flow: if, match (future), while (future), etc.
 
-// Control flow expression: if, while, and more in the future
+// Control flow expression: if, while, for-in, and more in the future
 control_flow_expr = {
     if_expr
   | while_expr
-    // Future: | match_expr | for_expr
+  | for_in_loop
+    // Future: | match_expr
 }
 
 // If expression: if(condition) { block } else { block }
@@ -276,6 +283,12 @@ if_expr = {
 // While loop: while(condition) { block }
 while_expr = {
     "while" ~ "(" ~ expr ~ ")" ~ &"{" ~ block
+}
+
+// For-in loop: for(variable in iterable) { block }
+// Iterates over an iterator (object with next() method)
+for_in_loop = {
+    "for" ~ "(" ~ identifier ~ "in" ~ expr ~ ")" ~ &"{" ~ block
 }
 
 // ============================================================================
@@ -470,8 +483,15 @@ return_statement = {
     "return" ~ expr
 }
 
-// Statement: import, export, let, mut, type alias, return, assignment, or expression
-// Try import/export first, then return, then assignment before expr to avoid ambiguity
+// Yield statement: yield expr
+// Suspends generator execution and returns the value
+// Only valid inside generate blocks
+yield_statement = {
+    "yield" ~ expr
+}
+
+// Statement: import, export, let, mut, type alias, return, yield, assignment, or expression
+// Try import/export first, then return/yield, then assignment before expr to avoid ambiguity
 statement = {
     import_statement
   | export_statement
@@ -479,6 +499,7 @@ statement = {
   | mut_statement
   | type_alias_statement
   | return_statement
+  | yield_statement
   | assignment
   | expr
 }

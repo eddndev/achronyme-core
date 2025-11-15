@@ -12,6 +12,7 @@ impl AstParser {
         match inner.as_rule() {
             Rule::if_expr => self.build_if_expr(inner),
             Rule::while_expr => self.build_while_expr(inner),
+            Rule::for_in_loop => self.build_for_in_loop(inner),
             // Future: Rule::match_expr => build_match_expr(inner),
             _ => Err(format!("Unexpected control flow rule: {:?}", inner.as_rule()))
         }
@@ -71,6 +72,34 @@ impl AstParser {
 
         Ok(AstNode::WhileLoop {
             condition,
+            body,
+        })
+    }
+
+    /// Build for-in loop: for(variable in iterable) { block }
+    pub(super) fn build_for_in_loop(&mut self, pair: Pair<Rule>) -> Result<AstNode, String> {
+        let mut inner = pair.into_inner();
+
+        // Grammar: "for" ~ "(" ~ identifier ~ "in" ~ expr ~ ")" ~ &"{" ~ block
+
+        // Get loop variable
+        let variable_pair = inner.next()
+            .ok_or("Missing variable in for-in loop")?;
+        let variable = variable_pair.as_str().to_string();
+
+        // Get iterable expression
+        let iterable_pair = inner.next()
+            .ok_or("Missing iterable in for-in loop")?;
+        let iterable = Box::new(self.build_ast_from_expr(iterable_pair)?);
+
+        // Get body block
+        let body_pair = inner.next()
+            .ok_or("Missing body block in for-in loop")?;
+        let body = Box::new(self.build_block(body_pair)?);
+
+        Ok(AstNode::ForInLoop {
+            variable,
+            iterable,
             body,
         })
     }

@@ -148,6 +148,23 @@ pub enum AstNode {
         name: String,
         type_definition: TypeAnnotation,
     },
+    // Yield statement: yield expr
+    // Suspends generator execution and returns the value
+    Yield {
+        value: Box<AstNode>,
+    },
+    // Generate block: generate { statements }
+    // Creates a generator function that can be paused and resumed
+    GenerateBlock {
+        statements: Vec<AstNode>,
+    },
+    // For-in loop: for(variable in iterable) { body }
+    // Iterates over an iterator (object with next() method)
+    ForInLoop {
+        variable: String,
+        iterable: Box<AstNode>,
+        body: Box<AstNode>,
+    },
 }
 
 /// Represents an array element - can be a single expression or a spread expression

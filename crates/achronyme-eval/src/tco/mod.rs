@@ -112,6 +112,14 @@ pub fn is_tail_position(node: &AstNode) -> bool {
 
         // Type alias is NOT tail position (it's a type declaration)
         AstNode::TypeAlias { .. } => false,
+
+        // Generator-related nodes are NOT tail positions
+        // Yield suspends execution, it's not a regular tail call
+        AstNode::Yield { .. } => false,
+        // Generate block creates a generator, not tail recursive
+        AstNode::GenerateBlock { .. } => false,
+        // For-in loops are NOT tail position
+        AstNode::ForInLoop { .. } => false,
     }
 }
 

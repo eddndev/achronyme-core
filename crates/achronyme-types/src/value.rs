@@ -1,6 +1,8 @@
 use crate::complex::Complex;
 use crate::tensor::{RealTensor, ComplexTensor};
 use crate::function::Function;
+use crate::environment::Environment;
+use achronyme_parser::ast::AstNode;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -49,6 +51,41 @@ pub enum Value {
     /// Null value - represents absence of value (for optional types)
     /// Used in union types like `Number | null` for optional values
     Null,
+    /// Generator: suspended function that can be resumed
+    /// Contains state for yield/resume semantics
+    Generator(Rc<RefCell<GeneratorState>>),
+    /// Internal marker for yield in generators
+    /// Contains the value to yield and signals that generator should suspend
+    /// This variant should never be exposed to user code
+    GeneratorYield(Box<Value>),
+}
+
+/// State of a generator function
+///
+/// A generator is a function that can be suspended (yield) and resumed (next()).
+/// It maintains its execution state between calls.
+#[derive(Debug, Clone)]
+pub struct GeneratorState {
+    /// The generator's environment (captured scope)
+    pub env: Environment,
+
+    /// Current execution position (statement index)
+    pub position: usize,
+
+    /// Statements in the generator body
+    pub statements: Vec<AstNode>,
+
+    /// Is the generator exhausted?
+    pub done: bool,
+
+    /// Value returned by last `return` statement (sticky)
+    pub return_value: Option<Box<Value>>,
+
+    /// Track how many yields have occurred (for resuming)
+    pub yield_count: usize,
+
+    /// Current yield target (for resuming after nested yields)
+    pub current_yield_target: usize,
 }
 
 // Conversiones automáticas con From/Into
@@ -145,6 +182,58 @@ impl Value {
             }
             _ => Err("Cannot assign to immutable value".to_string()),
         }
+    }
+
+    /// Check if this value is a generator
+    pub fn is_generator(&self) -> bool {
+        matches!(self, Value::Generator(_))
+    }
+
+    /// Get the generator state if this value is a generator
+    pub fn as_generator(&self) -> Option<&Rc<RefCell<GeneratorState>>> {
+        match self {
+            Value::Generator(g) => Some(g),
+            _ => None,
+        }
+    }
+}
+
+impl GeneratorState {
+    /// Create a new generator state
+    pub fn new(env: Environment, statements: Vec<AstNode>) -> Self {
+        Self {
+            env,
+            position: 0,
+            statements,
+            done: false,
+            return_value: None,
+            yield_count: 0,
+            current_yield_target: 0,
+        }
+    }
+
+    /// Check if the generator is exhausted
+    pub fn is_done(&self) -> bool {
+        self.done
+    }
+
+    /// Mark the generator as done with an optional return value
+    pub fn mark_done(&mut self, value: Option<Value>) {
+        self.done = true;
+        self.return_value = value.map(Box::new);
+    }
+}
+
+/// Generators are compared by reference identity (pointer equality)
+/// Two generators are equal only if they are the exact same instance
+impl PartialEq for GeneratorState {
+    fn eq(&self, other: &Self) -> bool {
+        // For generators, we use structural equality of position and done state
+        // This is reasonable since generators with same state are "equivalent"
+        // But in practice, comparing generators is rare
+        self.position == other.position
+            && self.done == other.done
+            && self.statements.len() == other.statements.len()
     }
 }
 

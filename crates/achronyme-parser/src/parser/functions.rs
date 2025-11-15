@@ -94,6 +94,7 @@ impl AstParser {
             Rule::lambda_body => {
                 let inner_body = next_pair.into_inner().next().ok_or("Empty lambda body")?;
                 match inner_body.as_rule() {
+                    Rule::generate_block => self.build_generate_block(inner_body)?,
                     Rule::do_block => self.build_do_block(inner_body)?,
                     Rule::expr => self.build_ast_from_expr(inner_body)?,
                     _ => return Err(format!("Unexpected lambda body rule: {:?}", inner_body.as_rule()))
@@ -107,6 +108,32 @@ impl AstParser {
             return_type,
             body: Box::new(body),
         })
+    }
+
+    pub(super) fn build_generate_block(&mut self, pair: Pair<Rule>) -> Result<AstNode, String> {
+        // Grammar: "generate" ~ block
+        let block_pair = pair.into_inner().next()
+            .ok_or("Missing block in generate statement")?;
+
+        // block contains sequence | statement
+        let inner = block_pair.into_inner().next()
+            .ok_or("Empty generate block")?;
+
+        let statements = match inner.as_rule() {
+            Rule::sequence => {
+                // Multiple statements
+                inner.into_inner()
+                    .map(|stmt_pair| self.build_ast_from_statement(stmt_pair))
+                    .collect::<Result<Vec<_>, _>>()?
+            }
+            Rule::statement => {
+                // Single statement
+                vec![self.build_ast_from_statement(inner)?]
+            }
+            _ => return Err(format!("Unexpected rule in generate block: {:?}", inner.as_rule()))
+        };
+
+        Ok(AstNode::GenerateBlock { statements })
     }
 
     pub(super) fn extract_lambda_params(&mut self, pair: Pair<Rule>) -> Result<Vec<String>, String> {

@@ -385,6 +385,18 @@ fn format_value(value: &achronyme_types::value::Value) -> String {
             format_value(&rc.borrow())
         }
         Value::Null => "null".to_string(),
+        Value::Generator(gen_rc) => {
+            let state = gen_rc.borrow();
+            if state.done {
+                "<generator:exhausted>".to_string()
+            } else {
+                "<generator>".to_string()
+            }
+        }
+        Value::GeneratorYield(_) => {
+            // GeneratorYield is an internal marker that should never reach the REPL
+            "<internal:generator-yield>".to_string()
+        }
     }
 }
 

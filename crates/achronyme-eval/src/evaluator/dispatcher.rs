@@ -97,6 +97,24 @@ impl Evaluator {
             AstNode::Piecewise { cases, default } => {
                 handlers::control_flow::evaluate_piecewise(self, cases, default)
             }
+            AstNode::ForInLoop { variable, iterable, body } => {
+                handlers::control_flow::evaluate_for_in(self, variable, iterable, body)
+            }
+
+            // Generators
+            AstNode::GenerateBlock { statements } => {
+                handlers::control_flow::evaluate_generate_block(self, statements)
+            }
+            AstNode::Yield { value } => {
+                // Check if we're in generator context
+                if !self.in_generator {
+                    return Err("yield can only be used inside a generator (generate { ... })".to_string());
+                }
+
+                // We're in generator context - evaluate and return yield marker
+                let yield_value = self.evaluate(value)?;
+                Ok(Value::GeneratorYield(Box::new(yield_value)))
+            }
 
             // Operations
             AstNode::BinaryOp { op, left, right } => {
@@ -181,6 +199,19 @@ impl Evaluator {
                         .ok_or_else(|| format!("Field '{}' not found in edge", field))
                 }
             }
+            Value::Generator(_) => {
+                // Generator field access - only 'next' is supported as a method call
+                // Field access alone (without call) is not meaningful for generators
+                match field {
+                    "next" => {
+                        // This shouldn't be reached because generator.next() is handled
+                        // in evaluate_call_expression. If we get here, user is accessing
+                        // .next without calling it.
+                        Err("Generator.next is a method - use generator.next() to call it".to_string())
+                    }
+                    _ => Err(format!("Generators only have a 'next' method, not '{}'", field)),
+                }
+            }
             _ => Err(format!("Cannot access field '{}' on non-record/edge value", field)),
         }
     }
@@ -215,6 +246,19 @@ impl Evaluator {
                         return result;
                     } else {
                         return Err(format!("Field '{}' is not a function", field));
+                    }
+                }
+                Value::Generator(ref gen_rc) => {
+                    // Generator method calls
+                    match field.as_str() {
+                        "next" => {
+                            if !args.is_empty() {
+                                return Err("Generator.next() takes no arguments".to_string());
+                            }
+                            // Resume the generator
+                            return handlers::control_flow::resume_generator(self, gen_rc);
+                        }
+                        _ => return Err(format!("Generators only have a 'next' method, not '{}'", field)),
                     }
                 }
                 _ => return Err(format!("Cannot access field '{}' on non-record value", field)),

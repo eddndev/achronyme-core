@@ -61,6 +61,8 @@ pub struct Evaluator {
     /// Type registry for storing type aliases
     /// Format: alias_name -> type_definition
     pub(crate) type_registry: HashMap<String, TypeAnnotation>,
+    /// Track if we're currently inside a generator (for yield validation)
+    pub(crate) in_generator: bool,
 }
 
 impl Evaluator {
@@ -77,6 +79,7 @@ impl Evaluator {
             current_file_dir: None,
             tco_mode: false,
             type_registry: HashMap::new(),
+            in_generator: false,
         }
     }
 
