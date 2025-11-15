@@ -2,11 +2,11 @@
 //
 // This module handles parsing of type annotations from Pest pairs into TypeAnnotation AST nodes.
 // Supports:
-// - Simple types: Number, Boolean, String, Complex
+// - Simple types: Number, Boolean, String, Complex, Edge
 // - Union types: Number | String | null
 // - Tensor types: Tensor<Number>, Tensor<Complex, [2,3]>
 // - Record types: {name: String, mut age: Number}
-// - Function types: Function<[Number, Number], Number>
+// - Function types: (Number, Number) => Number
 // - Any and null types
 
 use pest::iterators::Pair;
@@ -37,13 +37,19 @@ impl AstParser {
             Rule::vector_type => Ok(TypeAnnotation::Vector),
             Rule::record_type => self.parse_record_type(pair),
             Rule::function_type => self.parse_function_type(pair),
+            Rule::grouped_type => {
+                // Grouped type just unwraps: ((Number) => String) -> (Number) => String
+                let inner = pair.into_inner().next()
+                    .ok_or("Empty grouped type")?;
+                self.parse_type_annotation(inner)
+            }
             Rule::any_type => Ok(TypeAnnotation::Any),
             Rule::null_type => Ok(TypeAnnotation::Null),
             _ => Err(format!("Unexpected type annotation rule: {:?}", pair.as_rule()))
         }
     }
 
-    /// Parse simple types: Number, Boolean, String, Complex
+    /// Parse simple types: Number, Boolean, String, Complex, Edge
     fn parse_simple_type(&mut self, pair: Pair<Rule>) -> Result<TypeAnnotation, String> {
         let type_str = pair.as_str();
         match type_str {
@@ -51,6 +57,7 @@ impl AstParser {
             "Boolean" => Ok(TypeAnnotation::Boolean),
             "String" => Ok(TypeAnnotation::String),
             "Complex" => Ok(TypeAnnotation::Complex),
+            "Edge" => Ok(TypeAnnotation::Edge),
             _ => Err(format!("Unknown simple type: {}", type_str))
         }
     }
@@ -164,24 +171,24 @@ impl AstParser {
         Ok(TypeAnnotation::Record { fields })
     }
 
-    /// Parse function types: Function<[Number, String], Boolean>
+    /// Parse function types: (Number, String) => Boolean
     fn parse_function_type(&mut self, pair: Pair<Rule>) -> Result<TypeAnnotation, String> {
         let inner = pair.into_inner();
 
-        // First part is parameter types (may be empty)
+        // Collect all type annotations
+        // Grammar: "(" ~ (type_annotation ~ ("," ~ type_annotation)*)? ~ ")" ~ "=>" ~ type_annotation
+        // All children are type_annotation pairs, the last one is the return type
         let mut params = Vec::new();
-
-        // Collect parameter types until we find the return type
         let mut return_type_pair = None;
 
-        for param_pair in inner {
+        for type_pair in inner {
             // The last one is the return type
             if return_type_pair.is_some() {
                 // We already found return type, so previous one was a param
                 let param_ty = self.parse_type_annotation(return_type_pair.take().unwrap())?;
                 params.push(Some(param_ty));
             }
-            return_type_pair = Some(param_pair);
+            return_type_pair = Some(type_pair);
         }
 
         // Parse return type (the last pair we collected)

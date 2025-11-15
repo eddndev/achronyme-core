@@ -57,6 +57,9 @@ pub enum TypeAnnotation {
         return_type: Box<TypeAnnotation>,
     },
 
+    /// Edge type (graph edges: A -> B, A <> B)
+    Edge,
+
     /// Union type (CORE FEATURE)
     /// Represents "one of these types"
     /// Example: Number | String | null
@@ -80,6 +83,7 @@ impl TypeAnnotation {
             TypeAnnotation::String => "String".to_string(),
             TypeAnnotation::Complex => "Complex".to_string(),
             TypeAnnotation::Vector => "Vector".to_string(),
+            TypeAnnotation::Edge => "Edge".to_string(),
             TypeAnnotation::Null => "null".to_string(),
             TypeAnnotation::Any => "Any".to_string(),
 
@@ -120,7 +124,7 @@ impl TypeAnnotation {
                     .map(|p| p.as_ref().map_or("Any".to_string(), |t| t.to_string()))
                     .collect::<Vec<_>>()
                     .join(", ");
-                format!("Function<[{}], {}>", params_str, return_type.to_string())
+                format!("({}) => {}", params_str, return_type.to_string())
             }
 
             TypeAnnotation::Union(types) => {

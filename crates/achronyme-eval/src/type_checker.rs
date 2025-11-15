@@ -87,6 +87,7 @@ fn type_annotation_to_string(ty: &TypeAnnotation) -> String {
         TypeAnnotation::String => "String".to_string(),
         TypeAnnotation::Complex => "Complex".to_string(),
         TypeAnnotation::Vector => "Vector".to_string(),
+        TypeAnnotation::Edge => "Edge".to_string(),
         TypeAnnotation::Null => "null".to_string(),
         TypeAnnotation::Any => "Any".to_string(),
 
@@ -219,6 +220,9 @@ fn matches_type(value: &Value, expected: &TypeAnnotation) -> bool {
 
         // Vector type (heterogeneous, no element type checking)
         TypeAnnotation::Vector => matches!(value, Value::Vector(_)),
+
+        // Edge type (graph edges)
+        TypeAnnotation::Edge => matches!(value, Value::Edge { .. }),
 
         // Union type: value must match at least one variant
         TypeAnnotation::Union(types) => types.iter().any(|t| matches_type(value, t)),
@@ -441,8 +445,8 @@ pub fn infer_type(value: &Value) -> TypeAnnotation {
                 fields: type_fields,
             }
         }
+        Value::Edge { .. } => TypeAnnotation::Edge,
         // Internal values - should not appear in user code
-        Value::Edge { .. } => TypeAnnotation::Any,
         Value::TailCall(_) => TypeAnnotation::Any,
         Value::EarlyReturn(_) => TypeAnnotation::Any,
         Value::MutableRef(_) => unreachable!("MutableRef should be dereferenced"),

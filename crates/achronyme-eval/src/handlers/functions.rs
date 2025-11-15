@@ -6,34 +6,6 @@ use achronyme_types::value::Value;
 use crate::evaluator::Evaluator;
 use crate::tco;
 
-/// Evaluate a lambda expression with typed parameters
-pub fn evaluate_lambda(
-    evaluator: &Evaluator,
-    params: &[(String, Option<TypeAnnotation>)],
-    body: &AstNode,
-) -> Result<Value, String> {
-    // MAJOR PERFORMANCE OPTIMIZATION:
-    // Instead of calling snapshot() which copies ALL variables in the environment,
-    // we now just capture an Rc<Environment> which is a simple pointer increment.
-    //
-    // Before: O(n) where n = total variables, expensive deep clones of all Values
-    // After:  O(1) just incrementing a reference counter
-    //
-    // This is especially critical when you have many variables defined (like in a REPL)
-    // because each new lambda would copy all 20+ variables, and nested lambdas would
-    // create a quadratic explosion of memory usage.
-    let closure_env = evaluator.environment().to_rc();
-
-    // Extract parameter names and type annotations
-    let param_names: Vec<String> = params.iter().map(|(name, _)| name.clone()).collect();
-    let param_types: Vec<Option<TypeAnnotation>> = params.iter().map(|(_, ty)| ty.clone()).collect();
-
-    // Create a Function value with type annotations
-    let function = Function::new_typed(param_names, param_types, None, body.clone(), closure_env);
-
-    Ok(Value::Function(function))
-}
-
 /// Evaluate a lambda expression with typed parameters and return type
 pub fn evaluate_lambda_with_return_type(
     evaluator: &Evaluator,

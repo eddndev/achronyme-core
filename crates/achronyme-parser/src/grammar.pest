@@ -136,13 +136,19 @@ simple_type_annotation = {
   | vector_type
   | record_type
   | function_type
+  | grouped_type
   | any_type
   | null_type
 }
 
-// Simple types: Number, Boolean, String, Complex
+// Grouped type for precedence: ((Number) => String)
+grouped_type = {
+    "(" ~ type_annotation ~ ")" ~ !"=>"
+}
+
+// Simple types: Number, Boolean, String, Complex, Edge
 simple_type = @{
-    ("Number" | "Boolean" | "String" | "Complex") ~ !ASCII_ALPHANUMERIC
+    ("Number" | "Boolean" | "String" | "Complex" | "Edge") ~ !ASCII_ALPHANUMERIC
 }
 
 // Tensor type: Tensor<Number> or Tensor<Complex, [2,3]>
@@ -174,12 +180,10 @@ record_type_field = {
   | (identifier ~ ":" ~ type_annotation)                // name: String
 }
 
-// Function type: Function<[param types], return type>
+// Function type: (param types) => return type
+// Examples: (Number) => String, (Number, String) => Boolean, () => Number
 function_type = {
-    "Function" ~ "<" ~
-    "[" ~ (type_annotation ~ ("," ~ type_annotation)*)? ~ "]" ~
-    "," ~ type_annotation ~
-    ">"
+    "(" ~ (type_annotation ~ ("," ~ type_annotation)*)? ~ ")" ~ "=>" ~ type_annotation
 }
 
 // Any type (opt-out of type checking)

@@ -1,6 +1,7 @@
 use achronyme_parser::ast::AstNode;
 use achronyme_parser::TypeAnnotation;
 use achronyme_types::complex::Complex;
+use achronyme_types::function::Function;
 use achronyme_types::value::Value;
 
 use crate::evaluator::Evaluator;
@@ -14,10 +15,13 @@ pub fn evaluate_declaration(
     initializer: &AstNode,
 ) -> Result<Value, String> {
     // Evaluate the initializer
-    let value = evaluator.evaluate(initializer)?;
+    let mut value = evaluator.evaluate(initializer)?;
 
     // Type check if annotation is provided
     if let Some(expected_type) = type_annotation {
+        // Special case: if type is Function and value is a function, enrich with type info
+        value = enrich_function_with_type(value, expected_type);
+
         type_checker::check_type(&value, expected_type).map_err(|err| {
             format!("Type error: variable '{}' {}", name, err.replace("Type mismatch: ", ""))
         })?;
@@ -29,6 +33,56 @@ pub fn evaluate_declaration(
     Ok(value)
 }
 
+/// Enrich a function value with type information from the annotation
+/// This implements type inference from the variable's type to the lambda's parameters
+fn enrich_function_with_type(value: Value, expected_type: &TypeAnnotation) -> Value {
+    // Only enrich if the expected type is a Function type
+    if let TypeAnnotation::Function { params: expected_params, return_type: expected_return } = expected_type {
+        if let Value::Function(ref func) = value {
+            if let Function::UserDefined { params, param_types, return_type, body, closure_env } = func {
+                // Check if we need to enrich the parameter types
+                let needs_enrichment = param_types.iter().any(|t| t.is_none()) || return_type.is_none();
+
+                if needs_enrichment && params.len() == expected_params.len() {
+                    // Merge: use expected types where param_types has None
+                    let enriched_param_types: Vec<Option<TypeAnnotation>> = param_types
+                        .iter()
+                        .zip(expected_params.iter())
+                        .map(|(actual, expected)| {
+                            if actual.is_none() {
+                                expected.clone()
+                            } else {
+                                actual.clone()
+                            }
+                        })
+                        .collect();
+
+                    // Enrich return type if not specified
+                    let enriched_return_type = if return_type.is_none() {
+                        Some((**expected_return).clone())
+                    } else {
+                        return_type.clone()
+                    };
+
+                    // Create enriched function
+                    let enriched_func = Function::new_typed(
+                        params.clone(),
+                        enriched_param_types,
+                        enriched_return_type,
+                        (**body).clone(),
+                        closure_env.clone(),
+                    );
+
+                    return Value::Function(enriched_func);
+                }
+            }
+        }
+    }
+
+    // Return original value if no enrichment needed
+    value
+}
+
 /// Evaluate a mutable variable declaration (mut statement) with optional type checking
 pub fn evaluate_mutable_declaration(
     evaluator: &mut Evaluator,
@@ -37,10 +91,13 @@ pub fn evaluate_mutable_declaration(
     initializer: &AstNode,
 ) -> Result<Value, String> {
     // Evaluate the initializer
-    let value = evaluator.evaluate(initializer)?;
+    let mut value = evaluator.evaluate(initializer)?;
 
     // Type check if annotation is provided
     if let Some(expected_type) = type_annotation {
+        // Special case: if type is Function and value is a function, enrich with type info
+        value = enrich_function_with_type(value, expected_type);
+
         type_checker::check_type(&value, expected_type).map_err(|err| {
             format!("Type error: variable '{}' {}", name, err.replace("Type mismatch: ", ""))
         })?;
