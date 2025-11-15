@@ -109,6 +109,9 @@ pub fn is_tail_position(node: &AstNode) -> bool {
 
         // Null literal is in tail position
         AstNode::Null => true,
+
+        // Type alias is NOT tail position (it's a type declaration)
+        AstNode::TypeAlias { .. } => false,
     }
 }
 

@@ -62,7 +62,7 @@ string_char = {
 
 // Reserved keywords (use word boundaries to prevent matching prefixes)
 keyword = _{
-    ("let" | "mut" | "rec" | "self" | "true" | "false" | "import" | "from" | "export" | "as" | "return" | "while") ~ !ASCII_ALPHANUMERIC
+    ("let" | "mut" | "rec" | "self" | "true" | "false" | "import" | "from" | "export" | "as" | "return" | "while" | "type") ~ !ASCII_ALPHANUMERIC
 }
 
 // Identifiers: x, foo, my_var, PI, sin (but not keywords)
@@ -139,6 +139,12 @@ simple_type_annotation = {
   | grouped_type
   | any_type
   | null_type
+  | type_reference  // Reference to a type alias (must be last to avoid matching keywords)
+}
+
+// Type reference: identifier for type aliases (e.g., Point, Result, ApiResponse)
+type_reference = {
+    identifier
 }
 
 // Grouped type for precedence: ((Number) => String)
@@ -439,6 +445,16 @@ mut_statement = {
     "mut" ~ identifier ~ (":" ~ type_annotation)? ~ "=" ~ expr
 }
 
+// Type alias statement
+// Syntax: type Name = TypeAnnotation
+// Examples:
+//   type Point = { x: Number, y: Number }
+//   type Result = Success | Error
+//   type OptionalNumber = Number | null
+type_alias_statement = {
+    "type" ~ identifier ~ "=" ~ type_annotation
+}
+
 // Assignment: x = 20, obj.field = 30, arr[0] = 40
 // Uses postfix_expression as target for maximum flexibility
 // Semantic validation happens in evaluator
@@ -454,13 +470,14 @@ return_statement = {
     "return" ~ expr
 }
 
-// Statement: import, export, let, mut, return, assignment, or expression
+// Statement: import, export, let, mut, type alias, return, assignment, or expression
 // Try import/export first, then return, then assignment before expr to avoid ambiguity
 statement = {
     import_statement
   | export_statement
   | let_statement
   | mut_statement
+  | type_alias_statement
   | return_statement
   | assignment
   | expr

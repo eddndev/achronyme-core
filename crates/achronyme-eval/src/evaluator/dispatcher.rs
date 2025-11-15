@@ -147,6 +147,14 @@ impl Evaluator {
             AstNode::Export { items } => {
                 self.evaluate_export(items)
             }
+
+            // Type system
+            AstNode::TypeAlias { name, type_definition } => {
+                // Register the type alias in the type registry
+                self.register_type_alias(name.clone(), type_definition.clone());
+                // Type alias statements don't produce a value, return unit (true)
+                Ok(Value::Boolean(true))
+            }
         }
     }
 

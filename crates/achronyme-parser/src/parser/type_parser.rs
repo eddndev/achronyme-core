@@ -45,6 +45,14 @@ impl AstParser {
             }
             Rule::any_type => Ok(TypeAnnotation::Any),
             Rule::null_type => Ok(TypeAnnotation::Null),
+            Rule::type_reference => {
+                // Type reference: identifier for type aliases (e.g., Point, Result, ApiResponse)
+                let name = pair.into_inner().next()
+                    .ok_or("Empty type reference")?
+                    .as_str()
+                    .to_string();
+                Ok(TypeAnnotation::TypeReference(name))
+            }
             _ => Err(format!("Unexpected type annotation rule: {:?}", pair.as_rule()))
         }
     }

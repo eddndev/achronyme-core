@@ -72,6 +72,10 @@ pub enum TypeAnnotation {
     /// Any type (opt-out of type checking)
     /// Accepts any value
     Any,
+
+    /// Type reference (alias to another type definition)
+    /// Example: Point, Result, ApiResponse
+    TypeReference(String),
 }
 
 impl TypeAnnotation {
@@ -133,6 +137,8 @@ impl TypeAnnotation {
                     .collect::<Vec<_>>()
                     .join(" | ")
             }
+
+            TypeAnnotation::TypeReference(name) => name.clone(),
         }
     }
 

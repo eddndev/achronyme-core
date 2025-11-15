@@ -13,6 +13,7 @@ impl AstParser {
             Rule::export_statement => self.build_export_statement(inner),
             Rule::let_statement => self.build_let_statement(inner),
             Rule::mut_statement => self.build_mut_statement(inner),
+            Rule::type_alias_statement => self.build_type_alias_statement(inner),
             Rule::return_statement => self.build_return_statement(inner),
             Rule::assignment => self.build_assignment(inner),
             Rule::expr => self.build_ast_from_expr(inner),
@@ -198,6 +199,26 @@ impl AstParser {
 
         Ok(AstNode::Return {
             value: Box::new(self.build_ast_from_expr(value)?),
+        })
+    }
+
+    pub(super) fn build_type_alias_statement(&mut self, pair: Pair<Rule>) -> Result<AstNode, String> {
+        let mut inner = pair.into_inner();
+
+        // Grammar: "type" ~ identifier ~ "=" ~ type_annotation
+        let identifier = inner.next()
+            .ok_or("Missing identifier in type alias statement")?
+            .as_str()
+            .to_string();
+
+        let type_annotation_pair = inner.next()
+            .ok_or("Missing type annotation in type alias statement")?;
+
+        let type_definition = self.parse_type_annotation(type_annotation_pair)?;
+
+        Ok(AstNode::TypeAlias {
+            name: identifier,
+            type_definition,
         })
     }
 }

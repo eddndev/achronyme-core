@@ -2,7 +2,7 @@
 ///
 /// This module provides essential utility functions for:
 /// - Output: print() for displaying values
-/// - Type inspection: type() for getting type names
+/// - Type inspection: typeof() for getting type names
 /// - String conversion: str() for converting values to strings
 
 use crate::functions::FunctionRegistry;
@@ -13,8 +13,8 @@ pub fn register_functions(registry: &mut FunctionRegistry) {
     // Output function
     registry.register("print", print, -1); // Variadic: 1+ args
 
-    // Type inspection
-    registry.register("type", type_of, 1);
+    // Type inspection (renamed from type to typeof to free 'type' as keyword)
+    registry.register("typeof", type_of, 1);
 
     // String conversion
     registry.register("str", to_string, 1);
@@ -60,10 +60,10 @@ fn print(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
 /// Returns a string describing the type of the value.
 ///
 /// Examples:
-/// - type(42) => "Number"
-/// - type("hello") => "String"
-/// - type([1, 2, 3]) => "Tensor"
-/// - type(true) => "Boolean"
+/// - typeof(42) => "Number"
+/// - typeof("hello") => "String"
+/// - typeof([1, 2, 3]) => "Tensor"
+/// - typeof(true) => "Boolean"
 fn type_of(args: &[Value], _env: &mut Environment) -> Result<Value, String> {
     let type_name = get_type_name(&args[0]);
     Ok(Value::String(type_name))

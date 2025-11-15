@@ -19,10 +19,13 @@ pub fn evaluate_declaration(
 
     // Type check if annotation is provided
     if let Some(expected_type) = type_annotation {
-        // Special case: if type is Function and value is a function, enrich with type info
-        value = enrich_function_with_type(value, expected_type);
+        // Resolve type aliases before checking
+        let resolved_type = evaluator.resolve_type(expected_type);
 
-        type_checker::check_type(&value, expected_type).map_err(|err| {
+        // Special case: if type is Function and value is a function, enrich with type info
+        value = enrich_function_with_type(value, &resolved_type);
+
+        type_checker::check_type(&value, &resolved_type).map_err(|err| {
             format!("Type error: variable '{}' {}", name, err.replace("Type mismatch: ", ""))
         })?;
     }
@@ -95,18 +98,21 @@ pub fn evaluate_mutable_declaration(
 
     // Type check if annotation is provided
     if let Some(expected_type) = type_annotation {
-        // Special case: if type is Function and value is a function, enrich with type info
-        value = enrich_function_with_type(value, expected_type);
+        // Resolve type aliases before checking
+        let resolved_type = evaluator.resolve_type(expected_type);
 
-        type_checker::check_type(&value, expected_type).map_err(|err| {
+        // Special case: if type is Function and value is a function, enrich with type info
+        value = enrich_function_with_type(value, &resolved_type);
+
+        type_checker::check_type(&value, &resolved_type).map_err(|err| {
             format!("Type error: variable '{}' {}", name, err.replace("Type mismatch: ", ""))
         })?;
 
-        // Define as mutable variable with type annotation (enforced on assignment)
+        // Define as mutable variable with resolved type annotation (enforced on assignment)
         evaluator.environment_mut().define_mutable_typed(
             name.to_string(),
             value.clone(),
-            expected_type.clone(),
+            resolved_type,
         )?;
     } else {
         // Define as mutable variable without type annotation

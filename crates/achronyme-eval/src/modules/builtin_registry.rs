@@ -88,7 +88,7 @@ fn register_prelude(registry: &mut ModuleRegistry, func_registry: &FunctionRegis
 
     // === I/O & INSPECTION (3) ===
     register_if_exists(registry, func_registry, "print");
-    register_if_exists(registry, func_registry, "type");
+    register_if_exists(registry, func_registry, "typeof");
     register_if_exists(registry, func_registry, "str");
 
     // === STRINGS (5) ===

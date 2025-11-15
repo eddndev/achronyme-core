@@ -152,6 +152,11 @@ fn type_annotation_to_string(ty: &TypeAnnotation) -> String {
             .map(type_annotation_to_string)
             .collect::<Vec<_>>()
             .join(" | "),
+
+        TypeAnnotation::TypeReference(name) => {
+            // Type references should be resolved before reaching here
+            format!("<unresolved type: {}>", name)
+        }
     }
 }
 
@@ -255,6 +260,13 @@ fn matches_type(value: &Value, expected: &TypeAnnotation) -> bool {
             Value::Function(func) => check_function_type(func, params),
             _ => false,
         },
+
+        // Type reference should be resolved before type checking
+        TypeAnnotation::TypeReference(_) => {
+            // This is an error condition - type references should be resolved first
+            // Return false to indicate a type mismatch
+            false
+        }
     }
 }
 

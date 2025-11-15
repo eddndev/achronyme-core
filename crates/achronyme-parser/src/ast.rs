@@ -142,6 +142,12 @@ pub enum AstNode {
     Export {
         items: Vec<ImportItem>,
     },
+    // Type alias statement: type Name = TypeAnnotation
+    // Creates a named alias for a type
+    TypeAlias {
+        name: String,
+        type_definition: TypeAnnotation,
+    },
 }
 
 /// Represents an array element - can be a single expression or a spread expression

@@ -21,6 +21,7 @@
 
 use achronyme_types::Environment;
 use achronyme_types::value::Value;
+use achronyme_parser::type_annotation::TypeAnnotation;
 use std::collections::HashMap;
 
 use crate::constants::ConstantsRegistry;
@@ -57,6 +58,9 @@ pub struct Evaluator {
     /// Flag to enable tail call optimization mode
     /// When true, CallExpression with rec will return TailCall markers
     pub(crate) tco_mode: bool,
+    /// Type registry for storing type aliases
+    /// Format: alias_name -> type_definition
+    pub(crate) type_registry: HashMap<String, TypeAnnotation>,
 }
 
 impl Evaluator {
@@ -72,6 +76,59 @@ impl Evaluator {
             module_cache: HashMap::new(),
             current_file_dir: None,
             tco_mode: false,
+            type_registry: HashMap::new(),
+        }
+    }
+
+    /// Register a type alias
+    pub fn register_type_alias(&mut self, name: String, type_definition: TypeAnnotation) {
+        self.type_registry.insert(name, type_definition);
+    }
+
+    /// Resolve a type reference to its definition
+    /// Recursively resolves type aliases and expands them
+    pub fn resolve_type(&self, type_ann: &TypeAnnotation) -> TypeAnnotation {
+        match type_ann {
+            TypeAnnotation::TypeReference(name) => {
+                // Look up the type alias
+                if let Some(definition) = self.type_registry.get(name) {
+                    // Recursively resolve in case it references another alias
+                    self.resolve_type(definition)
+                } else {
+                    // Unknown type reference - keep as is (will be caught during type checking)
+                    type_ann.clone()
+                }
+            }
+            // For compound types, recursively resolve inner types
+            TypeAnnotation::Union(types) => {
+                let resolved = types.iter().map(|t| self.resolve_type(t)).collect();
+                TypeAnnotation::Union(resolved)
+            }
+            TypeAnnotation::Tensor { element_type, shape } => {
+                TypeAnnotation::Tensor {
+                    element_type: Box::new(self.resolve_type(element_type)),
+                    shape: shape.clone(),
+                }
+            }
+            TypeAnnotation::Record { fields } => {
+                let resolved_fields = fields.iter()
+                    .map(|(name, (is_mut, ty))| {
+                        (name.clone(), (*is_mut, self.resolve_type(ty)))
+                    })
+                    .collect();
+                TypeAnnotation::Record { fields: resolved_fields }
+            }
+            TypeAnnotation::Function { params, return_type } => {
+                let resolved_params = params.iter()
+                    .map(|p| p.as_ref().map(|t| self.resolve_type(t)))
+                    .collect();
+                TypeAnnotation::Function {
+                    params: resolved_params,
+                    return_type: Box::new(self.resolve_type(return_type)),
+                }
+            }
+            // Simple types don't need resolution
+            _ => type_ann.clone(),
         }
     }
 }
