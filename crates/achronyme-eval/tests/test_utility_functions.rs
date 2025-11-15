@@ -6,14 +6,14 @@ use achronyme_eval::Evaluator;
 use achronyme_types::value::Value;
 
 // ============================================================================
-// type() tests
+// typeof() tests
 // ============================================================================
 
 #[test]
 fn test_type_number() {
     let mut evaluator = Evaluator::new();
 
-    let result = evaluator.eval_str("type(42)").unwrap();
+    let result = evaluator.eval_str("typeof(42)").unwrap();
     assert_eq!(result, Value::String("Number".to_string()));
 }
 
@@ -21,7 +21,7 @@ fn test_type_number() {
 fn test_type_float() {
     let mut evaluator = Evaluator::new();
 
-    let result = evaluator.eval_str("type(3.14)").unwrap();
+    let result = evaluator.eval_str("typeof(3.14)").unwrap();
     assert_eq!(result, Value::String("Number".to_string()));
 }
 
@@ -29,7 +29,7 @@ fn test_type_float() {
 fn test_type_string() {
     let mut evaluator = Evaluator::new();
 
-    let result = evaluator.eval_str(r#"type("hello")"#).unwrap();
+    let result = evaluator.eval_str(r#"typeof("hello")"#).unwrap();
     assert_eq!(result, Value::String("String".to_string()));
 }
 
@@ -37,7 +37,7 @@ fn test_type_string() {
 fn test_type_boolean_true() {
     let mut evaluator = Evaluator::new();
 
-    let result = evaluator.eval_str("type(true)").unwrap();
+    let result = evaluator.eval_str("typeof(true)").unwrap();
     assert_eq!(result, Value::String("Boolean".to_string()));
 }
 
@@ -45,7 +45,7 @@ fn test_type_boolean_true() {
 fn test_type_boolean_false() {
     let mut evaluator = Evaluator::new();
 
-    let result = evaluator.eval_str("type(false)").unwrap();
+    let result = evaluator.eval_str("typeof(false)").unwrap();
     assert_eq!(result, Value::String("Boolean".to_string()));
 }
 
@@ -53,7 +53,7 @@ fn test_type_boolean_false() {
 fn test_type_vector() {
     let mut evaluator = Evaluator::new();
 
-    let result = evaluator.eval_str(r#"type(["a", "b", "c"])"#).unwrap();
+    let result = evaluator.eval_str(r#"typeof(["a", "b", "c"])"#).unwrap();
     assert_eq!(result, Value::String("Vector".to_string()));
 }
 
@@ -62,11 +62,11 @@ fn test_type_tensor() {
     let mut evaluator = Evaluator::new();
 
     // Simple arrays are now Vectors, matrices are Tensors
-    let result = evaluator.eval_str("type([1, 2, 3])").unwrap();
+    let result = evaluator.eval_str("typeof([1, 2, 3])").unwrap();
     assert_eq!(result, Value::String("Vector".to_string()));
 
     // 2D arrays (matrices) are Tensors
-    let result2 = evaluator.eval_str("type([[1, 2], [3, 4]])").unwrap();
+    let result2 = evaluator.eval_str("typeof([[1, 2], [3, 4]])").unwrap();
     assert_eq!(result2, Value::String("Tensor".to_string()));
 }
 
@@ -74,7 +74,7 @@ fn test_type_tensor() {
 fn test_type_complex() {
     let mut evaluator = Evaluator::new();
 
-    let result = evaluator.eval_str("type(3 + 4i)").unwrap();
+    let result = evaluator.eval_str("typeof(3 + 4i)").unwrap();
     assert_eq!(result, Value::String("Complex".to_string()));
 }
 
@@ -82,7 +82,7 @@ fn test_type_complex() {
 fn test_type_function() {
     let mut evaluator = Evaluator::new();
 
-    let result = evaluator.eval_str("type(x => x + 1)").unwrap();
+    let result = evaluator.eval_str("typeof(x => x + 1)").unwrap();
     assert_eq!(result, Value::String("Function".to_string()));
 }
 
@@ -90,7 +90,7 @@ fn test_type_function() {
 fn test_type_record() {
     let mut evaluator = Evaluator::new();
 
-    let result = evaluator.eval_str("type({x: 10, y: 20})").unwrap();
+    let result = evaluator.eval_str("typeof({x: 10, y: 20})").unwrap();
     assert_eq!(result, Value::String("Record".to_string()));
 }
 
@@ -100,7 +100,7 @@ fn test_type_with_variable() {
 
     let code = r#"
         let x = 42;
-        type(x)
+        typeof(x)
     "#;
     let result = evaluator.eval_str(code).unwrap();
     assert_eq!(result, Value::String("Number".to_string()));
@@ -274,7 +274,7 @@ fn test_type_and_str_combined() {
 
     let code = r#"
         let x = 42;
-        let t = type(x);
+        let t = typeof(x);
         "Type: " + t
     "#;
     let result = evaluator.eval_str(code).unwrap();
@@ -287,7 +287,7 @@ fn test_type_checking_pattern() {
 
     let code = r#"
         let x = 42;
-        type(x) == "Number"
+        typeof(x) == "Number"
     "#;
     let result = evaluator.eval_str(code).unwrap();
     assert_eq!(result, Value::Boolean(true));
@@ -311,12 +311,7 @@ fn test_print_in_pipeline() {
     let mut evaluator = Evaluator::new();
 
     let code = r#"
-        let result = pipe(
-            5,
-            x => x * 2,
-            x => print(x),  // print returns the value
-            x => x + 10
-        );
+        let result = pipe(5, x => x * 2, x => print(x), x => x + 10);
         result
     "#;
     let result = evaluator.eval_str(code).unwrap();
@@ -324,12 +319,12 @@ fn test_print_in_pipeline() {
 }
 
 #[test]
-fn test_debugging_with_print_and_type() {
+fn test_debugging_with_print_and_typeof() {
     let mut evaluator = Evaluator::new();
 
     let code = r#"
         let x = [1, 2, 3];
-        print("Type:", type(x));
+        print("Type:", typeof(x));
         print("Value:", str(x));
         x
     "#;
@@ -349,7 +344,7 @@ fn test_type_with_map() {
 
     let code = r#"
         let values = [42, "hello", true, [1, 2, 3]];
-        map(x => type(x), values)
+        map(x => typeof(x), values)
     "#;
     let result = evaluator.eval_str(code).unwrap();
 

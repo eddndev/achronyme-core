@@ -16,12 +16,7 @@ fn test_tco_tail_recursive_factorial_deep() {
 
     // Define tail-recursive factorial with accumulator
     // This should use TCO because rec() is in tail position
-    let code = r#"
-        let fact = (n, acc) =>
-            if(n <= 1,
-                acc,
-                rec(n - 1, acc * n))
-    "#;
+    let code = r#"let fact = (n, acc) => if(n <= 1, acc, rec(n - 1, acc * n))"#;
 
     evaluator.eval_str(code).expect("Failed to define factorial");
 
@@ -44,12 +39,7 @@ fn test_tco_sum_range_deep() {
     let mut evaluator = Evaluator::new();
 
     // Sum from 1 to n using tail recursion
-    let code = r#"
-        let sum_range = (n, acc) =>
-            if(n <= 0,
-                acc,
-                rec(n - 1, acc + n))
-    "#;
+    let code = r#"let sum_range = (n, acc) => if(n <= 0, acc, rec(n - 1, acc + n))"#;
 
     evaluator.eval_str(code).expect("Failed to define sum_range");
 
@@ -69,12 +59,7 @@ fn test_tco_countdown_deep() {
     let mut evaluator = Evaluator::new();
 
     // Simple countdown that returns 0
-    let code = r#"
-        let countdown = n =>
-            if(n <= 0,
-                0,
-                rec(n - 1))
-    "#;
+    let code = r#"let countdown = n => if(n <= 0, 0, rec(n - 1))"#;
 
     evaluator.eval_str(code).expect("Failed to define countdown");
 
@@ -94,12 +79,7 @@ fn test_tco_gcd_deep() {
     let mut evaluator = Evaluator::new();
 
     // GCD using tail recursion
-    let code = r#"
-        let gcd = (a, b) =>
-            if(b == 0,
-                a,
-                rec(b, a % b))
-    "#;
+    let code = r#"let gcd = (a, b) => if(b == 0, a, rec(b, a % b))"#;
 
     evaluator.eval_str(code).expect("Failed to define gcd");
 
@@ -120,25 +100,8 @@ fn test_tco_gcd_deep() {
 fn test_tco_list_length_deep() {
     let mut evaluator = Evaluator::new();
 
-    // Count elements by recursively decrementing until we hit an empty case
-    // We'll use a piecewise to check the length
-    let code = r#"
-        let length = vec => acc =>
-            piecewise(
-                [length(vec) == 0, acc],
-                rec(tail(vec), acc + 1)
-            )
-    "#;
-
-    evaluator.eval_str(code).expect("Failed to define length");
-
-    // For now, let's test with a simpler approach using an index counter
-    let count_code = r#"
-        let count = (n, acc) =>
-            if(n <= 0,
-                acc,
-                rec(n - 1, acc + 1))
-    "#;
+    // Simple count function using tail recursion with accumulator
+    let count_code = r#"let count = (n, acc) => if(n <= 0, acc, rec(n - 1, acc + 1))"#;
 
     evaluator.eval_str(count_code).expect("Failed to define count");
 
@@ -157,12 +120,7 @@ fn test_tco_accumulator_pattern_deep() {
     let mut evaluator = Evaluator::new();
 
     // Generic accumulator pattern - sum of squares
-    let code = r#"
-        let sum_squares = (n, acc) =>
-            if(n <= 0,
-                acc,
-                rec(n - 1, acc + n * n))
-    "#;
+    let code = r#"let sum_squares = (n, acc) => if(n <= 0, acc, rec(n - 1, acc + n * n))"#;
 
     evaluator.eval_str(code).expect("Failed to define sum_squares");
 
@@ -182,14 +140,7 @@ fn test_tco_piecewise_with_multiple_tail_calls() {
     let mut evaluator = Evaluator::new();
 
     // Collatz conjecture - all paths are tail calls
-    let code = r#"
-        let collatz = (n, acc) =>
-            piecewise(
-                [n == 1, acc],
-                [n % 2 == 0, rec(n / 2, acc + 1)],
-                rec(3 * n + 1, acc + 1)
-            )
-    "#;
+    let code = r#"let collatz = (n, acc) => piecewise([n == 1, acc], [n % 2 == 0, rec(n / 2, acc + 1)], rec(3 * n + 1, acc + 1))"#;
 
     evaluator.eval_str(code).expect("Failed to define collatz");
 
@@ -210,12 +161,7 @@ fn test_non_tail_recursive_should_still_work_shallow() {
 
     // Non-tail-recursive factorial (for comparison)
     // This should still work for small n, but uses regular recursion
-    let code = r#"
-        let fact = n =>
-            if(n <= 1,
-                1,
-                n * rec(n - 1))
-    "#;
+    let code = r#"let fact = n => if(n <= 1, 1, n * rec(n - 1))"#;
 
     evaluator.eval_str(code).expect("Failed to define factorial");
 
