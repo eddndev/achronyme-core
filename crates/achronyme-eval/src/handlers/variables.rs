@@ -44,10 +44,17 @@ pub fn evaluate_mutable_declaration(
         type_checker::check_type(&value, expected_type).map_err(|err| {
             format!("Type error: variable '{}' {}", name, err.replace("Type mismatch: ", ""))
         })?;
-    }
 
-    // Define as mutable variable in the environment
-    evaluator.environment_mut().define_mutable(name.to_string(), value.clone())?;
+        // Define as mutable variable with type annotation (enforced on assignment)
+        evaluator.environment_mut().define_mutable_typed(
+            name.to_string(),
+            value.clone(),
+            expected_type.clone(),
+        )?;
+    } else {
+        // Define as mutable variable without type annotation
+        evaluator.environment_mut().define_mutable(name.to_string(), value.clone())?;
+    }
 
     // Return the value (not the MutableRef wrapper)
     Ok(value)

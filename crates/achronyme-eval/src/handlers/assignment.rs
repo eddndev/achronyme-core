@@ -2,6 +2,7 @@ use achronyme_parser::ast::AstNode;
 use achronyme_types::value::Value;
 
 use crate::evaluator::Evaluator;
+use crate::type_checker;
 
 /// Evaluate an assignment statement
 ///
@@ -15,6 +16,7 @@ use crate::evaluator::Evaluator;
 /// - Target must be a valid lvalue (variable, field access, or index access)
 /// - Cannot assign to literals, function calls, or arbitrary expressions
 /// - Variables must be declared with `mut` to be assignable
+/// - Type annotations are enforced on assignment (if variable was declared with a type)
 pub fn evaluate_assignment(
     evaluator: &mut Evaluator,
     target: &AstNode,
@@ -27,6 +29,18 @@ pub fn evaluate_assignment(
     match target {
         // Simple variable: x = 20
         AstNode::VariableRef(name) => {
+            // Check type annotation before assignment (if one exists)
+            if let Some(expected_type) = evaluator.environment().get_type_annotation(name) {
+                type_checker::check_type(&new_value, &expected_type).map_err(|_| {
+                    format!(
+                        "Type error: cannot assign {} to variable '{}' of type {}",
+                        type_checker::infer_type(&new_value).to_string(),
+                        name,
+                        expected_type.to_string()
+                    )
+                })?;
+            }
+
             evaluator.environment_mut().assign(name, new_value.clone())?;
             Ok(new_value)
         }

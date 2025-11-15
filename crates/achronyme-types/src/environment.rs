@@ -1,4 +1,5 @@
 use crate::value::Value;
+use achronyme_parser::type_annotation::TypeAnnotation;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -36,6 +37,8 @@ pub struct Environment {
     variables: HashMap<String, Value>,
     /// Metadata: tracks which variables are mutable
     mutability: HashMap<String, bool>,
+    /// Metadata: tracks type annotations for variables (for type checking on assignment)
+    type_annotations: HashMap<String, TypeAnnotation>,
     /// Parent environment (if any)
     /// Now uses RefCell to allow mutation of parent scopes
     parent: Option<Rc<RefCell<Environment>>>,
@@ -47,6 +50,7 @@ impl Environment {
         Self {
             variables: HashMap::new(),
             mutability: HashMap::new(),
+            type_annotations: HashMap::new(),
             parent: None,
         }
     }
@@ -59,6 +63,7 @@ impl Environment {
         Self {
             variables: HashMap::new(),
             mutability: HashMap::new(),
+            type_annotations: HashMap::new(),
             parent: Some(parent),
         }
     }
@@ -118,6 +123,26 @@ impl Environment {
     /// * `value` - Initial value
     pub fn define_mutable(&mut self, name: String, value: Value) -> Result<(), String> {
         self.define_with_mutability(name, value, true)
+    }
+
+    /// Define a mutable variable with a type annotation
+    ///
+    /// The type annotation will be enforced on subsequent assignments.
+    ///
+    /// # Arguments
+    /// * `name` - Variable name
+    /// * `value` - Initial value
+    /// * `type_ann` - Type annotation to enforce on assignments
+    pub fn define_mutable_typed(&mut self, name: String, value: Value, type_ann: TypeAnnotation) -> Result<(), String> {
+        // Wrap in MutableRef
+        let stored_value = Value::new_mutable(value);
+
+        // Insert into current scope's variables
+        self.variables.insert(name.clone(), stored_value);
+        self.mutability.insert(name.clone(), true);
+        // Store the type annotation for assignment checking
+        self.type_annotations.insert(name, type_ann);
+        Ok(())
     }
 
     /// Internal: Define a variable with specified mutability
@@ -194,6 +219,9 @@ impl Environment {
     /// Returns error if:
     /// - Variable not found in any scope
     /// - Variable is immutable (not declared with `mut`)
+    ///
+    /// # Returns
+    /// Ok(()) on success. Caller should check type annotations separately.
     pub fn assign(&mut self, name: &str, value: Value) -> Result<(), String> {
         // Check current scope first
         if let Some(var_value) = self.variables.get(name) {
@@ -214,6 +242,23 @@ impl Environment {
         }
 
         Err(format!("Undefined variable '{}'", name))
+    }
+
+    /// Get the type annotation for a variable, if one exists
+    ///
+    /// Searches current and parent scopes.
+    pub fn get_type_annotation(&self, name: &str) -> Option<TypeAnnotation> {
+        // Check current scope first
+        if let Some(type_ann) = self.type_annotations.get(name) {
+            return Some(type_ann.clone());
+        }
+
+        // Search parent scopes
+        if let Some(ref parent) = self.parent {
+            return parent.borrow().get_type_annotation(name);
+        }
+
+        None
     }
 
     /// Update an existing variable in the scope where it was defined
@@ -253,6 +298,7 @@ impl Environment {
     pub fn clear(&mut self) {
         self.variables.clear();
         self.mutability.clear();
+        self.type_annotations.clear();
         self.parent = None;
     }
 
@@ -303,6 +349,7 @@ impl Environment {
         Self {
             variables: snapshot,
             mutability: HashMap::new(), // No mutability info in snapshot
+            type_annotations: HashMap::new(), // No type info in snapshot
             parent: None,
         }
     }
