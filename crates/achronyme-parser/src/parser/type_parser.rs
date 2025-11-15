@@ -57,7 +57,7 @@ impl AstParser {
         }
     }
 
-    /// Parse simple types: Number, Boolean, String, Complex, Edge
+    /// Parse simple types: Number, Boolean, String, Complex, Generator, Edge
     fn parse_simple_type(&mut self, pair: Pair<Rule>) -> Result<TypeAnnotation, String> {
         let type_str = pair.as_str();
         match type_str {
@@ -65,6 +65,7 @@ impl AstParser {
             "Boolean" => Ok(TypeAnnotation::Boolean),
             "String" => Ok(TypeAnnotation::String),
             "Complex" => Ok(TypeAnnotation::Complex),
+            "Generator" => Ok(TypeAnnotation::Generator),
             "Edge" => Ok(TypeAnnotation::Edge),
             _ => Err(format!("Unknown simple type: {}", type_str))
         }

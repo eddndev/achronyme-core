@@ -152,9 +152,9 @@ grouped_type = {
     "(" ~ type_annotation ~ ")" ~ !"=>"
 }
 
-// Simple types: Number, Boolean, String, Complex, Edge
+// Simple types: Number, Boolean, String, Complex, Edge, Generator
 simple_type = @{
-    ("Number" | "Boolean" | "String" | "Complex" | "Edge") ~ !ASCII_ALPHANUMERIC
+    ("Number" | "Boolean" | "String" | "Complex" | "Generator" | "Edge") ~ !ASCII_ALPHANUMERIC
 }
 
 // Tensor type: Tensor<Number> or Tensor<Complex, [2,3]>

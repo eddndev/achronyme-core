@@ -60,6 +60,11 @@ pub enum TypeAnnotation {
     /// Edge type (graph edges: A -> B, A <> B)
     Edge,
 
+    /// Generator type (opaque, does not track yield type)
+    /// Represents a resumable function that can yield values
+    /// Future: Generator<T> for typed generators
+    Generator,
+
     /// Union type (CORE FEATURE)
     /// Represents "one of these types"
     /// Example: Number | String | null
@@ -88,6 +93,7 @@ impl TypeAnnotation {
             TypeAnnotation::Complex => "Complex".to_string(),
             TypeAnnotation::Vector => "Vector".to_string(),
             TypeAnnotation::Edge => "Edge".to_string(),
+            TypeAnnotation::Generator => "Generator".to_string(),
             TypeAnnotation::Null => "null".to_string(),
             TypeAnnotation::Any => "Any".to_string(),
 

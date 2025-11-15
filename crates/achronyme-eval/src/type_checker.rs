@@ -90,6 +90,7 @@ fn type_annotation_to_string(ty: &TypeAnnotation) -> String {
         TypeAnnotation::Complex => "Complex".to_string(),
         TypeAnnotation::Vector => "Vector".to_string(),
         TypeAnnotation::Edge => "Edge".to_string(),
+        TypeAnnotation::Generator => "Generator".to_string(),
         TypeAnnotation::Null => "null".to_string(),
         TypeAnnotation::Any => "Any".to_string(),
 
@@ -230,6 +231,9 @@ fn matches_type(value: &Value, expected: &TypeAnnotation) -> bool {
 
         // Edge type (graph edges)
         TypeAnnotation::Edge => matches!(value, Value::Edge { .. }),
+
+        // Generator type (opaque, no yield type checking)
+        TypeAnnotation::Generator => matches!(value, Value::Generator(_)),
 
         // Union type: value must match at least one variant
         TypeAnnotation::Union(types) => types.iter().any(|t| matches_type(value, t)),

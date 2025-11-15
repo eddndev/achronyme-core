@@ -67,13 +67,13 @@ More specialized transformations:
 
 | Function | Signature | Purpose | Status | Priority |
 |----------|-----------|---------|--------|----------|
-| `zip` | `zip(array1, array2)` | Combine two arrays | ❌ Missing | ⭐⭐ |
-| `flatten` | `flatten(nestedArray, depth?)` | Flatten nested arrays | ❌ Missing | ⭐⭐ |
-| `take` | `take(array, n)` | Take first n elements | ❌ Missing | ⭐⭐ |
-| `drop` | `drop(array, n)` | Skip first n elements | ❌ Missing | ⭐⭐ |
-| `slice` | `slice(array, start, end?)` | Extract subarray | ❌ Missing | ⭐⭐ |
-| `unique` | `unique(array)` | Remove duplicates | ❌ Missing | ⭐ |
-| `chunk` | `chunk(array, size)` | Split into chunks | ❌ Missing | ⭐ |
+| `zip` | `zip(array1, array2)` | Combine two arrays | ✅ Implemented | ⭐⭐ |
+| `flatten` | `flatten(nestedArray, depth?)` | Flatten nested arrays | ✅ Implemented | ⭐⭐ |
+| `take` | `take(array, n)` | Take first n elements | ✅ Implemented | ⭐⭐ |
+| `drop` | `drop(array, n)` | Skip first n elements | ✅ Implemented | ⭐⭐ |
+| `slice` | `slice(array, start, end?)` | Extract subarray | ✅ Implemented | ⭐⭐ |
+| `unique` | `unique(array)` | Remove duplicates | ✅ Implemented | ⭐ |
+| `chunk` | `chunk(array, size)` | Split into chunks | ✅ Implemented | ⭐ |
 
 ### **Tier 4: Sorting & Advanced** (Week 2, Days 4-5)
 Sorting and advanced operations:
