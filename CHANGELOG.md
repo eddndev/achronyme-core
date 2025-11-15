@@ -7,6 +7,177 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Advanced Type System: Function Types, Edge Types, and Type Aliases 🏷️
+
+**Complete Gradual Type System with Custom Type Definitions:**
+
+Achronyme now supports a comprehensive type system with first-class function types, edge types for graph programming, and type aliases for creating custom named types.
+
+#### 1. Function Types
+
+Define and enforce function signatures with arrow syntax.
+
+**Syntax:**
+```javascript
+let func: (ParamTypes) => ReturnType = lambda
+```
+
+**Features:**
+- Parameter type checking at runtime
+- Return type enforcement
+- Type inference from annotations to lambda parameters
+- Higher-order function types
+- Currying support
+
+**Examples:**
+```javascript
+// Simple function type
+let add: (Number, Number) => Number = (a, b) => a + b
+
+// Type inference - lambda parameters get types from annotation
+let multiply: (Number, Number) => Number = (a, b) => a * b
+// Now a and b are known to be Number without explicit annotation
+
+// Higher-order functions
+let compose: ((Number) => Number) => ((Number) => Number) => (Number) => Number =
+    (f) => (g) => (x) => f(g(x))
+
+// Union types in parameters
+let process: (Number | String) => String = (x) => str(x)
+
+// Any type (opt-out)
+let flexible: (Any) => Any = (x) => x
+```
+
+---
+
+#### 2. Edge Type
+
+Native support for graph edges in the type system.
+
+**Syntax:**
+```javascript
+let edge: Edge = A -> B      // Directed edge
+let edge2: Edge = A <> B     // Undirected edge
+```
+
+**Features:**
+- Type checking for directed and undirected edges
+- Edge metadata support
+- Integration with union types for optional edges
+
+**Examples:**
+```javascript
+// Type-safe edge declarations
+let connection: Edge = Server -> Client
+let link: Edge = NodeA <> NodeB
+
+// Optional edges
+let maybeEdge: Edge | null = null
+let activeEdge: Edge | null = A -> B
+
+// Edge with metadata
+let weighted: Edge = Start -> End : { weight: 10, label: "path" }
+```
+
+---
+
+#### 3. Type Aliases
+
+Create custom named types for better code organization and reusability.
+
+**Syntax:**
+```javascript
+type AliasName = TypeDefinition
+```
+
+**Features:**
+- Aliases for any type (simple, union, record, function, tensor)
+- Recursive alias resolution
+- Chained aliases (alias of alias)
+- Full type checking enforcement
+
+**Examples:**
+```javascript
+// Simple type alias
+type ID = Number
+let userId: ID = 42
+
+// Record type alias
+type Point = { x: Number, y: Number }
+let origin: Point = { x: 0, y: 0 }
+
+// Union type alias (optional types)
+type OptionalNumber = Number | null
+let maybeValue: OptionalNumber = null
+
+// Function type alias
+type BinaryOp = (Number, Number) => Number
+let add: BinaryOp = (a, b) => a + b
+let mul: BinaryOp = (a, b) => a * b
+
+// Complex nested structures
+type Person = {
+    id: ID,
+    name: String,
+    location: Point
+}
+let john: Person = {
+    id: 1,
+    name: "John",
+    location: { x: 10, y: 20 }
+}
+
+// Result type pattern
+type ErrorCode = Number
+type Result = String | ErrorCode
+let success: Result = "OK"
+let error: Result = 404
+
+// Chained aliases
+type Integer = Number
+type PositiveInt = Integer
+let count: PositiveInt = 100
+
+// Mutable variables with type aliases
+type Counter = Number
+mut counter: Counter = 0
+counter = 10  // Type enforced on reassignment
+
+// Tensor type alias
+type Matrix = Tensor<Number>
+let data: Matrix = [[1, 2], [3, 4]]
+```
+
+**Note:** The `type()` function has been renamed to `typeof()` to free the `type` keyword for type aliases.
+
+```javascript
+// Old syntax (deprecated)
+type(42)  // Error: type is now a keyword
+
+// New syntax
+typeof(42)  // Returns "Number"
+```
+
+---
+
+#### Type System Summary
+
+| Feature | Syntax | Example |
+|---------|--------|---------|
+| Simple Types | `Number`, `String`, `Boolean`, `Complex` | `let x: Number = 42` |
+| Edge Type | `Edge` | `let e: Edge = A -> B` |
+| Function Type | `(Params) => Return` | `let f: (Number) => String = ...` |
+| Union Type | `Type1 \| Type2` | `let x: Number \| null = null` |
+| Type Alias | `type Name = Type` | `type Point = { x: Number, y: Number }` |
+| Any Type | `Any` | `let x: Any = "anything"` |
+| Null Type | `null` | Part of union types |
+
+**Tests:** 75 comprehensive type checking integration tests
+**Documentation:** `docs/design/type-system-explicit.md`
+
+---
+
 ### Added - Control Flow Enhancements: if-else Statements & Early Returns 🎯
 
 **Complete Control Flow System:**

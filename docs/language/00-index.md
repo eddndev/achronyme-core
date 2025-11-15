@@ -88,6 +88,8 @@ let stdDev = std(data)
 - **[26. Mutability](26-mutability.md)** - Mutable variables, mutable record fields, stateful objects
 - **[27. I/O and Persistence](27-io-persistence.md)** - File I/O, environment save/restore
 - **[28. Modules](28-modules.md)** - Import/export system, code organization
+- **[29. While Loops](29-while-loops.md)** - Iterative loops with mutable state
+- **[30. Gradual Type System](30-gradual-type-system.md)** - Type annotations, union types, type aliases
 
 ## Language Philosophy
 
