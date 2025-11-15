@@ -9,7 +9,7 @@ fn test_parse_mut_statement() {
     assert_eq!(ast.len(), 1);
 
     match &ast[0] {
-        AstNode::MutableDecl { name, initializer } => {
+        AstNode::MutableDecl { name, initializer, .. } => {
             assert_eq!(name, "x");
             match **initializer {
                 AstNode::Number(n) => assert_eq!(n, 10.0),

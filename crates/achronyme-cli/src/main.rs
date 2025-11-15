@@ -384,6 +384,7 @@ fn format_value(value: &achronyme_types::value::Value) -> String {
             // Auto-deref mutable references for display
             format_value(&rc.borrow())
         }
+        Value::Null => "null".to_string(),
     }
 }
 

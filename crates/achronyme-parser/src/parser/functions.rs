@@ -66,26 +66,45 @@ impl AstParser {
     pub(super) fn build_lambda(&mut self, pair: Pair<Rule>) -> Result<AstNode, String> {
         let mut inner = pair.into_inner();
 
+        // Grammar: typed_lambda_params ~ (":" ~ type_annotation)? ~ "=>" ~ lambda_body
         let params_pair = inner.next().ok_or("Missing lambda parameters")?;
-        let params = self.extract_lambda_params(params_pair)?;
 
-        let body_pair = inner.next().ok_or("Missing lambda body")?;
+        // Parse typed parameters
+        let params = if params_pair.as_rule() == Rule::typed_lambda_params {
+            self.parse_typed_lambda_params(params_pair)?
+        } else {
+            // Fallback to legacy lambda_params for backward compatibility
+            self.extract_lambda_params(params_pair)?
+                .into_iter()
+                .map(|name| (name, None))
+                .collect()
+        };
 
-        // Lambda body can be either a do_block or an expression
-        let body = match body_pair.as_rule() {
+        // Parse optional return type
+        let mut return_type = None;
+        let mut next_pair = inner.next().ok_or("Missing lambda body")?;
+
+        if next_pair.as_rule() == Rule::type_annotation {
+            return_type = Some(self.parse_type_annotation(next_pair)?);
+            next_pair = inner.next().ok_or("Missing lambda body after return type")?;
+        }
+
+        // Parse lambda body
+        let body = match next_pair.as_rule() {
             Rule::lambda_body => {
-                let inner_body = body_pair.into_inner().next().ok_or("Empty lambda body")?;
+                let inner_body = next_pair.into_inner().next().ok_or("Empty lambda body")?;
                 match inner_body.as_rule() {
                     Rule::do_block => self.build_do_block(inner_body)?,
                     Rule::expr => self.build_ast_from_expr(inner_body)?,
                     _ => return Err(format!("Unexpected lambda body rule: {:?}", inner_body.as_rule()))
                 }
             }
-            _ => return Err(format!("Expected lambda_body, got {:?}", body_pair.as_rule()))
+            _ => return Err(format!("Expected lambda_body, got {:?}", next_pair.as_rule()))
         };
 
         Ok(AstNode::Lambda {
             params,
+            return_type,
             body: Box::new(body),
         })
     }

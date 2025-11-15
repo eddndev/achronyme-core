@@ -114,36 +114,62 @@ impl AstParser {
     pub(super) fn build_let_statement(&mut self, pair: Pair<Rule>) -> Result<AstNode, String> {
         let mut inner = pair.into_inner();
 
-        // Grammar: "let" ~ identifier ~ "=" ~ expr
+        // Grammar: "let" ~ identifier ~ (":" ~ type_annotation)? ~ "=" ~ expr
         let identifier = inner.next()
             .ok_or("Missing identifier in let statement")?
             .as_str()
             .to_string();
 
-        let initializer = inner.next()
+        // Parse optional type annotation
+        let mut type_annotation = None;
+        let mut next_pair = inner.next()
             .ok_or("Missing initializer in let statement")?;
+
+        // Check if next element is a type annotation or the initializer
+        if next_pair.as_rule() == Rule::type_annotation {
+            type_annotation = Some(self.parse_type_annotation(next_pair)?);
+            next_pair = inner.next()
+                .ok_or("Missing initializer after type annotation")?;
+        }
+
+        // next_pair is now the initializer
+        let initializer = self.build_ast_from_expr(next_pair)?;
 
         Ok(AstNode::VariableDecl {
             name: identifier,
-            initializer: Box::new(self.build_ast_from_expr(initializer)?),
+            type_annotation,
+            initializer: Box::new(initializer),
         })
     }
 
     pub(super) fn build_mut_statement(&mut self, pair: Pair<Rule>) -> Result<AstNode, String> {
         let mut inner = pair.into_inner();
 
-        // Grammar: "mut" ~ identifier ~ "=" ~ expr
+        // Grammar: "mut" ~ identifier ~ (":" ~ type_annotation)? ~ "=" ~ expr
         let identifier = inner.next()
             .ok_or("Missing identifier in mut statement")?
             .as_str()
             .to_string();
 
-        let initializer = inner.next()
+        // Parse optional type annotation
+        let mut type_annotation = None;
+        let mut next_pair = inner.next()
             .ok_or("Missing initializer in mut statement")?;
+
+        // Check if next element is a type annotation or the initializer
+        if next_pair.as_rule() == Rule::type_annotation {
+            type_annotation = Some(self.parse_type_annotation(next_pair)?);
+            next_pair = inner.next()
+                .ok_or("Missing initializer after type annotation")?;
+        }
+
+        // next_pair is now the initializer
+        let initializer = self.build_ast_from_expr(next_pair)?;
 
         Ok(AstNode::MutableDecl {
             name: identifier,
-            initializer: Box::new(self.build_ast_from_expr(initializer)?),
+            type_annotation,
+            initializer: Box::new(initializer),
         })
     }
 

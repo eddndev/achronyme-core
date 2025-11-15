@@ -46,6 +46,9 @@ pub enum Value {
     /// Mutable reference - allows mutation of values declared with `mut` keyword
     /// Uses Rc<RefCell<>> for shared mutable ownership
     MutableRef(Rc<RefCell<Value>>),
+    /// Null value - represents absence of value (for optional types)
+    /// Used in union types like `Number | null` for optional values
+    Null,
 }
 
 // Conversiones automáticas con From/Into

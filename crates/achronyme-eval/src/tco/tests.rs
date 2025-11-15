@@ -75,6 +75,7 @@ fn test_do_block_with_tail_call() {
         statements: vec![
             AstNode::VariableDecl {
                 name: "x".to_string(),
+                type_annotation: None,
                 initializer: Box::new(AstNode::Number(5.0)),
             },
             AstNode::CallExpression {
@@ -94,6 +95,7 @@ fn test_do_block_with_non_tail_call() {
         statements: vec![
             AstNode::VariableDecl {
                 name: "x".to_string(),
+                type_annotation: None,
                 initializer: Box::new(AstNode::Number(5.0)),
             },
             AstNode::BinaryOp {

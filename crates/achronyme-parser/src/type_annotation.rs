@@ -1,0 +1,202 @@
+// Type Annotation System for Gradual Typing (AST representation)
+//
+// This module implements the type annotation representation in the AST.
+// It is independent of runtime values (Value enum) to avoid circular dependencies.
+// Type checking against runtime values happens in achronyme-eval.
+//
+// Supports:
+// - Simple types (Number, Boolean, String, Complex)
+// - Tensor types with optional shape specifications
+// - Union types (A | B | C) - CORE FEATURE
+// - Record types with structural subtyping (duck typing)
+// - Function types
+// - Null type for optional values
+// - Any type (opt-out of type checking)
+
+use std::collections::HashMap;
+
+/// Type annotation for gradual typing system (AST representation)
+#[derive(Debug, Clone, PartialEq)]
+pub enum TypeAnnotation {
+    /// Number type (f64)
+    Number,
+
+    /// Boolean type
+    Boolean,
+
+    /// String type
+    String,
+
+    /// Complex number type
+    Complex,
+
+    /// Tensor type with optional element type and shape
+    /// shape: None = unknown rank, Some(vec) = known rank with optional dimensions
+    /// Example: Tensor<Number> has shape=None
+    /// Example: Tensor<Number, [2, 3]> has shape=Some(vec![Some(2), Some(3)])
+    /// Example: Tensor<Number, [_, _]> has shape=Some(vec![None, None])
+    Tensor {
+        element_type: Box<TypeAnnotation>,
+        shape: Option<Vec<Option<usize>>>,
+    },
+
+    /// Vector type (heterogeneous array)
+    Vector,
+
+    /// Record type with structural typing
+    /// HashMap<field_name, (is_mutable, field_type)>
+    Record {
+        fields: HashMap<String, (bool, TypeAnnotation)>,
+    },
+
+    /// Function type
+    /// params: parameter types (None for untyped parameters in gradual typing)
+    /// return_type: return type
+    Function {
+        params: Vec<Option<TypeAnnotation>>,
+        return_type: Box<TypeAnnotation>,
+    },
+
+    /// Union type (CORE FEATURE)
+    /// Represents "one of these types"
+    /// Example: Number | String | null
+    Union(Vec<TypeAnnotation>),
+
+    /// Null type (for optional values)
+    /// Example: Number | null for optional numbers
+    Null,
+
+    /// Any type (opt-out of type checking)
+    /// Accepts any value
+    Any,
+}
+
+impl TypeAnnotation {
+    /// Get a human-readable string representation of this type
+    pub fn to_string(&self) -> String {
+        match self {
+            TypeAnnotation::Number => "Number".to_string(),
+            TypeAnnotation::Boolean => "Boolean".to_string(),
+            TypeAnnotation::String => "String".to_string(),
+            TypeAnnotation::Complex => "Complex".to_string(),
+            TypeAnnotation::Vector => "Vector".to_string(),
+            TypeAnnotation::Null => "null".to_string(),
+            TypeAnnotation::Any => "Any".to_string(),
+
+            TypeAnnotation::Tensor { element_type, shape } => {
+                let elem_str = element_type.to_string();
+                match shape {
+                    None => format!("Tensor<{}>", elem_str),
+                    Some(dims) => {
+                        let dims_str = dims.iter()
+                            .map(|d| d.map_or("_".to_string(), |n| n.to_string()))
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        format!("Tensor<{}, [{}]>", elem_str, dims_str)
+                    }
+                }
+            }
+
+            TypeAnnotation::Record { fields } => {
+                if fields.is_empty() {
+                    "{}".to_string()
+                } else {
+                    let fields_str = fields.iter()
+                        .map(|(name, (is_mut, ty))| {
+                            if *is_mut {
+                                format!("mut {}: {}", name, ty.to_string())
+                            } else {
+                                format!("{}: {}", name, ty.to_string())
+                            }
+                        })
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    format!("{{{}}}", fields_str)
+                }
+            }
+
+            TypeAnnotation::Function { params, return_type } => {
+                let params_str = params.iter()
+                    .map(|p| p.as_ref().map_or("Any".to_string(), |t| t.to_string()))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                format!("Function<[{}], {}>", params_str, return_type.to_string())
+            }
+
+            TypeAnnotation::Union(types) => {
+                types.iter()
+                    .map(|t| t.to_string())
+                    .collect::<Vec<_>>()
+                    .join(" | ")
+            }
+        }
+    }
+
+    /// Check if this type is assignable from another type (for type checking)
+    /// This is a simplified version - full checking happens in the evaluator
+    pub fn is_assignable_from(&self, other: &TypeAnnotation) -> bool {
+        // Same types are assignable
+        if self == other {
+            return true;
+        }
+
+        match (self, other) {
+            // Any accepts anything
+            (TypeAnnotation::Any, _) | (_, TypeAnnotation::Any) => true,
+
+            // Union type matching
+            (TypeAnnotation::Union(types), other) => {
+                types.iter().any(|t| t.is_assignable_from(other))
+            }
+            (self_type, TypeAnnotation::Union(other_types)) => {
+                other_types.iter().all(|ot| self_type.is_assignable_from(ot))
+            }
+
+            // Record structural subtyping (simplified)
+            (TypeAnnotation::Record { fields: self_fields }, TypeAnnotation::Record { fields: other_fields }) => {
+                self_fields.iter().all(|(field_name, (self_mut, self_type))| {
+                    other_fields.get(field_name).map_or(false, |(other_mut, other_type)| {
+                        self_mut == other_mut && self_type.is_assignable_from(other_type)
+                    })
+                })
+            }
+
+            _ => false,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_type_to_string() {
+        assert_eq!(TypeAnnotation::Number.to_string(), "Number");
+        assert_eq!(TypeAnnotation::Boolean.to_string(), "Boolean");
+
+        let union = TypeAnnotation::Union(vec![
+            TypeAnnotation::Number,
+            TypeAnnotation::String,
+        ]);
+        assert_eq!(union.to_string(), "Number | String");
+    }
+
+    #[test]
+    fn test_union_assignability() {
+        let union = TypeAnnotation::Union(vec![
+            TypeAnnotation::Number,
+            TypeAnnotation::String,
+        ]);
+
+        assert!(union.is_assignable_from(&TypeAnnotation::Number));
+        assert!(union.is_assignable_from(&TypeAnnotation::String));
+        assert!(!union.is_assignable_from(&TypeAnnotation::Boolean));
+    }
+
+    #[test]
+    fn test_any_type() {
+        assert!(TypeAnnotation::Any.is_assignable_from(&TypeAnnotation::Number));
+        assert!(TypeAnnotation::Number.is_assignable_from(&TypeAnnotation::Any));
+    }
+}

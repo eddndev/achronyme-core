@@ -44,6 +44,9 @@ impl AstParser {
             Rule::rec_ref => {
                 Ok(AstNode::RecReference)
             }
+            Rule::null_literal => {
+                Ok(AstNode::Null)
+            }
             Rule::array => self.build_array(inner),
             Rule::vector => self.build_array(inner),  // Alias for array
             Rule::matrix => self.build_array(inner),  // Alias for array

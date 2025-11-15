@@ -1,17 +1,27 @@
 use achronyme_parser::ast::AstNode;
+use achronyme_parser::TypeAnnotation;
 use achronyme_types::complex::Complex;
 use achronyme_types::value::Value;
 
 use crate::evaluator::Evaluator;
+use crate::type_checker;
 
-/// Evaluate a variable declaration (let statement)
+/// Evaluate a variable declaration (let statement) with optional type checking
 pub fn evaluate_declaration(
     evaluator: &mut Evaluator,
     name: &str,
+    type_annotation: &Option<TypeAnnotation>,
     initializer: &AstNode,
 ) -> Result<Value, String> {
     // Evaluate the initializer
     let value = evaluator.evaluate(initializer)?;
+
+    // Type check if annotation is provided
+    if let Some(expected_type) = type_annotation {
+        type_checker::check_type(&value, expected_type).map_err(|err| {
+            format!("Type error: variable '{}' {}", name, err.replace("Type mismatch: ", ""))
+        })?;
+    }
 
     // Define the variable in the environment (immutable)
     evaluator.environment_mut().define(name.to_string(), value.clone())?;
@@ -19,14 +29,22 @@ pub fn evaluate_declaration(
     Ok(value)
 }
 
-/// Evaluate a mutable variable declaration (mut statement)
+/// Evaluate a mutable variable declaration (mut statement) with optional type checking
 pub fn evaluate_mutable_declaration(
     evaluator: &mut Evaluator,
     name: &str,
+    type_annotation: &Option<TypeAnnotation>,
     initializer: &AstNode,
 ) -> Result<Value, String> {
     // Evaluate the initializer
     let value = evaluator.evaluate(initializer)?;
+
+    // Type check if annotation is provided
+    if let Some(expected_type) = type_annotation {
+        type_checker::check_type(&value, expected_type).map_err(|err| {
+            format!("Type error: variable '{}' {}", name, err.replace("Type mismatch: ", ""))
+        })?;
+    }
 
     // Define as mutable variable in the environment
     evaluator.environment_mut().define_mutable(name.to_string(), value.clone())?;

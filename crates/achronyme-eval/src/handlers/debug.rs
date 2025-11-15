@@ -96,6 +96,8 @@ fn describe_value(value: &Value, indent: usize) -> String {
             // EarlyReturn should never be visible to user code - it's an internal marker
             "EarlyReturn(internal marker - should not be visible)".to_string()
         }
+
+        Value::Null => "null".to_string(),
     }
 }
 
@@ -103,7 +105,7 @@ fn describe_function(func: &Function, indent: usize) -> String {
     let indent_str = "  ".repeat(indent);
 
     match func {
-        Function::UserDefined { params, body, closure_env: _ } => {
+        Function::UserDefined { params, body, .. } => {
             let params_str = params.join(", ");
             let body_str = format_ast_node(body, indent + 1);
 
@@ -153,8 +155,17 @@ fn format_ast_node(node: &AstNode, indent: usize) -> String {
                 format_ast_node(else_expr, indent))
         }
 
-        AstNode::Lambda { params, body } => {
-            format!("({}) => {}", params.join(", "), format_ast_node(body, indent))
+        AstNode::Lambda { params, body, .. } => {
+            let params_str: String = params.iter()
+                .map(|(name, type_ann)| {
+                    match type_ann {
+                        Some(ty) => format!("{}: {}", name, ty.to_string()),
+                        None => name.clone(),
+                    }
+                })
+                .collect::<Vec<String>>()
+                .join(", ");
+            format!("({}) => {}", params_str, format_ast_node(body, indent))
         }
 
         AstNode::FunctionCall { name, args } => {

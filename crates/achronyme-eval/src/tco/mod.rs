@@ -106,6 +106,9 @@ pub fn is_tail_position(node: &AstNode) -> bool {
         // Import/Export are NOT tail positions (they're module declarations)
         AstNode::Import { .. } => false,
         AstNode::Export { .. } => false,
+
+        // Null literal is in tail position
+        AstNode::Null => true,
     }
 }
 

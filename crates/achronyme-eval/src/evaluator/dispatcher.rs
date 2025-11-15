@@ -49,14 +49,15 @@ impl Evaluator {
             AstNode::ComplexLiteral { re, im } => handlers::literals::evaluate_complex(*re, *im),
             AstNode::ArrayLiteral(elements) => handlers::literals::evaluate_array(self, elements),
             AstNode::RecordLiteral(fields) => handlers::literals::evaluate_record(self, fields),
+            AstNode::Null => Ok(Value::Null),
 
             // Variables
-            AstNode::VariableDecl { name, initializer } => {
-                handlers::variables::evaluate_declaration(self, name, initializer)
+            AstNode::VariableDecl { name, type_annotation, initializer } => {
+                handlers::variables::evaluate_declaration(self, name, type_annotation, initializer)
             }
             AstNode::VariableRef(name) => handlers::variables::evaluate_reference(self, name),
-            AstNode::MutableDecl { name, initializer } => {
-                handlers::variables::evaluate_mutable_declaration(self, name, initializer)
+            AstNode::MutableDecl { name, type_annotation, initializer } => {
+                handlers::variables::evaluate_mutable_declaration(self, name, type_annotation, initializer)
             }
             AstNode::Assignment { target, value } => {
                 handlers::assignment::evaluate_assignment(self, target, value)
@@ -115,8 +116,8 @@ impl Evaluator {
             AstNode::CallExpression { callee, args } => {
                 self.evaluate_call_expression(callee, args)
             }
-            AstNode::Lambda { params, body } => {
-                handlers::functions::evaluate_lambda(self, params, body)
+            AstNode::Lambda { params, body, return_type } => {
+                handlers::functions::evaluate_lambda_with_return_type(self, params, return_type.clone(), body)
             }
 
             // Edges (graph/network support)

@@ -27,11 +27,16 @@ pub enum UnaryOp {
     Not,    // !x
 }
 
+// Import TypeAnnotation from local module (avoids circular dependency)
+use crate::type_annotation::TypeAnnotation;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum AstNode {
     Number(f64),
     Boolean(bool),
     StringLiteral(String),
+    /// Null literal (for optional types)
+    Null,
     BinaryOp {
         op: BinaryOp,
         left: Box<AstNode>,
@@ -70,10 +75,12 @@ pub enum AstNode {
     },
     VariableDecl {
         name: String,
+        type_annotation: Option<TypeAnnotation>,  // Optional type annotation
         initializer: Box<AstNode>,
     },
     MutableDecl {
         name: String,
+        type_annotation: Option<TypeAnnotation>,  // Optional type annotation
         initializer: Box<AstNode>,
     },
     Assignment {
@@ -86,8 +93,12 @@ pub enum AstNode {
     VariableRef(String),
     SelfReference, // 'self' keyword for use in records
     RecReference,  // 'rec' keyword for recursive function calls
+    /// Lambda with optional type annotations (gradual typing)
+    /// params: list of (param_name, optional_type_annotation)
+    /// return_type: optional return type annotation
     Lambda {
-        params: Vec<String>,
+        params: Vec<(String, Option<TypeAnnotation>)>,
+        return_type: Option<TypeAnnotation>,
         body: Box<AstNode>,
     },
     Edge {

@@ -45,5 +45,6 @@ pub fn value_to_string(value: &Value) -> String {
             let borrowed = r.borrow();
             value_to_string(&borrowed)
         }
+        Value::Null => "null".to_string(),
     }
 }

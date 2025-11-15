@@ -22,6 +22,8 @@ pub enum SerializedValue {
     Record(HashMap<String, SerializedValue>),
     Edge(String, String, bool, HashMap<String, SerializedValue>),  // (from, to, directed, props)
     BuiltinFunction(String),
+    /// Null value for optional types
+    Null,
     /// Placeholder for non-serializable values
     Unsupported(String),  // type_name
 }
@@ -108,6 +110,8 @@ impl SerializedValue {
                 // EarlyReturn should never be persisted
                 SerializedValue::Unsupported("early return".to_string())
             },
+
+            Value::Null => SerializedValue::Null,
         }
     }
 
@@ -179,6 +183,8 @@ impl SerializedValue {
                     "Function restoration not yet supported".to_string()
                 ))
             },
+
+            SerializedValue::Null => Ok(Value::Null),
 
             SerializedValue::Unsupported(type_name) => {
                 Err(EnvError::Deserialization(

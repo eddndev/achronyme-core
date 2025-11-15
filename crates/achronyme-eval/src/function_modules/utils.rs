@@ -91,6 +91,7 @@ fn get_type_name(value: &Value) -> String {
                 Err(_) => "MutableRef<?>".to_string(),
             }
         }
+        Value::Null => "null".to_string(),
     }
 }
 
@@ -206,6 +207,7 @@ fn format_value(value: &Value) -> String {
                 Err(_) => "mut <borrowed>".to_string(),
             }
         }
+        Value::Null => "null".to_string(),
     }
 }
 

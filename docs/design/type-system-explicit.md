@@ -1,23 +1,28 @@
-# Explicit Type System Design
+# Explicit Type System Design - FINAL SPECIFICATION
 
 ## Overview
 
-This document proposes an **optional static type system** for Achronyme that:
-- Maintains backward compatibility with existing dynamic typing
+This document specifies the **optional gradual type system** for Achronyme that:
+- Maintains 100% backward compatibility with existing dynamic typing
 - Allows explicit type annotations for function parameters, variables, and return types
 - Provides compile-time (parse-time) type checking when annotations are present
-- Enables better IDE support, documentation, and error catching
+- Enables better IDE support, documentation, and early error catching
 - Focuses on scientific computing use cases with tensor shapes and numeric precision
+- **Supports Union Types as a core feature** (not a future extension)
+- **Uses structural typing for Records** (duck typing)
+- **Allows partial type annotations** (gradual typing)
 
 ## Philosophy
 
-**"Types are optional, but when specified, they are enforced"**
+**"Simplicity by default, specificity when needed"**
 
 - **Dynamic by default**: Existing code continues to work without modification
-- **Gradual typing**: Add types incrementally where needed
-- **Type inference**: Annotated functions infer types for local variables where possible
-- **Runtime safety**: Type errors fail fast with clear messages
-- **Documentation**: Types serve as machine-verified documentation
+- **Gradual typing**: Add types incrementally - mix typed and untyped parameters
+- **Progressive enhancement**: Go from fully dynamic → partially typed → fully typed
+- **Type inference**: Infer types where obvious, require annotations where ambiguous
+- **Structural subtyping**: Records match by structure, not by name (duck typing)
+- **Union types**: Core feature for expressing "one of these types"
+- **Runtime safety**: Type errors fail fast with clear, helpful messages
 
 ## Motivation
 
@@ -35,7 +40,7 @@ add([1, 2], [3])  // Runtime error: Shape mismatch
 ### With Explicit Types
 
 ```javascript
-// Type-safe, errors caught early
+// Type-safe, errors caught at parse time
 let add = (a: Number, b: Number): Number => a + b
 
 add(5, 10)        // 15 (OK)
@@ -43,48 +48,18 @@ add("hello", 42)  // Parse-time error: Expected Number, got String
 add([1, 2], [3])  // Parse-time error: Expected Number, got Tensor
 ```
 
-## Type Syntax
-
-### Basic Type Annotations
-
-#### Variable Declarations
+### With Gradual Typing (Mix Both)
 
 ```javascript
-// Immutable with type
-let x: Number = 42
-let name: String = "Alice"
-let active: Boolean = true
+// Mix typed and untyped parameters
+let flexible = (x: Number, y) => x + y
 
-// Mutable with type
-mut counter: Number = 0
-counter = counter + 1  // OK
-counter = "text"       // Error: Expected Number, got String
-
-// Type inference from value
-let y = 3.14           // Inferred as Number
-let z: Number = 3.14   // Explicit (same result)
+flexible(5, 10)      // OK: x type-checked, y dynamic
+flexible(5, "text")  // OK at parse-time, runtime error if incompatible
+flexible("x", 10)    // Parse-time error: x must be Number
 ```
 
-#### Function Parameters and Return Types
-
-```javascript
-// Single parameter with return type
-let square = (x: Number): Number => x^2
-
-// Multiple parameters
-let add = (a: Number, b: Number): Number => a + b
-
-// No return type annotation (inferred)
-let max = (a: Number, b: Number) => if(a > b, a, b)  // Inferred: Number
-
-// Generic array parameter
-let sum = (arr: Tensor<Number>): Number => reduce((a, b) => a + b, 0, arr)
-
-// Heterogeneous vector
-let process = (data: Vector): Vector => map(x => x, data)
-```
-
-### Type System Hierarchy
+## Type System Hierarchy
 
 ```
 Type
@@ -97,8 +72,10 @@ Type
 │   ├── Tensor<Complex>       // ComplexTensor
 │   └── Tensor<Number, [3,3]> // Shaped tensor (3x3 matrix)
 ├── Vector          // Heterogeneous array (any types)
-├── Record<{...}>   // Structural type
-├── Function<A, B>  // Function type (A -> B)
+├── {field: Type}   // Record (structural, no wrapper)
+├── Function<[A, B], R>  // Function type
+├── Union (A | B)   // Union types (CORE FEATURE)
+├── null            // Null type (for optional values)
 └── Any             // Dynamic type (opt-out of checking)
 ```
 
@@ -113,7 +90,7 @@ let count: Number = 42
 // Functions
 let sqrt = (x: Number): Number => x^0.5
 let factorial = (n: Number): Number =>
-    if(n <= 1, 1, n * rec(n - 1))
+    if(n <= 1) { 1 } else { n * rec(n - 1) }
 ```
 
 ### 2. Boolean
@@ -202,23 +179,25 @@ let add = (a: Tensor<Number>, b: Tensor<Number>) => a + b
 add(mixed, [1, 2, 3])  // Error: Expected Tensor<Number>, got Vector
 ```
 
-### 7. Record Types
+### 7. Record Types (Structural Typing - NO `Record<...>` wrapper)
 
-#### Anonymous Records (Structural)
+**IMPORTANT DESIGN DECISION**: Records use **direct structural syntax** `{field: Type}`, not `Record<{field: Type}>`.
+
+#### Basic Record Types
 
 ```javascript
-// Simple record type
-let point: Record<{x: Number, y: Number}> = {x: 10, y: 20}
+// Simple record type - NO Record<...> wrapper
+let point: {x: Number, y: Number} = {x: 10, y: 20}
 
 // Nested records
-let person: Record<{
+let person: {
     name: String,
     age: Number,
-    address: Record<{
+    address: {
         city: String,
         country: String
-    }>
-}> = {
+    }
+} = {
     name: "Alice",
     age: 30,
     address: {
@@ -228,35 +207,201 @@ let person: Record<{
 }
 ```
 
+#### Record with Mutable Fields
+
+```javascript
+// Mutable field in type annotation
+let counter: {mut value: Number} = {
+    mut value: 0
+}
+
+// Function that requires mutable field
+let increment = (c: {mut value: Number}): Number => {
+    c.value = c.value + 1
+    c.value
+}
+
+increment(counter)           // OK: field is mutable
+increment({value: 10})       // Error: 'value' must be mutable
+```
+
+#### Structural Subtyping (Duck Typing)
+
+**KEY FEATURE**: Records are structurally typed - a record matches if it has **at least** the required fields.
+
+```javascript
+// Function requires only 'name' field
+let greet = (person: {name: String}): String => "Hello " + person.name
+
+// All of these work (structural subtyping):
+greet({name: "Alice"})                           // OK: exact match
+greet({name: "Bob", age: 30})                    // OK: has extra 'age' field
+greet({name: "Charlie", age: 30, city: "NY"})   // OK: has multiple extra fields
+
+// This fails:
+greet({age: 30})                                 // Error: missing 'name' field
+```
+
+#### Empty Record Type (Accepts Any Record)
+
+```javascript
+// Empty record type: {} accepts any record
+let keys = (obj: {}): Vector => getKeys(obj)
+
+keys({name: "Alice"})           // OK
+keys({x: 1, y: 2, z: 3})       // OK
+keys({})                        // OK: empty record
+```
+
+#### Access to Non-Typed Fields (Permissive with Warning)
+
+**DESIGN DECISION**: Accessing fields not in the type annotation is **permitted but warns** and returns `Any`.
+
+```javascript
+let greet = (person: {name: String}) => {
+    let base = "Hello " + person.name           // OK: field is typed
+
+    // Warning: 'age' not in type {name: String}, accessing as Any
+    if (person.age != null) {
+        base + " (age " + str(person.age) + ")"
+    } else {
+        base
+    }
+}
+```
+
+**Rationale**: Allows exploratory/dynamic code while maintaining type safety for declared fields.
+
 #### Record with Methods
 
 ```javascript
-// Record type with methods
-let Point: Record<{
+let Point: {
     x: Number,
     y: Number,
     distance: Function<[], Number>
-}> = {
+} = {
     x: 10,
     y: 20,
     distance: () => sqrt(self.x^2 + self.y^2)
 }
 ```
 
-#### Simplified Syntax (Type Aliases - Future)
+### 8. Union Types (CORE FEATURE)
+
+**CRITICAL DESIGN DECISION**: Union types are **not** a future extension - they are a **core MVP feature**.
+
+#### Basic Union Types
 
 ```javascript
-// Type alias (proposed for future)
-type Point = Record<{x: Number, y: Number}>
+// Variable can be Number OR Complex
+let x: Number | Complex = 3.14
+x = 2 + 3i  // OK: Complex is allowed
 
-let p1: Point = {x: 10, y: 20}
-let p2: Point = {x: 5, y: 15}
+// Function accepting multiple numeric types
+let abs = (x: Number | Complex): Number => {
+    if (type(x) == "Number") {
+        if (x < 0) { -x } else { x }
+    } else {
+        magnitude(x)
+    }
+}
 
-let distance = (a: Point, b: Point): Number =>
-    sqrt((a.x - b.x)^2 + (a.y - b.y)^2)
+abs(5)       // OK: Number
+abs(-3.14)   // OK: Number
+abs(3 + 4i)  // OK: Complex
+abs("text")  // Error: Expected Number | Complex, got String
 ```
 
-### 8. Function Types
+#### Union for Optional Values (Result Pattern)
+
+```javascript
+// Function that may fail
+let invert = (m: Tensor): Tensor | String => {
+    if (det(m) == 0) {
+        "Matrix is singular"  // Return error message
+    } else {
+        inv(m)                // Return result
+    }
+}
+
+let result = invert([[1, 2], [2, 4]])
+if (type(result) == "String") {
+    print("Error: " + result)
+} else {
+    print("Inverted: " + str(result))
+}
+```
+
+#### Union with Null (Optional Values)
+
+**NEW TYPE**: `null` type represents absence of value.
+
+```javascript
+// Optional value (may be null)
+let find = (arr: Vector, pred: Function): Any | null => {
+    for (i in range(len(arr))) {
+        if (pred(arr[i])) {
+            return arr[i]
+        }
+    }
+    return null
+}
+
+let result = find([1, 2, 3], x => x > 5)
+if (result != null) {
+    print("Found: " + str(result))
+} else {
+    print("Not found")
+}
+```
+
+#### Union in Record Fields
+
+```javascript
+// Record with union-typed field
+let response: {
+    status: Number,
+    data: Tensor | String | null
+} = {
+    status: 200,
+    data: [[1, 2], [3, 4]]
+}
+
+// Later...
+response.data = "Error occurred"  // OK: String is in union
+response.data = null              // OK: null is in union
+response.data = true              // Error: Boolean not in union
+```
+
+#### Multiple Types in Union
+
+```javascript
+// Parse function returns different types
+let parse = (input: String): Number | Boolean | String | null => {
+    if (input == "true") { true }
+    else if (input == "false") { false }
+    else if (isNumeric(input)) { toNumber(input) }
+    else if (input == "") { null }
+    else { input }
+}
+```
+
+#### Type Narrowing with Type Guards
+
+```javascript
+let process = (x: Number | String): String => {
+    // Type guard with type() function
+    if (type(x) == "Number") {
+        // Here x is narrowed to Number
+        return str(x * 2)
+    } else {
+        // Here x is narrowed to String
+        return x + x
+    }
+}
+```
+
+### 9. Function Types
 
 ```javascript
 // Function type annotation
@@ -270,7 +415,7 @@ let twice: Function<[Function<[Number], Number>, Number], Number> =
 let twice = (f: Number => Number, x: Number): Number => f(f(x))
 ```
 
-### 9. Any Type (Opt-out)
+### 10. Any Type (Opt-out)
 
 ```javascript
 // Explicitly dynamic
@@ -280,6 +425,75 @@ dynamic = [1, 2, 3]  // OK
 
 // Function accepting any type
 let describe = (value: Any): String => str(value)
+```
+
+### 11. Null Type
+
+```javascript
+// Null literal
+let nothing: null = null
+
+// Optional pattern (T | null)
+let maybeNumber: Number | null = null
+maybeNumber = 42  // OK
+
+// Null check
+if (maybeNumber != null) {
+    print(maybeNumber + 10)
+}
+```
+
+## Gradual Typing (Partial Type Annotations)
+
+**CORE PHILOSOPHY**: You can mix typed and untyped parameters in the same function.
+
+### Partially Typed Parameters
+
+```javascript
+// Only 'a' is type-checked, 'b' is dynamic
+let add = (a: Number, b) => a + b
+
+add(5, 10)       // OK: a=Number (checked), b=Any (dynamic)
+add(5, "text")   // OK at parse-time, may fail at runtime
+add("x", 10)     // Parse-time error: 'a' must be Number
+
+// Mix typed and untyped for flexibility
+let compute = (x: Number, y: Number, z) => x + y + z
+
+compute(1, 2, 3)       // OK: z dynamic
+compute(1, 2, "text")  // OK at parse-time, runtime error
+compute("a", 2, 3)     // Parse-time error: x must be Number
+```
+
+### Return Type Inference
+
+```javascript
+// Fully typed params → return type inferred
+let multiply = (a: Number, b: Number) => a * b  // Returns Number (inferred)
+
+// Partially typed → return type is Any (conservative)
+let mixed = (a: Number, b) => a + b  // Returns Any (b unknown)
+
+// Explicit return type overrides inference
+let explicit = (a: Number, b): Number => a + b  // Returns Number (enforced)
+```
+
+### Backward Compatibility
+
+```javascript
+// Existing dynamic code (no changes needed)
+let add = (a, b) => a + b
+let data = [1, 2, 3]
+let point = {x: 10, y: 20}
+
+// New typed code
+let addTyped = (a: Number, b: Number): Number => a + b
+
+// Can call dynamic from typed (runtime check)
+let result = addTyped(add(1, 2), 3)  // OK if add returns Number
+
+// Can call typed from dynamic (always OK)
+let result2 = add(addTyped(1, 2), 3)  // OK
 ```
 
 ## Type Checking Rules
@@ -304,12 +518,39 @@ add(5, "text")   // Error: Expected Number for parameter 'b', got String
 add(5)           // Error: Expected 2 arguments, got 1
 ```
 
-### 3. Tensor Shape Checking
+### 3. Union Type Matching
+
+```javascript
+let x: Number | String = 42     // OK: Number in union
+x = "hello"                     // OK: String in union
+x = true                        // Error: Boolean not in union
+
+// Function with union parameter
+let show = (x: Number | String): String => str(x)
+show(42)       // OK
+show("text")   // OK
+show(true)     // Error
+```
+
+### 4. Structural Record Matching
+
+```javascript
+let greet = (p: {name: String}): String => "Hello " + p.name
+
+greet({name: "Alice"})                    // OK: exact match
+greet({name: "Bob", age: 30})            // OK: has extra 'age' (structural subtyping)
+greet({age: 30})                          // Error: missing 'name'
+
+// Type compatibility
+let person: {name: String, age: Number} = {name: "Alice", age: 30}
+let nameOnly: {name: String} = person  // OK: structural subtyping (wider type)
+```
+
+### 5. Tensor Shape Checking
 
 ```javascript
 // Shape-aware operations
 let matmul = (a: Tensor<Number, [_, K]>, b: Tensor<Number, [K, _]]): Tensor<Number, [_, _]> =>
-    // Matrix multiplication with compatible inner dimension K
     dot(a, b)
 
 let A: Tensor<Number, [2, 3]> = [[1, 2, 3], [4, 5, 6]]
@@ -320,125 +561,20 @@ matmul(A, B)  // OK: [2,3] × [3,2] = [2,2]
 matmul(A, C)  // Error: Incompatible shapes [2,3] × [2,2]
 ```
 
-### 4. Return Type Checking
+### 6. Return Type Checking
 
 ```javascript
 let square = (x: Number): Number => x^2        // OK
 let bad = (x: Number): Number => "not a number"  // Error: Expected Number, got String
 
 // Early return type checking
-let sign = (x: Number): Number => if (x < 0) {
-    return -1;  // OK: returns Number
-    "unreachable"
-} else if (x > 0) {
-    return 1;   // OK: returns Number
-} else {
-    return 0;   // OK: returns Number
-}
-```
-
-### 5. Array Type Inference
-
-```javascript
-// Homogeneous array → Tensor
-let nums: Tensor<Number> = [1, 2, 3]        // Inferred from elements
-let nums2 = [1, 2, 3]                       // Auto-inferred as Tensor<Number>
-
-// Heterogeneous array → Vector
-let mixed = [1, "hello", true]              // Auto-inferred as Vector
-let mixed2: Vector = [1, "hello", true]     // Explicit
-
-// Complex promotion
-let complex: Tensor<Complex> = [1, 2+3i, 4] // All promoted to Complex
-```
-
-## Type Annotations in Context
-
-### Lambda Functions
-
-```javascript
-// Without types (dynamic)
-let add1 = (a, b) => a + b
-
-// With types
-let add2 = (a: Number, b: Number): Number => a + b
-
-// Partial annotation (parameters only)
-let add3 = (a: Number, b: Number) => a + b  // Return type inferred
-
-// With do block
-let processValue = (x: Number): Number => do {
-    let doubled: Number = x * 2;
-    let result: Number = doubled + 10;
-    result
-}
-```
-
-### If-Else Statements
-
-```javascript
-// Return type must be consistent across branches
-let abs = (x: Number): Number => if (x < 0) {
-    -x          // Type: Number (OK)
-} else {
-    x           // Type: Number (OK)
-}
-
-let bad = (x: Number): Number => if (x < 0) {
-    -x          // Type: Number
-} else {
-    "positive"  // Type: String - Error: Expected Number
-}
-```
-
-### Higher-Order Functions
-
-```javascript
-// map with typed callback
-let double: Tensor<Number> = map(
-    (x: Number): Number => x * 2,
-    [1, 2, 3]
-)
-
-// filter with typed predicate
-let positives: Tensor<Number> = filter(
-    (x: Number): Boolean => x > 0,
-    [-5, 3, -2, 8, 0]
-)
-
-// reduce with typed accumulator
-let sum: Number = reduce(
-    (acc: Number, x: Number): Number => acc + x,
-    0,
-    [1, 2, 3, 4, 5]
-)
-```
-
-### Record Fields with Types
-
-```javascript
-// Record with typed fields
-let config: Record<{
-    host: String,
-    port: Number,
-    ssl: Boolean,
-    timeout: Number
-}> = {
-    host: "localhost",
-    port: 8080,
-    ssl: true,
-    timeout: 30000
-}
-
-// Mutable typed field
-let counter: Record<{
-    mut value: Number,
-    increment: Function<[], Number>
-}> = {
-    mut value: 0,
-    increment: () => do {
-        self.value = self.value + 1;
-        self.value
+let sign = (x: Number): Number => {
+    if (x < 0) {
+        return -1  // OK: returns Number
+    } else if (x > 0) {
+        return 1   // OK: returns Number
+    } else {
+        return 0   // OK: returns Number
     }
 }
 ```
@@ -453,13 +589,13 @@ let dot = (a: Tensor<Number, [N]>, b: Tensor<Number, [N]>): Number =>
     sum(a * b)
 
 // Type-safe matrix operations
-let matmul = (a: Tensor<Number, [M, K]>, b: Tensor<Number, [K, N]>): Tensor<Number, [M, N]> =>
+let matmul = (a: Tensor<Number, [M, K]>, b: Tensor<Number, [K, N]]): Tensor<Number, [M, N]> =>
     // Implementation with shape guarantees
     ...
 
 // Eigenvalues (matrix → vector)
-let eigenvalues = (m: Tensor<Number, [N, N]>): Tensor<Number, [N]> =>
-    // Square matrix required by type
+let eigenvalues = (m: Tensor<Number, [N, N]>): Tensor<Complex, [N]> =>
+    // Square matrix required by type, returns complex eigenvalues
     ...
 ```
 
@@ -467,8 +603,8 @@ let eigenvalues = (m: Tensor<Number, [N, N]>): Tensor<Number, [N]> =>
 
 ```javascript
 // FFT with length constraint
-let fft = (signal: Tensor<Complex, [N]>): Tensor<Complex, [N]> =>
-    // Input and output have same length
+let fft = (signal: Tensor<Number> | Tensor<Complex>): Tensor<Complex> =>
+    // Accepts real or complex signal, always returns complex
     ...
 
 // Convolution with shape inference
@@ -484,44 +620,60 @@ let convolve = (
 
 ```javascript
 // Mean requires non-empty tensor
-let mean = (data: Tensor<Number, [N]>): Number =>
+let mean = (data: Tensor<Number>): Number =>
     sum(data) / len(data)
 
-// Covariance matrix (NxM data → MxM covariance)
-let cov = (data: Tensor<Number, [N, M]>): Tensor<Number, [M, M]> =>
-    // Returns square covariance matrix
-    ...
-
-// Regression (typed inputs/outputs)
+// Regression with typed result
 let linearRegression = (
     x: Tensor<Number, [N]>,
     y: Tensor<Number, [N]>
-): Record<{slope: Number, intercept: Number, r2: Number}> =>
+): {slope: Number, intercept: Number, r2: Number} =>
     // Returns structured result
     ...
+
+// Result pattern with union
+let fit = (data: Tensor): {params: Tensor, error: Number} | String => {
+    if (len(data) < 2) {
+        "Insufficient data"
+    } else {
+        {params: computeParams(data), error: computeError(data)}
+    }
+}
 ```
 
-## Implementation Strategy
+## Grammar Specification
 
-### Phase 1: Grammar Extensions
-
-Add type annotation syntax to `grammar.pest`:
+### Type Annotations (Pest Grammar)
 
 ```pest
-// Type annotations
+// ============================================================================
+// Type Annotations
+// ============================================================================
+
 type_annotation = {
+    union_type | simple_type_annotation
+}
+
+// Union types (core feature): Number | String | null
+union_type = {
+    simple_type_annotation ~ ("|" ~ simple_type_annotation)+
+}
+
+simple_type_annotation = {
     simple_type
   | tensor_type
   | vector_type
   | record_type
   | function_type
   | any_type
+  | null_type
 }
 
 simple_type = {
     "Number" | "Boolean" | "String" | "Complex"
 }
 
+// Tensor with optional shape: Tensor<Number> or Tensor<Complex, [2,3]>
 tensor_type = {
     "Tensor" ~ "<" ~ type_annotation ~ ("," ~ shape_spec)? ~ ">"
 }
@@ -534,50 +686,73 @@ dimension = { number | "_" }  // _ for unknown dimension
 
 vector_type = { "Vector" }
 
+// Record type: direct structural syntax (NO Record<...> wrapper)
+// Syntax: {field1: Type1, mut field2: Type2}
 record_type = {
-    "Record" ~ "<" ~ "{" ~ record_type_field ~ ("," ~ record_type_field)* ~ "}" ~ ">"
+    "{" ~ NEWLINE* ~
+    (record_type_field ~ (NEWLINE* ~ "," ~ NEWLINE* ~ record_type_field)*)? ~
+    NEWLINE* ~ "}"
 }
 
 record_type_field = {
-    ("mut")? ~ identifier ~ ":" ~ type_annotation
+    (mut_keyword ~ identifier ~ ":" ~ type_annotation)  // mut value: Number
+  | (identifier ~ ":" ~ type_annotation)                // name: String
 }
 
+// Function type: Function<[param types], return type>
 function_type = {
-    "Function" ~ "<" ~ "[" ~ (type_annotation ~ ("," ~ type_annotation)*)? ~ "]" ~ "," ~ type_annotation ~ ">"
+    "Function" ~ "<" ~
+    "[" ~ (type_annotation ~ ("," ~ type_annotation)*)? ~ "]" ~
+    "," ~ type_annotation ~
+    ">"
 }
 
 any_type = { "Any" }
+null_type = { "null" }
 
-// Modified declarations with optional types
-typed_let_statement = {
+// ============================================================================
+// Modified Statements with Type Annotations
+// ============================================================================
+
+// Let statement with optional type annotation
+// Syntax: let x: Type = value  OR  let x = value
+let_statement = {
     "let" ~ identifier ~ (":" ~ type_annotation)? ~ "=" ~ expr
 }
 
-typed_mut_statement = {
+// Mut statement with optional type annotation
+// Syntax: mut x: Type = value  OR  mut x = value
+mut_statement = {
     "mut" ~ identifier ~ (":" ~ type_annotation)? ~ "=" ~ expr
 }
 
-// Modified lambda with typed parameters and return type
-typed_lambda_params = {
-    typed_param
-  | ("(" ~ (typed_param ~ ("," ~ typed_param)*)? ~ ")")
-}
+// ============================================================================
+// Modified Lambda with Type Annotations (Gradual Typing)
+// ============================================================================
 
+// Typed parameter: x (untyped) OR x: Type (typed)
 typed_param = {
     identifier ~ (":" ~ type_annotation)?
 }
 
-typed_lambda = {
+// Lambda parameters with optional types (gradual typing)
+typed_lambda_params = {
+    typed_param                                          // Single: x or x: Type
+  | ("(" ~ (typed_param ~ ("," ~ typed_param)*)? ~ ")") // Multi/no params
+}
+
+// Lambda with optional return type annotation
+// Syntax: (x: Number, y) => x + y              (partial typing)
+// Syntax: (x: Number, y: Number): Number => x + y  (full typing)
+lambda = {
     typed_lambda_params ~ (":" ~ type_annotation)? ~ "=>" ~ lambda_body
 }
 ```
 
-### Phase 2: Type Representation
-
-Extend `Value` enum or create separate `Type` enum:
+## Type Representation (Rust Implementation)
 
 ```rust
-// New file: crates/achronyme-types/src/type_annotation.rs
+// File: crates/achronyme-types/src/type_annotation.rs
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TypeAnnotation {
@@ -587,100 +762,118 @@ pub enum TypeAnnotation {
     Complex,
     Tensor {
         element_type: Box<TypeAnnotation>,
-        shape: Option<Vec<Option<usize>>>,  // None = unknown rank, Some([None, None]) = known rank
+        shape: Option<Vec<Option<usize>>>,  // None = unknown rank, Some([None]) = known rank
     },
     Vector,
-    Record(HashMap<String, (bool, TypeAnnotation)>),  // (is_mutable, type)
+    Record {
+        fields: HashMap<String, (bool, TypeAnnotation)>,  // (is_mutable, type)
+    },
     Function {
         params: Vec<TypeAnnotation>,
         return_type: Box<TypeAnnotation>,
     },
+    Union(Vec<TypeAnnotation>),  // CORE FEATURE
+    Null,                        // For optional values
     Any,
 }
 
 impl TypeAnnotation {
     /// Check if a value matches this type annotation
     pub fn matches(&self, value: &Value) -> bool {
-        // Implementation
-    }
+        match (self, value) {
+            (TypeAnnotation::Number, Value::Number(_)) => true,
+            (TypeAnnotation::Boolean, Value::Boolean(_)) => true,
+            (TypeAnnotation::String, Value::String(_)) => true,
+            (TypeAnnotation::Complex, Value::Complex(_)) => true,
+            (TypeAnnotation::Null, Value::Null) => true,
 
-    /// Check if two types are compatible for assignment
-    pub fn is_assignable_from(&self, other: &TypeAnnotation) -> bool {
-        // Implementation
-    }
-}
-```
+            // Union: matches if value matches ANY of the types
+            (TypeAnnotation::Union(types), val) => {
+                types.iter().any(|t| t.matches(val))
+            }
 
-### Phase 3: Type Checker
+            // Record: structural subtyping (must have all required fields)
+            (TypeAnnotation::Record(required_fields), Value::Record(actual_fields)) => {
+                required_fields.iter().all(|(field_name, (_is_mut, field_type))| {
+                    actual_fields.get(field_name)
+                        .map(|actual_value| field_type.matches(actual_value))
+                        .unwrap_or(false)  // Missing field = no match
+                })
+            }
 
-```rust
-// New file: crates/achronyme-eval/src/type_checker.rs
+            // Tensor: check element types and optionally shape
+            (TypeAnnotation::Tensor { element_type, shape }, Value::Tensor(tensor)) => {
+                // Check element type for all elements
+                let elements_match = tensor.data().iter()
+                    .all(|elem| element_type.matches(&Value::Number(*elem)));
 
-pub struct TypeChecker {
-    // Symbol table for type information
-    type_env: HashMap<String, TypeAnnotation>,
-}
+                // Check shape if specified
+                let shape_match = match shape {
+                    None => true,  // No shape constraint
+                    Some(expected_shape) => {
+                        let actual_shape = tensor.shape();
+                        expected_shape.len() == actual_shape.len() &&
+                        expected_shape.iter().zip(actual_shape).all(|(exp, act)| {
+                            exp.map_or(true, |e| e == *act)  // None (_) matches any
+                        })
+                    }
+                };
 
-impl TypeChecker {
-    pub fn check_expr(&mut self, expr: &Expr) -> Result<TypeAnnotation, TypeError> {
-        // Type check an expression and return its type
-    }
+                elements_match && shape_match
+            }
 
-    pub fn check_function_call(
-        &mut self,
-        func_type: &TypeAnnotation,
-        args: &[Expr],
-    ) -> Result<TypeAnnotation, TypeError> {
-        // Verify argument types match parameter types
-    }
+            // Any: matches everything
+            (TypeAnnotation::Any, _) => true,
 
-    pub fn check_assignment(
-        &mut self,
-        target: &Expr,
-        value: &Expr,
-    ) -> Result<(), TypeError> {
-        // Verify value type matches target type
-    }
-}
-```
-
-### Phase 4: Integration with Evaluator
-
-```rust
-// Modified evaluator to use type information
-
-impl Evaluator {
-    pub fn eval_with_type_check(&mut self, expr: &Expr) -> Result<Value, String> {
-        // 1. Type check the expression (if annotations present)
-        if self.strict_mode {
-            let type_checker = TypeChecker::new();
-            type_checker.check_expr(expr)?;
+            _ => false,
         }
+    }
 
-        // 2. Evaluate normally
-        self.eval(expr)
+    /// Check if this type can be assigned from another type
+    pub fn is_assignable_from(&self, other: &TypeAnnotation) -> bool {
+        match (self, other) {
+            // Same types are assignable
+            (a, b) if a == b => true,
+
+            // Any accepts anything
+            (TypeAnnotation::Any, _) => true,
+
+            // Anything can be assigned to Any
+            (_, TypeAnnotation::Any) => true,
+
+            // Union assignability
+            (TypeAnnotation::Union(self_types), TypeAnnotation::Union(other_types)) => {
+                // All types in 'other' must be in 'self'
+                other_types.iter().all(|ot|
+                    self_types.iter().any(|st| st.is_assignable_from(ot))
+                )
+            }
+            (TypeAnnotation::Union(types), other) => {
+                // Single type assignable to union if it's in the list
+                types.iter().any(|t| t.is_assignable_from(other))
+            }
+            (self_type, TypeAnnotation::Union(other_types)) => {
+                // Union assignable to single type if ALL union members are assignable
+                other_types.iter().all(|ot| self_type.is_assignable_from(ot))
+            }
+
+            // Record structural subtyping
+            (TypeAnnotation::Record(self_fields), TypeAnnotation::Record(other_fields)) => {
+                // 'other' must have all fields of 'self' (can have extras)
+                self_fields.iter().all(|(field_name, (self_mut, self_type))| {
+                    other_fields.get(field_name).map_or(false, |(other_mut, other_type)| {
+                        // Mutability must match
+                        self_mut == other_mut &&
+                        // Type must be assignable
+                        self_type.is_assignable_from(other_type)
+                    })
+                })
+            }
+
+            _ => false,
+        }
     }
 }
-```
-
-## Backward Compatibility
-
-All existing code continues to work without modification:
-
-```javascript
-// Existing dynamic code (no changes needed)
-let add = (a, b) => a + b
-let data = [1, 2, 3]
-let point = {x: 10, y: 20}
-
-// New typed code
-let addTyped = (a: Number, b: Number): Number => a + b
-
-// Can call dynamic from typed (runtime check)
-let result = addTyped(add(1, 2), 3)  // OK if add returns Number
-
-// Can call typed from dynamic (always OK)
-let result2 = add(addTyped(1, 2), 3)  // OK
 ```
 
 ## Error Messages
@@ -697,6 +890,32 @@ Error: Type mismatch in function call
 Note: Function 'add' expects (Number, Number) -> Number
 ```
 
+### Union Type Mismatch
+
+```
+Error: Type not in union
+  --> example.soc:3:5
+   |
+3  | x = true
+   |     ^^^^ Expected Number | String, got Boolean
+   |
+Note: Variable 'x' has type Number | String
+      Allowed types: Number, String
+```
+
+### Record Field Missing
+
+```
+Error: Missing required field in record
+  --> example.soc:10:8
+   |
+10 | greet({age: 30})
+   |        ^^^^^^^^ Missing field 'name: String'
+   |
+Note: Function 'greet' expects record with at least:
+      {name: String}
+```
+
 ### Shape Mismatch
 
 ```
@@ -708,56 +927,21 @@ Error: Tensor shape mismatch
    |
 Note: Matrix multiplication requires compatible inner dimensions
       Left matrix:  [2, 3]
-      Right matrix: [2, 2]  <- dimension mismatch
+      Right matrix: [2, 2]  <- dimension mismatch (expected 3)
 ```
 
 ### Return Type Mismatch
 
 ```
 Error: Return type mismatch
-  --> example.soc:12:5
+  --> example.soc:12:9
    |
-10 | let abs = (x: Number): Number => if (x < 0) {
-11 |     -x
-12 | } else {
-13 |     "positive"
-   |     ^^^^^^^^^^ Expected Number, got String
+10 | let abs = (x: Number): Number => {
+11 |     if (x < 0) { -x }
+12 |     else { "positive" }
+   |            ^^^^^^^^^^ Expected Number, got String
    |
 Note: Function declared to return Number
-```
-
-## Future Extensions
-
-### 1. Type Aliases
-
-```javascript
-type Point2D = Record<{x: Number, y: Number}>
-type Matrix = Tensor<Number, [_, _]>
-type Transform = Function<[Point2D], Point2D>
-```
-
-### 2. Generic Types
-
-```javascript
-// Generic function
-let identity = <T>(x: T): T => x
-
-// Generic array operations
-let map = <A, B>(f: Function<[A], B>, arr: Tensor<A>): Tensor<B> => ...
-```
-
-### 3. Union Types
-
-```javascript
-type NumericValue = Number | Complex
-type Result = Record<{success: Boolean, value: Number}> | Record<{error: String}>
-```
-
-### 4. Type Constraints
-
-```javascript
-// Constrain to numeric types only
-let sum = <T: Number | Complex>(arr: Tensor<T>): T => reduce((a, b) => a + b, 0, arr)
 ```
 
 ## Benefits
@@ -766,34 +950,37 @@ let sum = <T: Number | Complex>(arr: Tensor<T>): T => reduce((a, b) => a + b, 0,
 
 1. **Shape Safety**: Catch dimension mismatches at compile-time
 2. **Numeric Precision**: Ensure real vs. complex consistency
-3. **API Documentation**: Types document expected inputs/outputs
-4. **Tooling**: Enable autocomplete, inline docs, refactoring
-5. **Performance**: Potential for optimization with known types
+3. **Union Types**: Express "accepts multiple numeric types" naturally
+4. **API Documentation**: Types document expected inputs/outputs
+5. **Tooling**: Enable autocomplete, inline docs, refactoring
+6. **Performance**: Potential for optimization with known types
 
 ### For Application Development
 
 1. **Type Safety**: Catch errors before runtime
-2. **Refactoring**: Safe renames and restructuring
-3. **Team Collaboration**: Self-documenting interfaces
-4. **IDE Support**: Better autocomplete and error highlighting
-5. **Gradual Adoption**: Add types incrementally
+2. **Gradual Adoption**: Add types incrementally (mix typed/untyped)
+3. **Refactoring**: Safe renames and restructuring
+4. **Team Collaboration**: Self-documenting interfaces
+5. **IDE Support**: Better autocomplete and error highlighting
+6. **Flexibility**: Dynamic when prototyping, typed when shipping
 
 ## Summary
 
-This proposal adds **optional, gradual typing** to Achronyme:
+This specification defines **optional, gradual typing** for Achronyme with:
 
 ✅ **Backward Compatible**: All existing code works unchanged
-✅ **Opt-in**: Add types where they provide value
+✅ **Gradual**: Mix typed and untyped parameters in same function
+✅ **Union Types**: Core feature, not future extension
+✅ **Structural Records**: Duck typing with `{field: Type}` syntax (no wrapper)
+✅ **Null Safety**: `T | null` pattern for optional values
 ✅ **Comprehensive**: Covers all value types including tensor shapes
 ✅ **Scientific Focus**: Designed for mathematical computing use cases
 ✅ **Clear Errors**: Helpful type error messages
 ✅ **Future-Proof**: Foundation for generics and advanced features
 
-The type system strikes a balance between:
-- **Flexibility**: Dynamic typing for rapid prototyping
-- **Safety**: Static checking for production code
-- **Expressiveness**: Rich types for scientific computing
+The type system enables:
+- **Quick exploratory analysis** (dynamic, no types)
+- **Hybrid development** (types on critical parameters only)
+- **Production scientific applications** (fully typed for safety)
 
-This makes Achronyme suitable for both:
-- Quick exploratory data analysis (dynamic)
-- Production scientific applications (typed)
+**Philosophy**: "Simplicity by default, specificity when needed" - start dynamic, add types progressively as your code matures.

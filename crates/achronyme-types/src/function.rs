@@ -1,4 +1,5 @@
 use achronyme_parser::ast::AstNode;
+use achronyme_parser::type_annotation::TypeAnnotation;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -30,6 +31,10 @@ pub enum Function {
     /// User-defined lambda with closure
     UserDefined {
         params: Vec<String>,
+        /// Type annotations for parameters (None means no type checking)
+        param_types: Vec<Option<TypeAnnotation>>,
+        /// Return type annotation (None means no type checking)
+        return_type: Option<TypeAnnotation>,
         body: Rc<AstNode>,
         /// Captured environment - using Rc<RefCell> makes this cheap to clone
         /// and allows mutation of mutable captured variables
@@ -50,8 +55,11 @@ impl Function {
         captured_vars: HashMap<String, crate::value::Value>,
     ) -> Self {
         let env = Environment::from_snapshot(captured_vars);
+        let param_count = params.len();
         Function::UserDefined {
             params,
+            param_types: vec![None; param_count],  // No type checking for legacy API
+            return_type: None,
             body: Rc::new(body),
             closure_env: Rc::new(RefCell::new(env)),
         }
@@ -66,8 +74,30 @@ impl Function {
         body: AstNode,
         closure_env: Rc<RefCell<Environment>>,
     ) -> Self {
+        let param_count = params.len();
         Function::UserDefined {
             params,
+            param_types: vec![None; param_count],  // No type checking
+            return_type: None,
+            body: Rc::new(body),
+            closure_env,
+        }
+    }
+
+    /// Create a new user-defined lambda function with type annotations (PREFERRED)
+    ///
+    /// This is the full-featured way to create typed closures.
+    pub fn new_typed(
+        params: Vec<String>,
+        param_types: Vec<Option<TypeAnnotation>>,
+        return_type: Option<TypeAnnotation>,
+        body: AstNode,
+        closure_env: Rc<RefCell<Environment>>,
+    ) -> Self {
+        Function::UserDefined {
+            params,
+            param_types,
+            return_type,
             body: Rc::new(body),
             closure_env,
         }
@@ -104,9 +134,9 @@ impl Function {
 impl PartialEq for Function {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Function::UserDefined { params: p1, body: b1, closure_env: e1 },
-             Function::UserDefined { params: p2, body: b2, closure_env: e2 }) => {
-                p1 == p2 && Rc::ptr_eq(b1, b2) && Rc::ptr_eq(e1, e2)
+            (Function::UserDefined { params: p1, param_types: pt1, return_type: rt1, body: b1, closure_env: e1 },
+             Function::UserDefined { params: p2, param_types: pt2, return_type: rt2, body: b2, closure_env: e2 }) => {
+                p1 == p2 && pt1 == pt2 && rt1 == rt2 && Rc::ptr_eq(b1, b2) && Rc::ptr_eq(e1, e2)
             }
             (Function::Builtin(n1), Function::Builtin(n2)) => n1 == n2,
             _ => false,

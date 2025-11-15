@@ -117,10 +117,93 @@ record_field = {
 }
 
 // ============================================================================
-// Lambda Functions and Do Blocks
+// Type Annotations (Gradual Typing System)
 // ============================================================================
 
-// Lambda parameters: x or (x, y, z) or ()
+// Type annotation: union types or simple types
+type_annotation = {
+    union_type | simple_type_annotation
+}
+
+// Union types (core feature): Number | String | null
+union_type = {
+    simple_type_annotation ~ ("|" ~ simple_type_annotation)+
+}
+
+simple_type_annotation = {
+    simple_type
+  | tensor_type
+  | vector_type
+  | record_type
+  | function_type
+  | any_type
+  | null_type
+}
+
+// Simple types: Number, Boolean, String, Complex
+simple_type = @{
+    ("Number" | "Boolean" | "String" | "Complex") ~ !ASCII_ALPHANUMERIC
+}
+
+// Tensor type: Tensor<Number> or Tensor<Complex, [2,3]>
+tensor_type = {
+    "Tensor" ~ "<" ~ type_annotation ~ ("," ~ shape_spec)? ~ ">"
+}
+
+// Shape specification: [2, 3] or [_, _] for dynamic dimensions
+shape_spec = {
+    "[" ~ (dimension ~ ("," ~ dimension)*)? ~ "]"
+}
+
+// Dimension: number or _ for unknown dimension
+dimension = { number | "_" }
+
+// Vector type
+vector_type = @{ "Vector" ~ !ASCII_ALPHANUMERIC }
+
+// Record type: {field1: Type1, mut field2: Type2}
+// Direct structural syntax (NO Record<...> wrapper)
+record_type = {
+    "{" ~ NEWLINE* ~
+    (record_type_field ~ (NEWLINE* ~ "," ~ NEWLINE* ~ record_type_field)*)? ~
+    NEWLINE* ~ "}"
+}
+
+record_type_field = {
+    (mut_keyword ~ identifier ~ ":" ~ type_annotation)  // mut value: Number
+  | (identifier ~ ":" ~ type_annotation)                // name: String
+}
+
+// Function type: Function<[param types], return type>
+function_type = {
+    "Function" ~ "<" ~
+    "[" ~ (type_annotation ~ ("," ~ type_annotation)*)? ~ "]" ~
+    "," ~ type_annotation ~
+    ">"
+}
+
+// Any type (opt-out of type checking)
+any_type = @{ "Any" ~ !ASCII_ALPHANUMERIC }
+
+// Null type (for optional values)
+null_type = @{ "null" ~ !ASCII_ALPHANUMERIC }
+
+// ============================================================================
+// Lambda Functions and Do Blocks (with Type Annotations)
+// ============================================================================
+
+// Typed parameter: x (untyped) OR x: Type (typed) - gradual typing
+typed_param = {
+    identifier ~ (":" ~ type_annotation)?
+}
+
+// Lambda parameters: single or multiple, with optional types
+typed_lambda_params = {
+    typed_param                                          // Single: x or x: Type
+  | ("(" ~ (typed_param ~ ("," ~ typed_param)*)? ~ ")") // Multi/no params: (x: Number, y) or ()
+}
+
+// Legacy lambda parameters (kept for backward compatibility during migration)
 lambda_params = {
     identifier                                       // Single param: x
   | ("(" ~ (identifier ~ ("," ~ identifier)*)? ~ ")") // Multi param or no params: (x, y) or ()
@@ -151,9 +234,13 @@ lambda_body = {
     do_block | expr
 }
 
-// Lambda: x => x^2 or (x, y) => x + y or x => do { ... }
+// Lambda with type annotations (gradual typing)
+// Syntax: (x: Number, y) => x + y              (partial typing)
+// Syntax: (x: Number, y: Number): Number => x + y  (full typing)
+// Syntax: x => x^2                             (no typing - backward compatible)
+// Syntax: x =>\n    expr                       (multi-line support)
 lambda = {
-    lambda_params ~ "=>" ~ lambda_body
+    typed_lambda_params ~ (":" ~ type_annotation)? ~ "=>" ~ NEWLINE* ~ lambda_body
 }
 
 // ============================================================================
@@ -195,11 +282,15 @@ self_ref = { "self" ~ !ASCII_ALPHANUMERIC }
 // Rec-reference (for recursive function calls) - use word boundary
 rec_ref = { "rec" ~ !ASCII_ALPHANUMERIC }
 
+// Null literal (for optional types) - use word boundary
+null_literal = { "null" ~ !ASCII_ALPHANUMERIC }
+
 // Primary expressions (highest precedence)
 // IMPORTANT: Order matters in PEG! More specific rules must come before general ones
 primary = {
     boolean            // Boolean literals
   | string_literal     // String literals
+  | null_literal       // Null literal (must come before identifier)
   | complex            // Must come before number (3i contains number)
   | number
   | control_flow_expr  // Control flow (if, match, etc.) - before record to avoid ambiguity
@@ -329,17 +420,19 @@ export_statement = {
 }
 
 // ============================================================================
-// Statements
+// Statements (with Type Annotations)
 // ============================================================================
 
-// Let statement: let x = 42
+// Let statement with optional type annotation
+// Syntax: let x: Type = value  OR  let x = value
 let_statement = {
-    "let" ~ identifier ~ "=" ~ expr
+    "let" ~ identifier ~ (":" ~ type_annotation)? ~ "=" ~ expr
 }
 
-// Mut statement: mut x = 42
+// Mut statement with optional type annotation
+// Syntax: mut x: Type = value  OR  mut x = value
 mut_statement = {
-    "mut" ~ identifier ~ "=" ~ expr
+    "mut" ~ identifier ~ (":" ~ type_annotation)? ~ "=" ~ expr
 }
 
 // Assignment: x = 20, obj.field = 30, arr[0] = 40

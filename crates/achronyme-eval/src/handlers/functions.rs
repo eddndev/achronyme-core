@@ -1,14 +1,15 @@
 use achronyme_parser::ast::AstNode;
+use achronyme_parser::type_annotation::TypeAnnotation;
 use achronyme_types::function::Function;
 use achronyme_types::value::Value;
 
 use crate::evaluator::Evaluator;
 use crate::tco;
 
-/// Evaluate a lambda expression
+/// Evaluate a lambda expression with typed parameters
 pub fn evaluate_lambda(
     evaluator: &Evaluator,
-    params: &[String],
+    params: &[(String, Option<TypeAnnotation>)],
     body: &AstNode,
 ) -> Result<Value, String> {
     // MAJOR PERFORMANCE OPTIMIZATION:
@@ -23,8 +24,31 @@ pub fn evaluate_lambda(
     // create a quadratic explosion of memory usage.
     let closure_env = evaluator.environment().to_rc();
 
-    // Create a Function value using the optimized constructor
-    let function = Function::new_with_env(params.to_vec(), body.clone(), closure_env);
+    // Extract parameter names and type annotations
+    let param_names: Vec<String> = params.iter().map(|(name, _)| name.clone()).collect();
+    let param_types: Vec<Option<TypeAnnotation>> = params.iter().map(|(_, ty)| ty.clone()).collect();
+
+    // Create a Function value with type annotations
+    let function = Function::new_typed(param_names, param_types, None, body.clone(), closure_env);
+
+    Ok(Value::Function(function))
+}
+
+/// Evaluate a lambda expression with typed parameters and return type
+pub fn evaluate_lambda_with_return_type(
+    evaluator: &Evaluator,
+    params: &[(String, Option<TypeAnnotation>)],
+    return_type: Option<TypeAnnotation>,
+    body: &AstNode,
+) -> Result<Value, String> {
+    let closure_env = evaluator.environment().to_rc();
+
+    // Extract parameter names and type annotations
+    let param_names: Vec<String> = params.iter().map(|(name, _)| name.clone()).collect();
+    let param_types: Vec<Option<TypeAnnotation>> = params.iter().map(|(_, ty)| ty.clone()).collect();
+
+    // Create a Function value with type annotations including return type
+    let function = Function::new_typed(param_names, param_types, return_type, body.clone(), closure_env);
 
     Ok(Value::Function(function))
 }
@@ -36,7 +60,7 @@ pub fn apply_lambda(
     args: Vec<Value>,
 ) -> Result<Value, String> {
     match function {
-        Function::UserDefined { params, body, closure_env } => {
+        Function::UserDefined { params, param_types, return_type, body, closure_env } => {
             // Check arity
             if args.len() != params.len() {
                 return Err(format!(
@@ -46,17 +70,43 @@ pub fn apply_lambda(
                 ));
             }
 
+            // Type check arguments
+            for (i, (arg, param_type)) in args.iter().zip(param_types.iter()).enumerate() {
+                if let Some(expected_type) = param_type {
+                    crate::type_checker::check_type(arg, expected_type)
+                        .map_err(|_| format!(
+                            "Type error: argument {} (parameter '{}') expected {}, got {}",
+                            i + 1,
+                            params[i],
+                            expected_type.to_string(),
+                            crate::type_checker::infer_type(arg).to_string()
+                        ))?;
+                }
+            }
+
             // TAIL CALL OPTIMIZATION (TCO):
             // Check if this function is tail-recursive
             let is_tail_recursive = tco::is_tail_recursive_function(body);
 
-            if is_tail_recursive {
+            let result = if is_tail_recursive {
                 // Use iterative execution for tail-recursive functions
                 apply_lambda_tco(evaluator, function, args)
             } else {
                 // Use regular recursive execution
-                apply_lambda_regular(evaluator, params, body, closure_env, args)
+                apply_lambda_regular(evaluator, params, param_types, return_type, body, closure_env, args)
+            }?;
+
+            // Type check return value
+            if let Some(expected_return) = return_type {
+                crate::type_checker::check_type(&result, expected_return)
+                    .map_err(|_| format!(
+                        "Type error: function return type expected {}, got {}",
+                        expected_return.to_string(),
+                        crate::type_checker::infer_type(&result).to_string()
+                    ))?;
             }
+
+            Ok(result)
         }
         Function::Builtin(name) => {
             // Built-in functions can be called directly through the registry
@@ -94,6 +144,8 @@ pub fn apply_lambda(
 fn apply_lambda_regular(
     evaluator: &mut Evaluator,
     params: &[String],
+    param_types: &[Option<TypeAnnotation>],
+    return_type: &Option<TypeAnnotation>,
     body: &AstNode,
     closure_env: &std::rc::Rc<std::cell::RefCell<achronyme_types::Environment>>,
     args: Vec<Value>,
@@ -112,7 +164,7 @@ fn apply_lambda_regular(
 
     // Inject the current function as 'rec' for recursive calls
     // We need to reconstruct the function for rec binding
-    let function = Function::new_with_env(params.to_vec(), body.clone(), closure_env.clone());
+    let function = Function::new_typed(params.to_vec(), param_types.to_vec(), return_type.clone(), body.clone(), closure_env.clone());
     evaluator.environment_mut().define("rec".to_string(), Value::Function(function))?;
 
     // If 'self' was available in the calling context, inject it (for record methods)
@@ -152,7 +204,7 @@ fn apply_lambda_tco(
     mut args: Vec<Value>,
 ) -> Result<Value, String> {
     let (params, body, closure_env) = match function {
-        Function::UserDefined { params, body, closure_env } => (params, body, closure_env),
+        Function::UserDefined { params, body, closure_env, .. } => (params, body, closure_env),
         _ => return Err("TCO only applies to user-defined functions".to_string()),
     };
 
