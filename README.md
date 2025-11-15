@@ -2,7 +2,10 @@
 
 **A modern functional programming language for mathematical computing**
 
+[![CI](https://github.com/achronyme/achronyme-core/actions/workflows/ci.yml/badge.svg)](https://github.com/achronyme/achronyme-core/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/achronyme/achronyme-core?include_prereleases)](https://github.com/achronyme/achronyme-core/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
 
 Achronyme is a high-performance functional programming language designed for mathematical computing, data science, and digital signal processing. Built in Rust with a focus on expressiveness and performance, it combines the elegance of functional programming with the power of numerical computation.
 
@@ -66,12 +69,38 @@ let spectrum = fft(signal)
 
 ### Installation
 
-**From source** (Rust required):
+#### Option 1: Download Pre-built Binary (Recommended)
+
+Download the latest release for your platform from [GitHub Releases](https://github.com/achronyme/achronyme-core/releases):
+
+**Linux:**
+```bash
+wget https://github.com/achronyme/achronyme-core/releases/latest/download/achronyme-VERSION-linux-x64.tar.gz
+tar -xzf achronyme-VERSION-linux-x64.tar.gz
+chmod +x achronyme
+./achronyme --version
+```
+
+**macOS:**
+```bash
+curl -LO https://github.com/achronyme/achronyme-core/releases/latest/download/achronyme-VERSION-macos-x64.tar.gz
+tar -xzf achronyme-VERSION-macos-x64.tar.gz
+chmod +x achronyme
+./achronyme --version
+```
+
+**Windows:**
+Download `achronyme-VERSION-windows-x64.zip`, extract, and run `achronyme.exe`.
+
+#### Option 2: Build from Source
+
+Requires Rust 1.70+ and system dependencies (OpenBLAS, LAPACK).
 
 ```bash
 git clone https://github.com/achronyme/achronyme-core.git
 cd achronyme-core
 cargo build --release
+./target/release/achronyme --version
 ```
 
 ### Your First Program
@@ -89,7 +118,30 @@ greet("Achronyme")
 Run it:
 
 ```bash
-cargo run -- hello.soc
+achronyme hello.soc
+# or with the run subcommand
+achronyme run hello.soc
+```
+
+### CLI Usage
+
+```bash
+# Start interactive REPL
+achronyme
+
+# Run a script
+achronyme script.soc
+
+# Evaluate an expression
+achronyme "2 + 3 * 4"
+achronyme --eval "map(x => x^2, [1,2,3,4])"
+
+# Check syntax without running
+achronyme check script.soc
+
+# Show version and help
+achronyme --version
+achronyme --help
 ```
 
 ### REPL
@@ -97,7 +149,9 @@ cargo run -- hello.soc
 Start the interactive REPL:
 
 ```bash
-cargo run --bin repl
+achronyme repl
+# or just
+achronyme
 ```
 
 Try some examples:

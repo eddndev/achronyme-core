@@ -1,7 +1,7 @@
 use achronyme_eval::Evaluator;
+use clap::{Parser, Subcommand};
 use rustyline::error::ReadlineError;
 use rustyline::{Editor, Config};
-use std::env;
 use std::fs;
 
 mod highlighter;
@@ -9,50 +9,112 @@ mod repl_helper;
 
 use repl_helper::ReplHelper;
 
+/// Achronyme - Scientific Computing Language
+#[derive(Parser)]
+#[command(name = "achronyme")]
+#[command(version = env!("CARGO_PKG_VERSION"))]
+#[command(about = "Scientific computing language with gradual typing", long_about = None)]
+#[command(author = "Achronyme Team")]
+struct Cli {
+    /// File to execute (.ach or .soc) or expression to evaluate
+    #[arg(value_name = "INPUT")]
+    input: Option<String>,
+
+    /// Evaluate an expression directly
+    #[arg(short, long, value_name = "EXPR")]
+    eval: Option<String>,
+
+    /// Run in REPL mode (default when no input)
+    #[arg(short, long)]
+    interactive: bool,
+
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Start interactive REPL
+    Repl,
+    /// Run a script file
+    Run {
+        /// Path to the script file
+        file: String,
+    },
+    /// Evaluate an expression
+    Eval {
+        /// Expression to evaluate
+        expression: String,
+    },
+    /// Check syntax without executing
+    Check {
+        /// File to check
+        file: String,
+    },
+}
+
 fn main() {
-    let args: Vec<String> = env::args().collect();
+    let cli = Cli::parse();
 
-    match args.len() {
-        // No arguments: REPL mode
-        1 => run_repl(),
+    // Handle subcommands first
+    if let Some(command) = cli.command {
+        match command {
+            Commands::Repl => run_repl(),
+            Commands::Run { file } => run_file(&file),
+            Commands::Eval { expression } => run_expression(&expression),
+            Commands::Check { file } => check_syntax(&file),
+        }
+        return;
+    }
 
-        // One argument: could be file or expression
-        2 => {
-            let input = &args[1];
+    // Handle --eval flag
+    if let Some(expr) = cli.eval {
+        run_expression(&expr);
+        return;
+    }
 
-            // Check if it's a file (ends with .ach or .soc)
+    // Handle --interactive flag
+    if cli.interactive {
+        run_repl();
+        return;
+    }
+
+    // Handle positional input
+    match cli.input {
+        None => run_repl(),
+        Some(input) => {
             if input.ends_with(".ach") || input.ends_with(".soc") {
-                run_file(input);
+                run_file(&input);
             } else {
-                // Treat as expression
-                run_expression(input);
+                run_expression(&input);
             }
         }
+    }
+}
 
-        // More arguments: error
-        _ => {
-            print_usage(&args[0]);
+fn check_syntax(filename: &str) {
+    let contents = match fs::read_to_string(filename) {
+        Ok(contents) => contents,
+        Err(err) => {
+            eprintln!("Error reading file '{}': {}", filename, err);
+            std::process::exit(1);
+        }
+    };
+
+    match achronyme_parser::parse(&contents) {
+        Ok(_) => {
+            println!("Syntax OK: {}", filename);
+        }
+        Err(err) => {
+            eprintln!("Syntax error in '{}':", filename);
+            eprintln!("{}", err);
             std::process::exit(1);
         }
     }
 }
 
-fn print_usage(program_name: &str) {
-    eprintln!("Achronyme CLI - Scientific Computing Language");
-    eprintln!();
-    eprintln!("Usage:");
-    eprintln!("  {}                    # Start REPL (interactive mode)", program_name);
-    eprintln!("  {} <file.ach>         # Execute a script file", program_name);
-    eprintln!("  {} <expression>       # Evaluate a single expression", program_name);
-    eprintln!();
-    eprintln!("Examples:");
-    eprintln!("  {} script.ach", program_name);
-    eprintln!("  {} \"2 + 2\"", program_name);
-    eprintln!("  {} \"diff(x => x^2, 2, 1e-5)\"", program_name);
-}
-
 fn run_repl() {
-    println!("Achronyme REPL v0.1.0");
+    println!("Achronyme REPL v{}", env!("CARGO_PKG_VERSION"));
     println!("Type 'exit' or 'quit' to exit, 'help' for help, 'clear' to clear screen");
     println!();
 

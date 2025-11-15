@@ -17,9 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [0.6.0] - 2025-11-15
 
-### Major Features in Development
+### Major Features
 
 **Phase 1 Iterators Complete**
 - Generators with `yield` and `generate` blocks
@@ -45,6 +45,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `slice(array, start, end?)` - Extract subarray
 - `unique(array)` - Remove duplicates
 - `chunk(array, size)` - Split into groups
+
+**CI/CD Infrastructure**
+- GitHub Actions CI workflow (tests on Linux, Windows, macOS)
+- GitHub Actions Release workflow (automatic binary builds)
+- Cross-platform releases with checksums
+
+**CLI Enhancements**
+- Command-line argument parsing with clap
+- `--version`, `--help` flags
+- `--eval` for direct expression evaluation
+- Subcommands: `repl`, `run`, `eval`, `check`
+- Syntax checking without execution
 
 **Advanced Type System**
 - Function types with arrow syntax: `(Number, Number) => Number`
@@ -79,6 +91,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Graph algorithms: BFS, DFS, Dijkstra, Kruskal, Prim
 - Critical path analysis
 - Probabilistic PERT calculations
+
+**Test Suite Stabilization**
+- Fixed 27 obsolete tests (TCO, utility functions, type annotations)
+- All 700+ tests passing
+- Codebase refactoring (all files under 500 lines)
 
 **[Full details...](./docs/changelog/v0.6.x.md)**
 
@@ -177,7 +194,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Repository Links
 
-[Unreleased]: https://github.com/eddndev/achronyme-core/compare/v0.5.3...HEAD
+[0.6.0]: https://github.com/eddndev/achronyme-core/compare/v0.5.3...v0.6.0
 [0.5.3]: https://github.com/eddndev/achronyme-core/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/eddndev/achronyme-core/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/eddndev/achronyme-core/compare/v0.5.0...v0.5.1
