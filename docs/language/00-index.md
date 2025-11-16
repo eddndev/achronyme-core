@@ -4,7 +4,7 @@ Welcome to the Achronyme programming language documentation. Achronyme is a func
 
 ## What is Achronyme?
 
-Achronyme (also known as SOC - Second-Order Calculus) is a domain-specific language that combines:
+Achronyme (also known as SOC - Scientific Operations Calculator) is a domain-specific language that combines:
 - **Functional programming** with first-class functions and closures
 - **Mathematical notation** familiar to scientists and engineers
 - **Powerful built-in libraries** for numerical analysis, DSP, linear algebra, and graph theory
@@ -13,7 +13,7 @@ Achronyme (also known as SOC - Second-Order Calculus) is a domain-specific langu
 
 ## File Extension
 
-Achronyme source files use the `.soc` extension (Second-Order Calculus).
+Achronyme source files use the `.soc` extension (Scientific Operations Calculator).
 
 ## Quick Example
 

@@ -92,6 +92,8 @@ chmod +x achronyme
 **Windows:**
 Download `achronyme-VERSION-windows-x64.zip`, extract, and run `achronyme.exe`.
 
+> **Note:** Windows SmartScreen may show a warning for unsigned executables. Click "More info" → "Run anyway" to proceed. This is normal for open-source software without code signing certificates.
+
 #### Option 2: Build from Source
 
 Requires Rust 1.70+ and system dependencies (OpenBLAS, LAPACK).

@@ -232,7 +232,7 @@ solve(f, a, b)
 
 ## File Extension
 
-Achronyme files use the `.soc` extension (Second-Order Calculus).
+Achronyme files use the `.soc` extension (Scientific Operations Calculator).
 
 ## Comments
 
